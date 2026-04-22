@@ -1,3 +1,4 @@
+<?php session_start(); ?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -23,7 +24,7 @@
             </div>
 
             <!-- Formulario de inicio de sesión -->
-            <form action="" method="POST" id="login-form">
+            <form action="../../controllers/AuthController.php?action=login" method="POST" id="login-form">
                 <div class="form-group">
                     <label class="form-label" for="email">Correo electrónico</label>
                     <input class="form-input" type="email" placeholder="medico@hospital.pe" id="email" name="email" required>
@@ -33,14 +34,15 @@
                     <input class="form-input" type="password" placeholder="••••••••" id="password" name="password" required>
                 </div>
 
-                <!-- Simulación de Estado de error (Oculto por defecto mediante Backend o JS) -->
-                <!-- <div class="alert-box alert-danger mb-16" id="login-error">
+                <?php if (isset($_SESSION['login_error'])): ?>
+                <div class="alert-box alert-danger mb-16" id="login-error">
                     <svg width="16" height="16" viewBox="0 0 20 20" fill="none" style="flex-shrink:0;margin-top:1px">
                         <circle cx="10" cy="10" r="9" stroke="#DC2626" stroke-width="1.5"/>
                         <path d="M10 6v5M10 13h.01" stroke="#DC2626" stroke-width="1.5" stroke-linecap="round"/>
                     </svg>
-                    <p id="login-error-msg">Credenciales incorrectas.</p>
-                </div> -->
+                    <p id="login-error-msg"><?= htmlspecialchars($_SESSION['login_error']) ?></p>
+                </div>
+                <?php unset($_SESSION['login_error']); endif; ?>
 
                 <button type="submit" class="btn btn-primary btn-full">Iniciar sesión</button>
 

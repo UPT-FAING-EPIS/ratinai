@@ -1,0 +1,1350 @@
+' ============================================================
+' RETINAI — Diagramas de Actividades con Objetos
+' Nivel de Análisis (Vista, Control, Entidad)
+' Todos los Requerimientos Funcionales RF-01 al RF-15
+' ============================================================
+
+
+' ============================================================
+' RF-01: Registrar Usuario Médico
+' ============================================================
+@startuml RF01_Actividades_RegistrarMedico
+title RF-01: Registrar Usuario Médico
+
+skinparam backgroundColor #FFFFFF
+skinparam ActivityBackgroundColor #FFFFFF
+skinparam ActivityBorderColor #000000
+skinparam ActivityArrowColor #000000
+skinparam ActivityDiamondBackgroundColor #FFFFFF
+skinparam ActivityDiamondBorderColor #000000
+skinparam swimlaneBackgroundColor #FAFAFA
+skinparam roundcorner 5
+
+|Médico Oftalmólogo|
+start
+:Accede al formulario de registro;
+
+|Control: Usuario|
+:Recibe datos del formulario;
+:Valida campos obligatorios y formato de correo;
+
+note right
+  **Objeto: DatosFormulario**
+  - nombre
+  - correo
+  - CMP
+  - especialidad
+  - institución
+end note
+
+if (¿Datos completos y válidos?) then (No)
+  :Genera mensaje de error de validación;
+
+  |Médico Oftalmólogo|
+  :Visualiza campos con error y corrige;
+  stop
+else (Sí)
+  |Control: Usuario|
+  :Verifica unicidad del CMP en el sistema;
+
+  note right
+    **Objeto: ConsultaCMP**
+    - numeroCMP
+  end note
+
+  if (¿CMP ya registrado?) then (Sí)
+    :Genera mensaje "CMP ya registrado";
+
+    |Médico Oftalmólogo|
+    :Visualiza mensaje de duplicado;
+    stop
+  else (No)
+    |Entidad: Usuario|
+    :Crea registro de usuario con estado "Pendiente";
+
+    note right
+      **Objeto: Usuario**
+      - id
+      - nombre
+      - correo
+      - CMP
+      - especialidad
+      - institución
+      - estado = "Pendiente"
+    end note
+
+    |Base de Datos|
+    :Persiste datos del médico;
+    :Retorna confirmación de guardado;
+
+    |Entidad: Usuario|
+    :Retorna confirmación a Control;
+
+    |Control: Usuario|
+    :Confirma solicitud enviada a Vista;
+
+    |Vista: Registro de Usuario|
+    :Muestra "Registro enviado.\nEspere aprobación del administrador";
+
+    |Médico Oftalmólogo|
+    :Visualiza confirmación de registro enviado;
+    stop
+  end if
+end if
+
+@enduml
+
+
+' ============================================================
+' RF-02: Iniciar Sesión
+' ============================================================
+@startuml RF02_Actividades_IniciarSesion
+title RF-02: Iniciar Sesión
+
+skinparam backgroundColor #FFFFFF
+skinparam ActivityBackgroundColor #FFFFFF
+skinparam ActivityBorderColor #000000
+skinparam ActivityArrowColor #000000
+skinparam ActivityDiamondBackgroundColor #FFFFFF
+skinparam ActivityDiamondBorderColor #000000
+skinparam swimlaneBackgroundColor #FAFAFA
+skinparam roundcorner 5
+
+|Médico Oftalmólogo|
+start
+:Ingresa correo y contraseña en formulario;
+
+|Control: Autenticación|
+:Recibe credenciales desde Vista;
+
+note right
+  **Objeto: Credenciales**
+  - correo
+  - contraseña
+end note
+
+|Entidad: Usuario|
+:Consulta usuario por correo en BD;
+
+|Base de Datos|
+:Ejecuta búsqueda de usuario;
+:Retorna datos del usuario o vacío;
+
+|Entidad: Usuario|
+:Retorna resultado a Control;
+
+|Control: Autenticación|
+if (¿Usuario encontrado?) then (No)
+  :Genera mensaje "Credenciales incorrectas";
+
+  |Vista: Inicio de Sesión|
+  :Muestra error al médico;
+
+  |Médico Oftalmólogo|
+  :Visualiza mensaje de error;
+  stop
+else (Sí)
+  :Verifica contraseña ingresada contra hash almacenado;
+
+  if (¿Contraseña correcta?) then (No)
+    :Genera mensaje "Credenciales incorrectas";
+
+    |Vista: Inicio de Sesión|
+    :Muestra error al médico;
+
+    |Médico Oftalmólogo|
+    :Visualiza mensaje de error;
+    stop
+  else (Sí)
+    :Verifica estado de la cuenta;
+
+    if (¿Cuenta activa?) then (No)
+      :Genera mensaje "Cuenta no aprobada aún";
+
+      |Vista: Inicio de Sesión|
+      :Muestra "Su cuenta aún no ha sido aprobada";
+
+      |Médico Oftalmólogo|
+      :Visualiza mensaje de estado de cuenta;
+      stop
+    else (Sí)
+      :Registra inicio de sesión;
+      :Genera token de sesión con expiración 60 min;
+
+      note right
+        **Objeto: SesionToken**
+        - token
+        - usuarioId
+        - expiracion = now + 60 min
+      end note
+
+      |Entidad: Usuario|
+      :Guarda token en BD;
+
+      |Base de Datos|
+      :Persiste token de sesión;
+      :Retorna confirmación;
+
+      |Control: Autenticación|
+      :Autoriza acceso al sistema;
+
+      |Vista: Inicio de Sesión|
+      :Redirige al panel principal;
+
+      |Médico Oftalmólogo|
+      :Accede al panel principal;
+      stop
+    end if
+  end if
+end if
+
+@enduml
+
+
+' ============================================================
+' RF-03: Aprobar o Rechazar Registro de Médico
+' ============================================================
+@startuml RF03_Actividades_AprobarRechazarRegistro
+title RF-03: Aprobar o Rechazar Registro de Médico
+
+skinparam backgroundColor #FFFFFF
+skinparam ActivityBackgroundColor #FFFFFF
+skinparam ActivityBorderColor #000000
+skinparam ActivityArrowColor #000000
+skinparam ActivityDiamondBackgroundColor #FFFFFF
+skinparam ActivityDiamondBorderColor #000000
+skinparam swimlaneBackgroundColor #FAFAFA
+skinparam roundcorner 5
+
+|Admin del Establecimiento|
+start
+:Accede al panel de solicitudes pendientes;
+
+|Control: Usuario|
+:Solicita listado de registros con estado "Pendiente";
+
+|Entidad: Usuario|
+:Consulta usuarios con estado "Pendiente" del establecimiento;
+
+note right
+  **Objeto: FiltroConsulta**
+  - estado = "Pendiente"
+  - establecimientoId
+end note
+
+|Base de Datos|
+:Ejecuta consulta filtrada;
+:Retorna listado de solicitudes;
+
+|Entidad: Usuario|
+:Retorna datos a Control;
+
+|Control: Usuario|
+:Envía listado a Vista;
+
+|Vista: Panel de Solicitudes|
+:Presenta listado con datos del médico y CMP;
+
+|Admin del Establecimiento|
+:Revisa datos del médico (nombre, CMP, especialidad);
+:Selecciona solicitud y elige Aprobar o Rechazar;
+
+note right
+  **Objeto: DecisionAdmin**
+  - usuarioId
+  - decision = "Aprobar" | "Rechazar"
+end note
+
+|Control: Usuario|
+:Recibe decisión del Admin;
+
+if (¿Decisión tomada?) then (Aprobar)
+  |Entidad: Usuario|
+  :Actualiza estado del usuario a "Activo";
+
+  note right
+    **Objeto: Usuario**
+    - id
+    - estado = "Activo"
+  end note
+
+  |Base de Datos|
+  :Persiste cambio de estado;
+  :Retorna confirmación;
+
+  |Control: Usuario|
+  :Confirma aprobación;
+
+  |Vista: Panel de Solicitudes|
+  :Muestra "Médico aprobado exitosamente";
+
+  |Admin del Establecimiento|
+  :Visualiza confirmación de aprobación;
+  stop
+
+else (Rechazar)
+  |Entidad: Usuario|
+  :Actualiza estado del usuario a "Rechazado";
+
+  note right
+    **Objeto: Usuario**
+    - id
+    - estado = "Rechazado"
+  end note
+
+  |Base de Datos|
+  :Persiste cambio de estado;
+  :Retorna confirmación;
+
+  |Control: Usuario|
+  :Confirma rechazo;
+
+  |Vista: Panel de Solicitudes|
+  :Muestra "Solicitud rechazada";
+
+  |Admin del Establecimiento|
+  :Visualiza confirmación de rechazo;
+  stop
+
+end if
+
+@enduml
+
+
+' ============================================================
+' RF-04: Gestionar Médicos Activos del Establecimiento
+' ============================================================
+@startuml RF04_Actividades_GestionarMedicosActivos
+title RF-04: Gestionar Médicos Activos del Establecimiento
+
+skinparam backgroundColor #FFFFFF
+skinparam ActivityBackgroundColor #FFFFFF
+skinparam ActivityBorderColor #000000
+skinparam ActivityArrowColor #000000
+skinparam ActivityDiamondBackgroundColor #FFFFFF
+skinparam ActivityDiamondBorderColor #000000
+skinparam swimlaneBackgroundColor #FAFAFA
+skinparam roundcorner 5
+
+|Admin del Establecimiento|
+start
+:Accede al panel de gestión de usuarios;
+
+|Control: Usuario|
+:Solicita listado de médicos activos del establecimiento;
+
+|Entidad: Usuario|
+:Consulta médicos con estado "Activo" del establecimiento;
+
+note right
+  **Objeto: FiltroConsulta**
+  - estado = "Activo"
+  - establecimientoId
+end note
+
+|Base de Datos|
+:Ejecuta consulta;
+:Retorna listado de médicos activos;
+
+|Entidad: Usuario|
+:Retorna datos a Control;
+
+|Control: Usuario|
+:Envía listado a Vista;
+
+|Vista: Panel de Usuarios|
+:Presenta médicos activos con nombre, CMP e institución;
+
+|Admin del Establecimiento|
+:Revisa listado de médicos activos;
+
+if (¿Desea desactivar a un médico?) then (Sí)
+  :Selecciona médico y elige "Desactivar acceso";
+
+  note right
+    **Objeto: SolicitudDesactivacion**
+    - usuarioId
+    - adminId
+  end note
+
+  |Control: Usuario|
+  :Recibe solicitud de desactivación;
+
+  |Entidad: Usuario|
+  :Actualiza estado del médico a "Desactivado";
+
+  note right
+    **Objeto: Usuario**
+    - id
+    - estado = "Desactivado"
+  end note
+
+  |Base de Datos|
+  :Persiste cambio de estado;
+  :Retorna confirmación;
+
+  |Entidad: Usuario|
+  :Retorna confirmación a Control;
+
+  |Control: Usuario|
+  :Confirma desactivación a Vista;
+
+  |Vista: Panel de Usuarios|
+  :Muestra "Acceso del médico desactivado exitosamente";
+
+  |Admin del Establecimiento|
+  :Visualiza confirmación de desactivación;
+  stop
+
+else (No)
+  |Admin del Establecimiento|
+  :Cierra el panel sin cambios;
+  stop
+end if
+
+@enduml
+
+
+' ============================================================
+' RF-05: Habilitar Establecimiento
+' ============================================================
+@startuml RF05_Actividades_HabilitarEstablecimiento
+title RF-05: Habilitar Establecimiento
+
+skinparam backgroundColor #FFFFFF
+skinparam ActivityBackgroundColor #FFFFFF
+skinparam ActivityBorderColor #000000
+skinparam ActivityArrowColor #000000
+skinparam ActivityDiamondBackgroundColor #FFFFFF
+skinparam ActivityDiamondBorderColor #000000
+skinparam swimlaneBackgroundColor #FAFAFA
+skinparam roundcorner 5
+
+|Super Admin|
+start
+:Accede al panel de gestión de establecimientos;
+:Completa formulario: nombre, dirección, tipo;
+
+note right
+  **Objeto: DatosEstablecimiento**
+  - nombre
+  - dirección
+  - tipo
+  - adminNombre
+  - adminCorreo
+end note
+
+|Control: Establecimiento|
+:Recibe datos del formulario;
+:Valida campos obligatorios;
+
+if (¿Datos completos y válidos?) then (No)
+  :Genera mensaje de error de validación;
+
+  |Vista: Gestión de Establecimientos|
+  :Muestra campos con error;
+
+  |Super Admin|
+  :Corrige datos del formulario;
+  stop
+
+else (Sí)
+  |Entidad: Establecimiento|
+  :Crea registro del nuevo establecimiento;
+
+  note right
+    **Objeto: Establecimiento**
+    - id (generado)
+    - nombre
+    - dirección
+    - tipo
+    - estado = "Activo"
+  end note
+
+  |Base de Datos|
+  :Persiste datos del establecimiento;
+  :Retorna ID generado del establecimiento;
+
+  |Entidad: Establecimiento|
+  :Retorna ID a Control;
+
+  |Control: Establecimiento|
+  :Inicia creación de cuenta Admin asociada;
+
+  |Entidad: Usuario|
+  :Crea cuenta de Admin vinculada al establecimiento;
+
+  note right
+    **Objeto: UsuarioAdmin**
+    - id (generado)
+    - establecimientoId
+    - rol = "Admin"
+    - estado = "Activo"
+  end note
+
+  |Base de Datos|
+  :Persiste datos del Admin;
+  :Retorna confirmación;
+
+  |Entidad: Usuario|
+  :Retorna confirmación a Control;
+
+  |Control: Establecimiento|
+  :Confirma registro exitoso;
+
+  |Vista: Gestión de Establecimientos|
+  :Muestra "Establecimiento registrado y Admin asignado correctamente";
+
+  |Super Admin|
+  :Visualiza confirmación del registro;
+  stop
+end if
+
+@enduml
+
+
+' ============================================================
+' RF-06: Cargar y Procesar Imagen Retinal
+' ============================================================
+@startuml RF06_Actividades_CargarProcesarImagen
+title RF-06: Cargar y Procesar Imagen Retinal
+
+skinparam backgroundColor #FFFFFF
+skinparam ActivityBackgroundColor #FFFFFF
+skinparam ActivityBorderColor #000000
+skinparam ActivityArrowColor #000000
+skinparam ActivityDiamondBackgroundColor #FFFFFF
+skinparam ActivityDiamondBorderColor #000000
+skinparam swimlaneBackgroundColor #FAFAFA
+skinparam roundcorner 5
+
+|Médico Oftalmólogo|
+start
+:Selecciona retinografía en formato JPG o PNG;
+
+note right
+  **Objeto: ImagenCargada**
+  - archivo (binario)
+  - formato
+  - tamaño
+  - nombre
+end note
+
+|Control: Análisis|
+:Recibe imagen desde Vista;
+:Valida formato JPG/PNG y tamaño;
+
+if (¿Formato y tamaño válidos?) then (No)
+  :Genera mensaje "Solo se aceptan imágenes JPG o PNG";
+
+  |Vista: Análisis Retinal|
+  :Muestra error de formato al médico;
+
+  |Médico Oftalmólogo|
+  :Visualiza mensaje de error y selecciona otra imagen;
+  stop
+
+else (Sí)
+  :Aplica preprocesamiento:\n- Redimensionamiento 224x224\n- Normalización\n- Ajuste brillo y contraste;
+
+  note right
+    **Objeto: ImagenPreprocesada**
+    - pixeles[224][224]
+    - normalizada = true
+    - brilloAjustado = true
+  end note
+
+  :Ejecuta inferencia con modelo CNN (TF Lite);
+
+  note right
+    **Objeto: ModeloCNN**
+    - tipo = "TF Lite"
+    - entrada = ImagenPreprocesada
+  end note
+
+  if (¿Tiempo de respuesta > 5 segundos?) then (Sí)
+    :Genera mensaje de tiempo excedido;
+
+    |Vista: Análisis Retinal|
+    :Muestra "El sistema tardó más de lo esperado.\nIntente nuevamente";
+
+    |Médico Oftalmólogo|
+    :Visualiza mensaje de error de tiempo;
+    stop
+
+  else (No)
+    |Entidad: Análisis|
+    :Crea registro del análisis con imagen y resultados CNN;
+
+    note right
+      **Objeto: Análisis**
+      - id (generado)
+      - medicoId
+      - imagenRuta
+      - probabilidades[4]
+      - resultadoPrincipal
+      - fechaHora
+    end note
+
+    |Base de Datos|
+    :Persiste datos del análisis;
+    :Retorna ID del análisis generado;
+
+    |Control: Análisis|
+    :Envía resultado principal y porcentajes a Vista;
+
+    |Vista: Análisis Retinal|
+    :Muestra resultado principal y porcentajes\nde las cuatro categorías;
+
+    |Médico Oftalmólogo|
+    :Visualiza resultado del análisis CNN;
+    stop
+  end if
+end if
+
+@enduml
+
+
+' ============================================================
+' RF-07: Validar Imagen Cargada
+' ============================================================
+@startuml RF07_Actividades_ValidarImagen
+title RF-07: Validar Imagen Cargada
+
+skinparam backgroundColor #FFFFFF
+skinparam ActivityBackgroundColor #FFFFFF
+skinparam ActivityBorderColor #000000
+skinparam ActivityArrowColor #000000
+skinparam ActivityDiamondBackgroundColor #FFFFFF
+skinparam ActivityDiamondBorderColor #000000
+skinparam swimlaneBackgroundColor #FAFAFA
+skinparam roundcorner 5
+
+|Médico Oftalmólogo|
+start
+:Selecciona imagen y confirma carga;
+
+note right
+  **Objeto: ImagenCandidato**
+  - archivo (binario)
+  - formato
+  - tamañoMB
+  - resolución
+end note
+
+|Control: Validación de Imagen|
+:Recibe imagen para validación;
+:Verifica formato JPG/PNG;
+
+if (¿Formato válido?) then (No)
+  :Genera mensaje "Formato no válido";
+
+  |Vista: Análisis Retinal|
+  :Muestra "Formato no válido. Use JPG o PNG";
+
+  |Médico Oftalmólogo|
+  :Visualiza error de formato;
+  stop
+
+else (Sí)
+  :Verifica tamaño máximo 10 MB;
+
+  if (¿Tamaño <= 10 MB?) then (No)
+    :Genera mensaje "Archivo supera tamaño máximo";
+
+    |Vista: Análisis Retinal|
+    :Muestra "El archivo supera el\ntamaño máximo permitido de 10 MB";
+
+    |Médico Oftalmólogo|
+    :Visualiza error de tamaño;
+    stop
+
+  else (Sí)
+    :Evalúa calidad técnica de la imagen;
+
+    note right
+      **Objeto: ResultadoCalidad**
+      - nivelCalidad = "Alta"|"Baja"
+      - indicadores[]
+    end note
+
+    if (¿Calidad aceptable?) then (No - Baja calidad)
+      :Genera advertencia de baja calidad;
+
+      |Vista: Análisis Retinal|
+      :Muestra advertencia "Imagen de baja calidad.\nEl resultado puede no ser óptimo"\ny habilita botón Continuar;
+
+      |Médico Oftalmólogo|
+      :Visualiza advertencia de calidad;
+      :Decide si continuar con el análisis;
+
+      if (¿Confirma continuar?) then (Sí)
+        |Control: Validación de Imagen|
+        :Autoriza procesamiento con advertencia registrada;
+      else (No)
+        stop
+      end if
+
+    else (Sí - Calidad aceptable)
+      :Imagen aprobada sin advertencias;
+    end if
+
+    |Entidad: Análisis|
+    :Registra imagen validada para análisis;
+
+    note right
+      **Objeto: ImagenValidada**
+      - imagenId (generado)
+      - rutaAlmacenamiento
+      - validada = true
+      - advertenciaCalidad = true|false
+    end note
+
+    |Base de Datos|
+    :Guarda referencia de imagen;
+    :Retorna confirmación;
+
+    |Control: Validación de Imagen|
+    :Habilita procesamiento CNN;
+
+    |Vista: Análisis Retinal|
+    :Muestra "Imagen lista para analizar";
+
+    |Médico Oftalmólogo|
+    :Visualiza confirmación y procede al análisis;
+    stop
+  end if
+end if
+
+@enduml
+
+
+' ============================================================
+' RF-08: Solicitar Registro de Centro Oftalmológico
+' ============================================================
+@startuml RF08_Secuencia_RegistroCentroOftalmologico
+title RF-08: Solicitar Registro de Centro Oftalmológico
+
+skinparam backgroundColor #FFFFFF
+skinparam sequenceArrowThickness 1.5
+skinparam roundcorner 5
+skinparam ParticipantBackgroundColor #FFFFFF
+skinparam ParticipantBorderColor #000000
+skinparam ArrowColor #000000
+skinparam SequenceLifeLineBorderColor #888888
+
+actor "Dueño del Centro\nOftalmológico" as DUENO
+
+boundary "Vista:\nFormulario de\nRegistro" as V
+control "Control:\nValidación de\nSolicitud" as C
+entity "Entidad:\nEstablecimiento" as E
+database "Base de Datos" as BD
+
+== Acceso al formulario ==
+
+DUENO -> V : Selecciona "Registrar\nmi centro oftalmológico"
+V --> DUENO : Muestra formulario con campos:\nnombre, dirección, tipo y RUC
+
+== Llenado y envío ==
+
+DUENO -> V : Completa todos los campos\ndel formulario
+DUENO -> V : Hace clic en\n"Enviar solicitud"
+V -> C : Envía datos\ndel formulario
+
+== Validación de datos ==
+
+C -> C : Verifica que todos los\ncampos estén completos
+
+alt Campos incompletos
+    C --> V : Error: campos faltantes
+    V --> DUENO : Resalta campos sin completar\ny muestra mensaje de error
+else Todos los campos completos
+    C -> C : Verifica el formato\ndel RUC (11 dígitos)
+    alt RUC inválido
+        C --> V : Error: formato de RUC incorrecto
+        V --> DUENO : "El RUC ingresado no\nes válido"
+    else RUC con formato válido
+        C -> BD : Consulta si el RUC\nya existe en el sistema
+        BD --> C : Resultado de búsqueda
+        alt RUC ya registrado
+            C --> V : Error: RUC duplicado
+            V --> DUENO : "Ya existe un centro\nregistrado con este RUC"
+        else RUC disponible
+        end
+    end
+end
+
+== Registro de la solicitud ==
+
+C -> E : Solicita crear\nnuevo establecimiento\ncon estado "Pendiente"
+E -> BD : INSERT en tabla Establecimiento\n(nombre, dirección, tipo, RUC,\nestado = Pendiente)
+BD --> E : Confirmación de guardado
+E --> C : Solicitud registrada\nexitosamente
+C --> V : Confirmación de éxito
+V --> DUENO : "Su solicitud ha sido enviada.\nEl administrador revisará\nsu información y le\nnotificará el resultado."
+
+@enduml
+
+
+' ============================================================
+' RF-09: Mostrar Resultado con Probabilidades
+' ============================================================
+@startuml RF09_Actividades_MostrarResultado
+title RF-09: Mostrar Resultado con Probabilidades
+
+skinparam backgroundColor #FFFFFF
+skinparam ActivityBackgroundColor #FFFFFF
+skinparam ActivityBorderColor #000000
+skinparam ActivityArrowColor #000000
+skinparam ActivityDiamondBackgroundColor #FFFFFF
+skinparam ActivityDiamondBorderColor #000000
+skinparam swimlaneBackgroundColor #FAFAFA
+skinparam roundcorner 5
+
+|Control: Análisis|
+start
+:Obtiene vector de probabilidades\ndel modelo CNN;
+
+note right
+  **Objeto: VectorProbabilidades**
+  - normal: float [0-1]
+  - retinopatíaDiabética: float [0-1]
+  - glaucoma: float [0-1]
+  - catarata: float [0-1]
+end note
+
+:Identifica clase de mayor probabilidad\ncomo resultado principal;
+
+note right
+  **Objeto: ResultadoPrincipal**
+  - clase = clase con max probabilidad
+  - probabilidad = valor máximo
+end note
+
+|Entidad: Análisis|
+:Guarda resultado con probabilidades por clase;
+
+note right
+  **Objeto: Análisis**
+  - id
+  - vectorProbabilidades
+  - resultadoPrincipal
+  - fechaHora
+  - medicoId
+end note
+
+|Base de Datos|
+:Persiste resultado del análisis;
+:Retorna confirmación con ID de análisis;
+
+|Entidad: Análisis|
+:Retorna datos del análisis guardado a Control;
+
+|Control: Análisis|
+:Prepara datos para presentación en Vista;
+
+|Vista: Resultado de Análisis|
+:Presenta resultado principal destacado;
+:Muestra indicadores visuales con porcentajes\nde las cuatro categorías;
+:Muestra advertencia de uso clínico referencial;
+
+|Médico Oftalmólogo|
+:Visualiza resultado del análisis CNN\ncon probabilidades por categoría;
+stop
+
+@enduml
+
+
+' ============================================================
+' RF-10: Activar Alerta Visual ante Anomalía
+' ============================================================
+@startuml RF10_Actividades_AlertaVisual
+title RF-10: Activar Alerta Visual ante Anomalía
+
+skinparam backgroundColor #FFFFFF
+skinparam ActivityBackgroundColor #FFFFFF
+skinparam ActivityBorderColor #000000
+skinparam ActivityArrowColor #000000
+skinparam ActivityDiamondBackgroundColor #FFFFFF
+skinparam ActivityDiamondBorderColor #000000
+skinparam swimlaneBackgroundColor #FAFAFA
+skinparam roundcorner 5
+
+|Control: Alertas|
+start
+:Recibe probabilidades por clase del modelo CNN;
+
+note right
+  **Objeto: VectorProbabilidades**
+  - normal: float [0-1]
+  - retinopatíaDiabética: float [0-1]
+  - glaucoma: float [0-1]
+  - catarata: float [0-1]
+end note
+
+:Recupera umbral configurado del sistema;
+
+note right
+  **Objeto: ConfiguraciónUmbral**
+  - umbralAnomalia: float (valor configurado)
+end note
+
+:Compara probabilidad máxima de anomalía\ncontra umbral configurado;
+
+if (¿Probabilidad de anomalía >= umbral?) then (Sí)
+  |Entidad: Análisis|
+  :Registra alerta activada en el análisis;
+
+  note right
+    **Objeto: Análisis**
+    - id
+    - alertaActivada = true
+    - claseAnomalia = clase detectada
+  end note
+
+  |Base de Datos|
+  :Guarda estado de alerta en el análisis;
+  :Retorna confirmación;
+
+  |Entidad: Análisis|
+  :Retorna confirmación a Control;
+
+  |Control: Alertas|
+  :Envía señal de alerta con clase detectada a Vista;
+
+  |Vista: Resultado de Análisis|
+  :Activa indicador visual prominente:\n- Color rojo\n- Ícono de alerta\n- Clase de anomalía destacada;
+
+  |Médico Oftalmólogo|
+  :Visualiza alerta de anomalía detectada;
+  stop
+
+else (No — probabilidad < umbral)
+  |Control: Alertas|
+  :Envía resultado sin alerta a Vista;
+
+  |Vista: Resultado de Análisis|
+  :Muestra resultado en estado normal\nsin indicador de alerta;
+
+  |Médico Oftalmólogo|
+  :Visualiza resultado sin alerta;
+  stop
+end if
+
+@enduml
+
+
+' ============================================================
+' RF-11: Generar Reporte PDF Descargable
+' ============================================================
+@startuml RF11_Actividades_GenerarReportePDF
+title RF-11: Generar Reporte PDF Descargable
+
+skinparam backgroundColor #FFFFFF
+skinparam ActivityBackgroundColor #FFFFFF
+skinparam ActivityBorderColor #000000
+skinparam ActivityArrowColor #000000
+skinparam ActivityDiamondBackgroundColor #FFFFFF
+skinparam ActivityDiamondBorderColor #000000
+skinparam swimlaneBackgroundColor #FAFAFA
+skinparam roundcorner 5
+
+|Médico Oftalmólogo|
+start
+:Solicita descarga del reporte PDF\ndesde la pantalla de resultados;
+
+note right
+  **Objeto: SolicitudReporte**
+  - análisisId
+  - medicoId
+end note
+
+|Control: Reporte|
+:Recibe solicitud con ID del análisis;
+
+|Entidad: Reporte|
+:Recupera datos completos del análisis;
+
+|Base de Datos|
+:Consulta análisis por ID;
+:Retorna datos: nombre médico, fecha, hora,\nimagen, probabilidades y resultado;
+
+|Entidad: Reporte|
+:Retorna datos completos del análisis a Control;
+
+note right
+  **Objeto: DatosAnálisis**
+  - nombreMedico
+  - fechaHora
+  - imagenRuta (miniatura)
+  - probabilidades[4]
+  - resultadoPrincipal
+  - advertenciaLegal
+end note
+
+|Control: Reporte|
+:Compone estructura del reporte PDF:\n- Nombre del médico\n- Fecha y hora del análisis\n- Miniatura de retinografía\n- Porcentajes por clase\n- Resultado destacado\n- Advertencia legal de uso clínico;
+
+note right
+  **Objeto: EstructuraReporte**
+  - secciones[]
+  - estilos
+  - advertenciaLegal = true
+end note
+
+|Entidad: Reporte|
+:Registra generación del reporte en BD;
+
+|Base de Datos|
+:Guarda referencia del reporte generado;
+:Retorna confirmación;
+
+|Entidad: Reporte|
+:Retorna confirmación a Control;
+
+|Control: Reporte|
+:Genera archivo PDF final;
+
+note right
+  **Objeto: ArchivoPDF**
+  - nombre = "Reporte_RetinAI_[fecha].pdf"
+  - tamaño
+  - contenido (binario)
+end note
+
+|Vista: Resultado de Análisis|
+:Inicia descarga automática del reporte PDF;
+
+|Médico Oftalmólogo|
+:Descarga y recibe el reporte PDF;
+stop
+
+@enduml
+
+
+' ============================================================
+' RF-12: Gestionar Historial por Paciente
+' ============================================================
+@startuml RF12_Actividades_GestionarHistorial
+title RF-12: Gestionar Historial por Paciente
+
+skinparam backgroundColor #FFFFFF
+skinparam ActivityBackgroundColor #FFFFFF
+skinparam ActivityBorderColor #000000
+skinparam ActivityArrowColor #000000
+skinparam ActivityDiamondBackgroundColor #FFFFFF
+skinparam ActivityDiamondBorderColor #000000
+skinparam swimlaneBackgroundColor #FAFAFA
+skinparam roundcorner 5
+
+|Médico Oftalmólogo|
+start
+:Ingresa DNI del paciente\nantes de confirmar análisis;
+
+note right
+  **Objeto: DNIPaciente**
+  - dni (8 dígitos)
+end note
+
+|Control: Historial|
+:Recibe DNI del paciente desde Vista;
+
+|Entidad: Paciente|
+:Verifica si el paciente ya tiene\ncódigo de historial asignado;
+
+|Base de Datos|
+:Consulta paciente por DNI;
+:Retorna resultado;
+
+|Entidad: Paciente|
+:Retorna resultado a Control;
+
+if (¿Paciente existe en el sistema?) then (No — paciente nuevo)
+  |Entidad: Paciente|
+  :Genera código único de historial automáticamente;
+
+  note right
+    **Objeto: Paciente**
+    - id (generado)
+    - dni
+    - codigoHistorial (UUID generado)
+    - fechaRegistro = hoy
+  end note
+
+  |Base de Datos|
+  :Guarda paciente con código generado;
+  :Retorna confirmación;
+
+  |Control: Historial|
+  :Envía código generado a Vista;
+
+  |Vista: Análisis Retinal|
+  :Muestra "Código de historial\nasignado al paciente: [CÓDIGO]";
+
+  |Médico Oftalmólogo|
+  :Anota el código de historial asignado;
+
+else (Sí — paciente existente)
+  |Control: Historial|
+  :Confirma paciente identificado a Vista;
+
+  |Vista: Análisis Retinal|
+  :Muestra "Paciente identificado correctamente";
+
+  |Médico Oftalmólogo|
+  :Confirma identidad del paciente;
+end if
+
+:Solicita ver historial ingresando\ncódigo de historial;
+
+note right
+  **Objeto: ConsultaHistorial**
+  - codigoHistorial
+  - medicoId
+end note
+
+|Control: Historial|
+:Recibe solicitud de historial;
+
+|Entidad: Análisis|
+:Consulta análisis asociados al código de historial;
+
+|Base de Datos|
+:Ejecuta consulta ordenada por fecha descendente;
+:Retorna listado de análisis del paciente;
+
+|Entidad: Análisis|
+:Retorna historial a Control;
+
+note right
+  **Objeto: HistorialPaciente**
+  - codigoHistorial
+  - análisis[] (ordenados por fecha)
+    - id
+    - fechaHora
+    - resultadoPrincipal
+end note
+
+|Control: Historial|
+:Envía historial completo a Vista;
+
+|Vista: Análisis Retinal|
+:Presenta análisis ordenados cronológicamente\ncon fecha, resultado y opción ver detalle;
+
+|Médico Oftalmólogo|
+:Visualiza historial completo del paciente;
+stop
+
+@enduml
+
+
+' ============================================================
+' RF-13: Recuperar Código de Historial por DNI
+' ============================================================
+@startuml RF13_Actividades_RecuperarCodigoHistorial
+title RF-13: Recuperar Código de Historial por DNI
+
+skinparam backgroundColor #FFFFFF
+skinparam ActivityBackgroundColor #FFFFFF
+skinparam ActivityBorderColor #000000
+skinparam ActivityArrowColor #000000
+skinparam ActivityDiamondBackgroundColor #FFFFFF
+skinparam ActivityDiamondBorderColor #000000
+skinparam swimlaneBackgroundColor #FAFAFA
+skinparam roundcorner 5
+
+|Médico Oftalmólogo|
+start
+:Accede a la opción\n"Recuperar código de historial";
+:Ingresa DNI del paciente;
+
+note right
+  **Objeto: DNIBusqueda**
+  - dni (ingresado)
+end note
+
+|Control: Historial|
+:Recibe DNI para búsqueda;
+:Valida formato del DNI ingresado;
+
+if (¿Formato DNI válido — 8 dígitos?) then (No)
+  :Genera mensaje "Ingrese un DNI válido de 8 dígitos";
+
+  |Vista: Recuperación de Código|
+  :Muestra error de formato;
+
+  |Médico Oftalmólogo|
+  :Visualiza error y corrige DNI;
+  stop
+
+else (Sí)
+  |Entidad: Paciente|
+  :Busca paciente por DNI en BD;
+
+  |Base de Datos|
+  :Ejecuta consulta por DNI;
+  :Retorna resultado;
+
+  |Entidad: Paciente|
+  :Retorna resultado a Control;
+
+  if (¿Paciente encontrado?) then (No)
+    |Control: Historial|
+    :Genera mensaje "Paciente no encontrado";
+
+    |Vista: Recuperación de Código|
+    :Muestra "No se encontró ningún\npaciente con ese número de DNI";
+
+    |Médico Oftalmólogo|
+    :Visualiza mensaje de no encontrado;
+    stop
+
+  else (Sí)
+    note right
+      **Objeto: Paciente**
+      - dni
+      - codigoHistorial
+      - nombreAnónimo (sin datos sensibles)
+    end note
+
+    |Control: Historial|
+    :Envía código recuperado a Vista;
+
+    |Vista: Recuperación de Código|
+    :Muestra "El código de historial\nde este paciente es: [CÓDIGO]";
+
+    |Médico Oftalmólogo|
+    :Visualiza y anota el código de historial recuperado;
+    stop
+  end if
+end if
+
+@enduml
+
+
+' ============================================================
+' RF-14: Mostrar Panel Informativo del Modelo
+' ============================================================
+@startuml RF14_Actividades_PanelInformativoModelo
+title RF-14: Mostrar Panel Informativo del Modelo
+
+skinparam backgroundColor #FFFFFF
+skinparam ActivityBackgroundColor #FFFFFF
+skinparam ActivityBorderColor #000000
+skinparam ActivityArrowColor #000000
+skinparam ActivityDiamondBackgroundColor #FFFFFF
+skinparam ActivityDiamondBorderColor #000000
+skinparam swimlaneBackgroundColor #FAFAFA
+skinparam roundcorner 5
+
+|Médico Oftalmólogo|
+start
+:Accede a la sección\n"Información del modelo";
+
+|Control: Información del Modelo|
+:Solicita datos y métricas del modelo CNN;
+
+|Entidad: Configuración del Modelo|
+:Consulta parámetros y métricas del modelo;
+
+|Base de Datos|
+:Recupera parámetros configurados:\n- accuracy\n- sensibilidad\n- especificidad\n- dataset de entrenamiento\n- limitaciones conocidas;
+:Retorna datos del modelo;
+
+|Entidad: Configuración del Modelo|
+:Retorna métricas a Control;
+
+note right
+  **Objeto: MetricasModelo**
+  - accuracy: float
+  - sensibilidad: float
+  - especificidad: float
+  - dataset = "ODIR-5K"
+  - limitaciones[]
+  - advertenciaUso
+end note
+
+|Control: Información del Modelo|
+:Prepara información completa para presentación;
+
+|Vista: Panel Informativo del Modelo|
+:Presenta panel con:\n- Precisión (accuracy)\n- Sensibilidad\n- Especificidad\n- Dataset: ODIR-5K\n- Limitaciones conocidas\n- Advertencia de uso en contexto clínico;
+
+|Médico Oftalmólogo|
+:Visualiza métricas y limitaciones del modelo CNN\nantes de interpretar resultados;
+stop
+
+@enduml
+
+
+' ============================================================
+' RF-15: Mostrar Advertencia de Uso Clínico
+' ============================================================
+@startuml RF15_Actividades_AdvertenciaUsoClinico
+title RF-15: Mostrar Advertencia de Uso Clínico
+
+skinparam backgroundColor #FFFFFF
+skinparam ActivityBackgroundColor #FFFFFF
+skinparam ActivityBorderColor #000000
+skinparam ActivityArrowColor #000000
+skinparam ActivityDiamondBackgroundColor #FFFFFF
+skinparam ActivityDiamondBorderColor #000000
+skinparam swimlaneBackgroundColor #FAFAFA
+skinparam roundcorner 5
+
+|Médico Oftalmólogo|
+start
+:Accede a la pantalla de resultados\ndel análisis;
+
+|Control: Advertencias|
+:Solicita configuración de advertencias\ndel sistema;
+
+|Entidad: Configuración del Sistema|
+:Consulta texto de advertencia activo\nconfigurando en BD;
+
+|Base de Datos|
+:Recupera leyenda configurada\npara advertencia clínica;
+:Retorna texto de advertencia;
+
+|Entidad: Configuración del Sistema|
+:Retorna advertencia a Control;
+
+note right
+  **Objeto: AdvertenciaClinica**
+  - texto = "Este resultado es de carácter
+    referencial. No reemplaza el
+    diagnóstico médico definitivo."
+  - activa = true
+  - incluyeEnPDF = true
+end note
+
+|Control: Advertencias|
+:Envía advertencia a Vista para mostrar;
+
+|Vista: Resultado de Análisis|
+:Despliega advertencia de forma permanente\ny visible en la pantalla de resultados;
+
+note right
+  La advertencia también se incluye
+  automáticamente en todos los
+  reportes PDF generados (RF-11)
+end note
+
+|Médico Oftalmólogo|
+:Visualiza advertencia permanente\n"Este resultado es de carácter referencial.\nNo reemplaza el diagnóstico médico definitivo.";
+
+if (¿Médico solicita descarga de reporte PDF?) then (Sí)
+  |Control: Advertencias|
+  :Confirma inclusión de advertencia en PDF\nal módulo de Reporte (RF-11);
+
+  |Médico Oftalmólogo|
+  :Recibe reporte PDF con advertencia incluida;
+  stop
+
+else (No)
+  |Médico Oftalmólogo|
+  :Continúa revisando resultado en pantalla\ncon advertencia siempre visible;
+  stop
+end if
+
+@enduml

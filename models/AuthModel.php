@@ -15,9 +15,16 @@ class AuthModel {
         $stmt->execute();
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
-    
+
     public function updateLastAccess($id) {
         $stmt = $this->db->prepare("UPDATE usuarios SET ultimo_acceso = NOW() WHERE id = :id");
+        $stmt->bindParam(':id', $id);
+        $stmt->execute();
+    }
+
+    public function updatePassword($id, $hashedPassword) {
+        $stmt = $this->db->prepare("UPDATE usuarios SET password = :password, es_password_temporal = 0 WHERE id = :id");
+        $stmt->bindParam(':password', $hashedPassword);
         $stmt->bindParam(':id', $id);
         $stmt->execute();
     }

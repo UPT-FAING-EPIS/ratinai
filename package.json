@@ -1,0 +1,28 @@
+{
+  "name": "retinai",
+  "version": "1.0.0",
+  "description": "RetinAI — Sistema de Diagnóstico Oftalmológico con IA",
+  "private": true,
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "cypress:open": "cypress open",
+    "cypress:run": "cypress run",
+    "cypress:login": "cypress run --spec \"tests/e2e/login.cy.js\""
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/tests/unit/**/*.test.js"
+    ],
+    "coverageDirectory": "tests/coverage",
+    "collectCoverageFrom": [
+      "assets/js/**/*.js"
+    ]
+  },
+  "devDependencies": {
+    "cypress": "^13.0.0",
+    "jest": "^29.0.0"
+  }
+}

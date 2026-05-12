@@ -9,6 +9,25 @@ class AuthController {
         $this->model = new AuthModel();
     }
 
+    // ----------------------------------------------------------------
+    // Calcula la URL base del proyecto (e.g. "/retinai/" o "/")
+    // independiente del subdirectorio en Azure App Service.
+    // ----------------------------------------------------------------
+    private function baseUrl(): string {
+        $scriptDir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME']));
+        // controllers/ está un nivel dentro del root; subir un nivel
+        $base = rtrim(dirname($scriptDir), '/') . '/';
+        // Si el script es /controllers/AuthController.php → base = /
+        // Si el script es /subdir/controllers/AuthController.php → base = /subdir/
+        // Pero cuando se llama desde la vista via GET action, SCRIPT_NAME
+        // apunta al propio AuthController.php
+        // Solucion: subir 1 nivel desde el directorio del script
+        $parts = explode('/', rtrim($scriptDir, '/'));
+        array_pop($parts); // quita "controllers"
+        $root = implode('/', $parts);
+        return ($root === '' ? '/' : $root . '/');
+    }
+
     public function login() {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $email    = trim($_POST['email'] ?? '');
@@ -21,36 +40,46 @@ class AuthController {
 
             $user = $this->model->getUserByEmail($email);
 
-            if ($user && password_verify($password, $user['password'])) {
-                // --- Sesión exitosa ---
-                $_SESSION['user_id']               = $user['id'];
-                $_SESSION['rol_codigo']             = $user['rol_codigo'];
-                $_SESSION['nombre']                 = $user['nombre'];
-                $_SESSION['establecimiento_id']     = $user['establecimiento_id'];
-                $_SESSION['es_password_temporal']   = $user['es_password_temporal'];
-                $_SESSION['last_activity']          = time();
-
-                $this->model->updateLastAccess($user['id']);
-
-                // Contraseña temporal: forzar cambio
-                if ($user['es_password_temporal']) {
-                    header("Location: ../views/auth/change_password.php");
-                    exit();
-                }
-
-                // Redirigir según rol
-                $this->redirectByRole($user['rol_codigo']);
-            } else {
+            if (!$user) {
                 $this->redirectWithError("Credenciales incorrectas. Verifique su correo y contraseña.");
+                return;
             }
+
+            if (!password_verify($password, $user['password'])) {
+                $this->redirectWithError("Credenciales incorrectas. Verifique su correo y contraseña.");
+                return;
+            }
+
+            // Verificar estado activo
+            if (!$user['activo']) {
+                $this->redirectWithError("Su cuenta aún no ha sido aprobada por el administrador.");
+                return;
+            }
+
+            // --- Sesión exitosa ---
+            $_SESSION['user_id']               = $user['id'];
+            $_SESSION['rol_codigo']             = $user['rol_codigo'];
+            $_SESSION['nombre']                 = $user['nombre'];
+            $_SESSION['establecimiento_id']     = $user['establecimiento_id'];
+            $_SESSION['es_password_temporal']   = (bool) $user['es_password_temporal'];
+            $_SESSION['last_activity']          = time();
+
+            $this->model->updateLastAccess($user['id']);
+
+            // Contraseña temporal: forzar cambio
+            if ($user['es_password_temporal']) {
+                $this->redirect('views/auth/change_password.php');
+            }
+
+            // Redirigir según rol
+            $this->redirectByRole($user['rol_codigo']);
         }
     }
 
     public function changePassword() {
         if (session_status() === PHP_SESSION_NONE) session_start();
         if (!isset($_SESSION['user_id'])) {
-            header("Location: ../views/auth/login.php");
-            exit();
+            $this->redirect('views/auth/login.php');
         }
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -59,13 +88,11 @@ class AuthController {
 
             if (strlen($nueva) < 6) {
                 $_SESSION['cp_error'] = "La contraseña debe tener al menos 6 caracteres.";
-                header("Location: ../views/auth/change_password.php");
-                exit();
+                $this->redirect('views/auth/change_password.php');
             }
             if ($nueva !== $confirma) {
                 $_SESSION['cp_error'] = "Las contraseñas no coinciden.";
-                header("Location: ../views/auth/change_password.php");
-                exit();
+                $this->redirect('views/auth/change_password.php');
             }
 
             $hash = password_hash($nueva, PASSWORD_BCRYPT);
@@ -79,30 +106,36 @@ class AuthController {
     public function logout() {
         session_unset();
         session_destroy();
-        header("Location: ../../index.php");
+        $this->redirect('index.php');
+    }
+
+    // ----------------------------------------------------------------
+    // Helpers
+    // ----------------------------------------------------------------
+    private function redirect(string $path): void {
+        $base = $this->baseUrl();
+        header("Location: " . $base . ltrim($path, '/'));
         exit();
     }
 
-    private function redirectWithError($error) {
+    private function redirectWithError(string $error): void {
         $_SESSION['login_error'] = $error;
-        header("Location: ../views/auth/login.php");
-        exit();
+        $this->redirect('views/auth/login.php');
     }
 
-    private function redirectByRole($rol) {
+    private function redirectByRole(string $rol): void {
         switch ($rol) {
             case 'SAD':
-                header("Location: ../views/dashboard/superadmin/index.php");
+                $this->redirect('views/dashboard/superadmin/index.php');
                 break;
             case 'ADM':
-                header("Location: ../views/dashboard/admin/index.php");
+                $this->redirect('views/dashboard/admin/index.php');
                 break;
             case 'MED':
             default:
-                header("Location: ../views/dashboard/medico/index.php");
+                $this->redirect('views/dashboard/medico/index.php');
                 break;
         }
-        exit();
     }
 }
 
@@ -110,8 +143,8 @@ class AuthController {
 if (isset($_GET['action'])) {
     $controller = new AuthController();
     switch ($_GET['action']) {
-        case 'login':           $controller->login(); break;
-        case 'logout':          $controller->logout(); break;
+        case 'login':           $controller->login();          break;
+        case 'logout':          $controller->logout();         break;
         case 'change_password': $controller->changePassword(); break;
     }
 }

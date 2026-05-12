@@ -165,5 +165,10 @@ function showClientError(msg) {
     box.style.display = 'flex';
 }
 </script>
+<script src="../../assets/js/session.service.js"></script>
+<script>
+    // Limpiar rastro de sesión del cliente al cargar el login
+    SessionService.destroy();
+</script>
 </body>
 </html>

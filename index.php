@@ -27,7 +27,7 @@
             <p class="hero-subtitle">Agilizamos el análisis automatizado de imágenes retinianas para recintos de oftalmología en Tacna. Precisión clínica, reducción de tiempos y prevención de la discapacidad visual en un solo lugar.</p>
             
             <div class="hero-actions">
-                <a href="view/auth/login.php" class="btn btn-primary btn-lg">Ingresar a la Plataforma</a>
+                <a href="views/auth/login.php" class="btn btn-primary btn-lg">Ingresar a la Plataforma</a>
                 <a href="#solucion" class="btn btn-secondary btn-lg">Conocer más</a>
             </div>
         </div>
@@ -111,7 +111,7 @@
         <div class="container text-center">
             <h2 class="text-white">Únete a la evolución diagnóstica</h2>
             <p class="text-light-gray" style="max-width: 600px; margin: 0 auto 30px;">Si representas a una clínica u hospital y deseas integrar RetinAI a tus procesos, accede a la plataforma ahora.</p>
-            <a href="view/auth/login.php" class="btn btn-primary btn-lg">Iniciar Sesión en el Sistema</a>
+            <a href="views/auth/login.php" class="btn btn-primary btn-lg">Iniciar Sesión en el Sistema</a>
         </div>
     </section>
 

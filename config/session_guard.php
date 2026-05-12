@@ -8,7 +8,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-define('SESSION_TIMEOUT', 3600); // 60 minutos
+define('SESSION_TIMEOUT', 300); // 5 minutos
 
 /**
  * Verifica que el usuario esté autenticado.

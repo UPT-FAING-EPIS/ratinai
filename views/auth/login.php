@@ -108,7 +108,7 @@ $expired = isset($_GET['expired']);
             </button>
         </form>
 
-        <p class="info-text">La sesión expira tras 60 minutos de inactividad por seguridad.</p>
+        <p class="info-text">La sesión expira tras 5 minutos de inactividad por seguridad.</p>
 
         <div class="divider"></div>
 

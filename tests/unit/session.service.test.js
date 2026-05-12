@@ -76,17 +76,17 @@ describe('SessionService — Expiración por inactividad', () => {
         expect(SessionService._getTimer()).toBeNull();
     });
 
-    test('debe usar 3 600 000 ms (60 min) como timeout por defecto', () => {
+    test('debe usar 300 000 ms (5 min) como timeout por defecto', () => {
         const onExpire = jest.fn();
         SessionService.init({ onExpire }); // sin especificar timeout
 
-        expect(SessionService._getTimeout()).toBe(3600000);
+        expect(SessionService._getTimeout()).toBe(300000);
 
-        // A los 59 min 59 s NO debe expirar
-        jest.advanceTimersByTime(3599999);
+        // A los 4 min 59 s NO debe expirar
+        jest.advanceTimersByTime(299999);
         expect(onExpire).not.toHaveBeenCalled();
 
-        // Al minuto 60 exacto SÍ debe expirar
+        // Al minuto 5 exacto SÍ debe expirar
         jest.advanceTimersByTime(1);
         expect(onExpire).toHaveBeenCalledTimes(1);
     });

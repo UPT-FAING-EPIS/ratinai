@@ -45,18 +45,23 @@ body {
 }
 
 .bg-white { background-color: #FFFFFF; }
-.bg-soft-blue { background-color: #F8FAFC; }
+.bg-soft-blue { background-color: #F1F5F9; }
 .bg-gradient {
-  background: linear-gradient(135deg, #EFF6FF 0%, #FFFFFF 100%);
+  background: linear-gradient(135deg, #0B1121 0%, #172554 100%);
   position: relative;
   overflow: hidden;
+}
+.bg-gradient .hero-title, 
+.bg-gradient .hero-subtitle,
+.bg-gradient .logo-text {
+  color: #FFFFFF;
 }
 .bg-gradient::before {
   content: "";
   position: absolute;
-  top: -10%; left: -10%;
-  width: 400px; height: 400px;
-  background: radial-gradient(circle, rgba(37,99,235,0.08) 0%, rgba(255,255,255,0) 70%);
+  top: -20%; left: -10%;
+  width: 600px; height: 600px;
+  background: radial-gradient(circle, rgba(37,99,235,0.15) 0%, rgba(255,255,255,0) 70%);
   border-radius: 50%;
 }
 .bg-gradient-dark {
@@ -100,7 +105,7 @@ body {
 
 /* Hero Section */
 .hero {
-  min-height: 90vh;
+  min-height: 100vh;
   display: flex;
   align-items: center;
   text-align: center;

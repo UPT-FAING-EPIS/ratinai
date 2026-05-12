@@ -54,3 +54,12 @@ INSERT INTO usuarios (rol_codigo, establecimiento_id, nombre, correo, password, 
 -- Insertar Médico Oftalmólogo (Password: medico123 -> misma hash para prueba)
 INSERT INTO usuarios (rol_codigo, establecimiento_id, nombre, correo, password, cmp, especialidad, es_password_temporal, activo) VALUES 
 ('MED', 1, 'Dr. Juan Perez', 'medico@hospital.com', '$2y$10$Wwk04DqoCefNnKTCcrajjuYktY3q2saxD6.BvH/eB2KhY7RR5vpzK', '123456', 'Retina', 1, 1);
+
+superadmin@ratinai.com
+admin123
+
+admin@hospital.com
+admin123
+
+medico@hospital.com
+medico123

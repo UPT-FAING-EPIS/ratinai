@@ -118,7 +118,7 @@ if (isset($_GET['ok'])) $msg_ok = htmlspecialchars($_GET['ok']);
         <div class="sidebar-footer">
             <div class="session-info">
                 <svg viewBox="0 0 20 20" fill="none" width="13" height="13"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.3"/><path d="M10 6v4l2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-                Sesión: <span id="session-countdown">60:00</span>
+                Sesión: <span id="session-countdown">05:00</span>
             </div>
         </div>
     </aside>
@@ -227,8 +227,8 @@ if (isset($_GET['ok'])) $msg_ok = htmlspecialchars($_GET['ok']);
 
 <script src="<?= $base ?>assets/js/session.service.js"></script>
 <script>
-SessionService.init({ timeout: 3600000, loginUrl: '<?= htmlspecialchars($base."views/auth/login.php") ?>' });
-let remaining = 3600;
+SessionService.init({ timeout: 300000, loginUrl: '<?= htmlspecialchars($base."views/auth/login.php") ?>' });
+let remaining = 300;
 const cd = document.getElementById('session-countdown');
 setInterval(()=>{ const m=Math.floor(remaining/60).toString().padStart(2,'0'); const s=(remaining%60).toString().padStart(2,'0'); cd.textContent=m+':'+s; if(remaining>0)remaining--; },1000);
 

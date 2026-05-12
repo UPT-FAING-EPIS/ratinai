@@ -18,7 +18,7 @@
 const SessionService = (() => {
     // Estado privado
     let _timer       = null;
-    let _timeout     = 3600000; // 60 minutos en ms (default)
+    let _timeout     = 300000; // 5 minutos en ms (default)
     let _loginUrl    = '/views/auth/login.php';
     let _onExpire    = null;    // callback opcional (útil para tests)
     let _initialized = false;
@@ -76,12 +76,12 @@ const SessionService = (() => {
     /**
      * Inicializa el servicio de sesión.
      * @param {Object} options
-     * @param {number}   [options.timeout=3600000]  - Timeout en ms (default 60 min)
+     * @param {number}   [options.timeout=300000]  - Timeout en ms (default 5 min)
      * @param {string}   [options.loginUrl]          - URL de login para redirección
      * @param {Function} [options.onExpire]          - Callback al expirar (útil en tests)
      */
     function init(options = {}) {
-        _timeout    = options.timeout  ?? 3600000;
+        _timeout    = options.timeout  ?? 300000;
         _loginUrl   = options.loginUrl ?? '/views/auth/login.php';
         _onExpire   = options.onExpire ?? null;
         _initialized = true;

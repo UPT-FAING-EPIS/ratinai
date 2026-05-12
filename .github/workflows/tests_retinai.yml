@@ -1,0 +1,38 @@
+name: Automated Testing (Jest & Cypress)
+
+# Este flujo de trabajo se dispara automáticamente
+# SOLO cuando el flujo de despliegue ("Build and deploy PHP app to Azure Web App - retinai") 
+# ha terminado exitosamente.
+on:
+  workflow_run:
+    workflows: ["Build and deploy PHP app to Azure Web App - retinai"]
+    types:
+      - completed
+
+jobs:
+  test:
+    name: Execute Unit & E2E Tests
+    runs-on: ubuntu-latest
+    
+    # Solo ejecutar si el despliegue anterior fue exitoso
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          
+      - name: Install Dependencies
+        run: npm ci || npm install
+        
+      - name: Run Unit Tests (Jest)
+        run: npm test
+        
+      - name: Run E2E Tests (Cypress)
+        run: npm run cypress:run
+        env:
+          CYPRESS_baseUrl: 'https://retinai-ehcadnergkbkd9dr.eastus2-01.azurewebsites.net'

@@ -4,8 +4,8 @@ module.exports = defineConfig({
     e2e: {
         // URL base del servidor. Cambiar según el entorno:
         // Local: 'http://localhost/ratinai' o 'http://localhost:8000'
-        // Azure: 'https://retinai.azurewebsites.net'
-        baseUrl: 'https://retinai.azurewebsites.net',
+        // Azure: 'https://retinai-ehcadnergkbkd9dr.eastus2-01.azurewebsites.net'
+        baseUrl: 'https://retinai-ehcadnergkbkd9dr.eastus2-01.azurewebsites.net',
 
         specPattern: 'tests/e2e/**/*.cy.js',
         supportFile: false,

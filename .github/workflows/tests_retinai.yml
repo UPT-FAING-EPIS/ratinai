@@ -8,6 +8,7 @@ on:
     workflows: ["Build and deploy PHP app to Azure Web App - retinai"]
     types:
       - completed
+  workflow_dispatch:
 
 jobs:
   test:

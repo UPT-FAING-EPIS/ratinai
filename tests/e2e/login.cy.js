@@ -67,7 +67,7 @@ describe('RF-02 — Login: redirección por clave temporal', () => {
         cy.url().should('include', 'change_password.php');
 
         // El formulario de cambio de contraseña debe estar visible
-        cy.get('#change-password-form').should('be.visible');
+        cy.get('#cp-form').should('be.visible');
         cy.get('#nueva_password').should('be.visible');
         cy.get('#confirma_password').should('be.visible');
     });

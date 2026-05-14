@@ -8,22 +8,11 @@ class AuthController {
     public function __construct() {
         $this->model = new AuthModel();
     }
-
-    // ----------------------------------------------------------------
-    // Calcula la URL base del proyecto (e.g. "/retinai/" o "/")
-    // independiente del subdirectorio en Azure App Service.
-    // ----------------------------------------------------------------
     private function baseUrl(): string {
         $scriptDir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME']));
-        // controllers/ está un nivel dentro del root; subir un nivel
         $base = rtrim(dirname($scriptDir), '/') . '/';
-        // Si el script es /controllers/AuthController.php → base = /
-        // Si el script es /subdir/controllers/AuthController.php → base = /subdir/
-        // Pero cuando se llama desde la vista via GET action, SCRIPT_NAME
-        // apunta al propio AuthController.php
-        // Solucion: subir 1 nivel desde el directorio del script
         $parts = explode('/', rtrim($scriptDir, '/'));
-        array_pop($parts); // quita "controllers"
+        array_pop($parts);
         $root = implode('/', $parts);
         return ($root === '' ? '/' : $root . '/');
     }

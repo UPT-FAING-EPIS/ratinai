@@ -42,7 +42,7 @@ describe('RF-02 — Login: redirección por clave temporal', () => {
     it('debe mostrar "Credenciales incorrectas" con password incorrecto', () => {
         cy.visit(LOGIN_URL);
         cy.get('#email').type('test01@hospital.com');
-        cy.get('#password').type('wrongpassword');
+        cy.get('#password').type('aaaaaa');
         cy.get('#login-form').submit();
         cy.get('.alert-danger').should('be.visible');
         cy.get('.alert-danger p').should('contain', 'Credenciales incorrectas');

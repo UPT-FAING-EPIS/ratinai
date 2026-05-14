@@ -62,4 +62,4 @@ admin@hospital.com
 admin123
 
 medico@hospital.com
-medico123
+admin123

@@ -11,7 +11,6 @@ describe('SessionService — Expiración por inactividad', () => {
 
     beforeEach(() => {
         jest.useFakeTimers();
-        // Asegurarse de que el servicio esté limpio antes de cada test
         SessionService.destroy();
     });
 
@@ -100,7 +99,6 @@ describe('SessionService — Expiración por inactividad', () => {
 
         jest.advanceTimersByTime(60000);
 
-        // Sólo debe haberse llamado una vez
         expect(onExpire).toHaveBeenCalledTimes(1);
     });
 });

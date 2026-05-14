@@ -15,7 +15,7 @@ describe('RF-02 — Login: redirección por clave temporal', () => {
 
     const LOGIN_URL = '/views/auth/login.php';
     const MEDICO_TEMPORAL = {
-        correo: 'medico@hospital.com',
+        correo: 'test01@hospital.com',
         password: 'admin123',
     };
 
@@ -45,7 +45,7 @@ describe('RF-02 — Login: redirección por clave temporal', () => {
     // ── Test 3: Credenciales incorrectas → error servidor ─────────────────
     it('debe mostrar "Credenciales incorrectas" con password incorrecto', () => {
         cy.visit(LOGIN_URL);
-        cy.get('#email').type('medico@hospital.com');
+        cy.get('#email').type('test01@hospital.com');
         cy.get('#password').type('wrongpassword');
         cy.get('#login-form').submit();
         cy.get('.alert-danger').should('be.visible');

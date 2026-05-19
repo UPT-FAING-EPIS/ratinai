@@ -50,7 +50,7 @@ class MailService {
             $mail->CharSet = 'UTF-8';
             $mail->Subject = 'Acceso a RetinAI - Su cuenta ha sido creada';
             
-            $loginUrl = 'http://localhost/ratinai/views/auth/login.php'; // Cambiar en prod
+            $loginUrl = 'https://retinai-ehcadnergkbkd9dr.eastus2-01.azurewebsites.net/views/auth/login.php';
 
             $mail->Body = "
             <!DOCTYPE html>

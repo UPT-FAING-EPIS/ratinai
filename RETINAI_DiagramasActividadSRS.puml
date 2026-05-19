@@ -1,0 +1,138 @@
+@startuml RF01_Actividad_CrearCuentaOftalmologo
+
+title RF-01: Crear Cuenta de Oftalmólogo [Diagrama de Actividad SRS]
+
+|Administrador|
+start
+:Accede a la sección "Médicos"
+y hace clic en "Agregar Médico";
+
+|Vista: Gestión de Médicos|
+:Presenta formulario de creación de cuenta;
+
+|Administrador|
+:Completa los campos (incluyendo
+una especialidad nueva si es necesario)
+y presiona "Guardar médico";
+
+|Control: Cuenta Médico|
+:Recibe datos del formulario;
+
+note right
+  **Objeto: FormularioMedico**
+  - nombreCompleto
+  - correoElectronico
+  - numeroCMP
+  - especialidad (seleccionada o nueva)
+  - contraseniaTemporal
+end note
+
+:Valida campos obligatorios,
+formato de correo y
+longitud de contraseña (mínimo 6);
+
+if (¿Datos válidos, formato correcto y contraseña segura?) then (no)
+  :Genera mensaje indicando
+  los errores en los campos;
+
+  |Vista: Gestión de Médicos|
+  :Muestra alertas indicando
+  los errores a corregir en el formulario;
+
+  |Administrador|
+  :Corrige los campos indicados;
+  end
+
+else (sí)
+  |Control: Cuenta Médico|
+  :Verifica que el CMP y correo
+  no estén registrados previamente;
+
+  note right
+    **Objeto: ConsultaDuplicados**
+    - numeroCMP
+    - correoElectronico
+  end note
+
+  if (¿CMP o correo ya registrado?) then (sí)
+    :Genera mensaje de duplicado;
+
+    |Vista: Gestión de Médicos|
+    :Muestra alerta indicando que
+    el CMP o correo ya existe en el sistema;
+
+    |Administrador|
+    :Visualiza mensaje de duplicado;
+    end
+
+  else (no)
+    |Control: Cuenta Médico|
+
+    if (¿Se especificó una "Nueva Especialidad"?) then (sí)
+      |Base de Datos|
+      :Guarda la nueva especialidad
+      en el catálogo del sistema;
+      |Control: Cuenta Médico|
+    else (no)
+    endif
+
+    :Cifra la contraseña temporal ingresada;
+
+    |Entidad: Médico|
+    :Crea cuenta de médico
+    con estado "Activo", asociado al hospital
+    y con la contraseña temporal cifrada;
+
+    note right
+      **Objeto: Medico**
+      - id
+      - nombreCompleto
+      - correoElectronico
+      - numeroCMP
+      - especialidad
+      - establecimiento_id
+      - estado = "Activo"
+      - es_password_temporal = true
+    end note
+
+    |Base de Datos|
+    :Persiste datos del médico;
+    :Retorna confirmación de guardado;
+
+    |Entidad: Médico|
+    :Retorna confirmación a Control;
+
+    |Control: Cuenta Médico|
+    :Intenta enviar correo de bienvenida
+    con la contraseña temporal asignada;
+
+    if (¿Correo enviado exitosamente?) then (sí)
+      :Retorna resultado de éxito;
+
+      |Vista: Gestión de Médicos|
+      :Redirige a la lista de médicos y muestra:
+      "Cuenta creada. Contraseña enviada al correo.";
+
+      |Administrador|
+      :Visualiza confirmación de cuenta creada;
+      end
+
+    else (no)
+      |Control: Cuenta Médico|
+      :Retorna resultado parcial indicando
+      fallo de correo y pasa la contraseña;
+      
+      |Vista: Gestión de Médicos|
+      :Muestra cuadro azul de advertencia con la
+      contraseña temporal para entrega manual;
+
+      |Administrador|
+      :Anota/Copia la contraseña temporal
+      y la entrega al médico manualmente;
+      end
+
+    endif
+  endif
+endif
+
+@enduml

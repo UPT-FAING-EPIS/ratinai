@@ -1,0 +1,61 @@
+@startuml RF01_SRS_CrearCuentaOftalmologo
+
+title RF-01: Crear Cuenta de Oftalmólogo
+
+actor "Administrador" as Admin
+participant "Vista:\nGestión de Médicos" as Vista
+participant "Control:\nCuenta Médico" as Control
+participant "Servicio:\nNotificación por Correo" as Mail
+entity "Entidad:\nMédico" as Entidad
+database "Base de Datos" as BD
+
+box "Proceso de Registro de Médico" #White
+    participant Admin
+    participant Vista
+    participant Control
+    participant Mail
+    participant Entidad
+    participant BD
+end box
+
+Admin -> Vista : Accede a la sección "Médicos"\ny hace clic en "Agregar Médico"
+Vista -> Admin : Muestra formulario con campos:\nNombre, Correo, CMP, Especialidad\ny Contraseña temporal
+Admin -> Vista : Completa los campos (agregando especialidad\nnueva si requiere) y presiona "Guardar médico"
+Vista -> Control : Envía los datos ingresados
+Control -> Control : Valida campos obligatorios, formato de\ncorreo y longitud de contraseña (mínimo 6)
+
+alt [Datos incompletos o inválidos]
+    Control --> Vista : Informa qué campos tienen error
+    Vista -> Admin : Muestra alertas indicando\nlos errores a corregir en el formulario
+else [Datos válidos]
+    Control -> BD : Verifica que el CMP y el correo\nno estén registrados previamente
+    BD --> Control : Resultado de la verificación
+
+    alt [CMP o correo ya registrado]
+        Control --> Vista : Informa duplicidad de datos
+        Vista -> Admin : Muestra alerta indicando que\nel CMP o correo ya existe en el sistema
+    else [Datos disponibles]
+        alt [Seleccionó agregar "Nueva Especialidad"]
+            Control -> BD : Guarda la nueva especialidad\nen el catálogo del sistema
+        end
+
+        Control -> Entidad : Crea la cuenta del médico con estado\n"Activo" y la contraseña temporal cifrada
+        Entidad -> BD : Guarda los datos del médico\nasociados al hospital del Administrador
+        BD --> Entidad : Confirmación de guardado
+        Entidad --> Control : Retorna confirmación
+
+        Control -> Mail : Solicita enviar correo de bienvenida\ncon la contraseña temporal asignada
+        
+        alt [Correo enviado exitosamente]
+            Mail --> Control : Confirma envío
+            Control --> Vista : Confirma creación exitosa
+            Vista -> Admin : Redirige a la lista de médicos y muestra:\n"Cuenta creada. Contraseña enviada al correo."
+        else [Fallo en el servicio de correo]
+            Mail --> Control : Informa fallo en envío
+            Control --> Vista : Informa creación exitosa pero fallo de correo
+            Vista -> Admin : Muestra cuadro azul de advertencia con la\ncontraseña temporal para entrega manual.
+        end
+    end
+end
+
+@enduml

@@ -24,45 +24,54 @@ actor "Administrador" as ADM
 boundary "views/admin/\ncreate_doctor.php" as V
 control "controllers/\nDoctorController.php\n::createDoctor()" as C
 control "services/\nMailService.php\n::sendTempPassword()" as MS
-entity "models/\nDoctor.php" as E
-database "Railway DB\n(tabla: doctors)" as BD
+entity "models/\nDoctorModel.php" as E
+database "Railway DB\n(tablas: usuarios, maestro)" as BD
 
-== POST /admin/doctors/create ==
+== POST controllers/DoctorController.php?action=create ==
 
-ADM -> V : Envía formulario\nPOST: nombre, correo,\ncmp, especialidad, institucion
-V -> C : DoctorController::createDoctor(\n  $nombre, $correo, $cmp,\n  $especialidad, $institucion\n)
+ADM -> V : Envía formulario\nPOST: nombre, correo, cmp,\nespecialidad, esp_nueva, password_temp
+V -> C : HTTP POST a DoctorController::createDoctor()
 
-C -> C : Validator::required([\n  'nombre','correo','cmp',\n  'especialidad','institucion'\n])\nValidator::email($correo)
+C -> C : Extrae y limpia campos.\nValida obligatorios y formato email.\nValida longitud de password_temp (>= 6)
 
-alt Campos vacíos o correo inválido
-    C --> V : return ['error' =>\n  'Campos inválidos', 'fields' => [...]]
-    V --> ADM : HTTP 422 — Resalta campos\ncon error en el formulario
+alt Campos vacíos o inválidos
+    C -> C : $_SESSION['flash_errors'] = [...]
+    C --> V : HTTP 302 Redirect a\nviews/admin/create_doctor.php
+    V --> ADM : Muestra alertas de error\ncon $_SESSION['flash_errors']
 else Datos válidos
-    C -> E : Doctor::existsByCMP($cmp)\nDoctor::existsByEmail($correo)
-    E -> BD : SELECT id FROM doctors\nWHERE cmp=? OR email=? LIMIT 1
-    BD --> E : rows [ ] / rows [id]
+    C -> E : DoctorModel::existsByEmail($correo)\nDoctorModel::existsByCMP($cmp)
+    E -> BD : SELECT id FROM usuarios\nWHERE correo=? / cmp=? LIMIT 1
+    BD --> E : row / false
     E --> C : true / false
 
-    alt CMP o correo ya registrado
-        C --> V : return ['error' =>\n  'CMP o correo ya registrado']
-        V --> ADM : HTTP 409 — Muestra mensaje\nde duplicado en formulario
+    alt Correo o CMP ya registrado
+        C -> C : $_SESSION['flash_errors'] = [...]
+        C --> V : HTTP 302 Redirect a\nviews/admin/create_doctor.php
+        V --> ADM : Muestra alertas de duplicidad
     else Disponibles
-        C -> C : $tempPass =\n  PasswordHelper::generateTemp(12)\n$hash =\n  password_hash($tempPass,\n  PASSWORD_BCRYPT)
-        C -> E : Doctor::create([\n  'nombre'       => $nombre,\n  'email'        => $correo,\n  'cmp'          => $cmp,\n  'especialidad' => $especialidad,\n  'institucion'  => $institucion,\n  'password'     => $hash,\n  'is_temp_pass' => true,\n  'estado'       => 'activo',\n  'created_at'   => now()\n])
-        E -> BD : INSERT INTO doctors\n(nombre, email, cmp, especialidad,\ninstitucion, password,\nis_temp_pass, estado, created_at)\nVALUES (?, ?, ?, ?, ?, ?, 1,\n'activo', NOW())
+        alt especialidad == '__nueva__'
+            C -> E : DoctorModel::addSpecialty($esp_nueva)
+            E -> BD : INSERT INTO maestro (tipo, codigo,\ndescripcion, orden) VALUES (...)
+        end
+        
+        C -> C : $hash = password_hash(\n  $password_temp, PASSWORD_BCRYPT\n)
+        C -> E : DoctorModel::create([\n  'nombre' => $nombre,\n  'email' => $correo,\n  'cmp' => $cmp,\n  'especialidad' => $especialidad_final,\n  'password' => $hash,\n  'establecimiento_id' => $est_id\n])
+        E -> BD : INSERT INTO usuarios (nombre, correo,\npassword, rol_codigo, cmp, especialidad,\nestablecimiento_id, activo, es_password_temporal)\nVALUES (?, ?, ?, 'MED', ?, ?, ?, 1, 1)
         BD --> E : INSERT OK — lastInsertId()
-        E --> C : $doctorId
+        E --> C : $newDoctorId
 
-        C -> MS : MailService::sendTempPassword(\n  $correo, $nombre, $tempPass\n)
+        C -> MS : MailService::sendTempPassword(\n  $correo, $nombre, $password_temp\n)
 
         alt SMTP responde 250 OK
             MS --> C : return true
-            C --> V : return ['success' =>\n  'Cuenta creada y correo enviado']
-            V --> ADM : HTTP 201 — "Cuenta creada.\nContraseña temporal enviada\nal correo del médico"
-        else SMTP falla / timeout
+            C -> C : $_SESSION['flash_success'] = \n"Cuenta creada. Contraseña enviada..."
+            C --> V : HTTP 302 Redirect a\nviews/admin/doctor.php
+            V --> ADM : Muestra tabla con el nuevo\nmédico y alerta verde de éxito
+        else SMTP falla / sin configurar
             MS --> C : return false
-            C --> V : return ['success' => true,\n  'warning' => 'Fallo de correo',\n  'temp_pass' => $tempPass]
-            V --> ADM : HTTP 201 — Muestra contraseña\ntemporal en pantalla para\nentrega manual
+            C -> C : $_SESSION['flash_success'] = "Creado exitosamente..."\n$_SESSION['flash_temp_pass'] = $password_temp
+            C --> V : HTTP 302 Redirect a\nviews/admin/create_doctor.php
+            V --> ADM : Muestra alerta de éxito y\ncuadro azul con la contraseña\ntemporal para entrega manual
         end
     end
 end

@@ -54,3 +54,18 @@ VALUES (
     1
 )
 ON DUPLICATE KEY UPDATE activo = 1;
+
+-- =========================================================================
+-- 5. Especialidades médicas en tabla maestro (TIPO_ESPECIALIDAD)
+--    Ejecutar una sola vez contra la BD de Railway.
+-- =========================================================================
+INSERT INTO maestro (tipo, codigo, descripcion, orden) VALUES
+('TIPO_ESPECIALIDAD', 'OFT', 'Oftalmología',            1),
+('TIPO_ESPECIALIDAD', 'RET', 'Retinología',             2),
+('TIPO_ESPECIALIDAD', 'GLA', 'Glaucoma',                3),
+('TIPO_ESPECIALIDAD', 'COR', 'Córnea',                  4),
+('TIPO_ESPECIALIDAD', 'OOR', 'Órbita y Oculoplástica',  5),
+('TIPO_ESPECIALIDAD', 'EST', 'Estrabismo',              6),
+('TIPO_ESPECIALIDAD', 'UVE', 'Uveítis',                 7),
+('TIPO_ESPECIALIDAD', 'OTR', 'Otro',                    99)
+ON DUPLICATE KEY UPDATE descripcion = VALUES(descripcion), orden = VALUES(orden);

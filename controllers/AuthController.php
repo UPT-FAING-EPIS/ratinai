@@ -115,14 +115,14 @@ class AuthController {
     private function redirectByRole(string $rol): void {
         switch ($rol) {
             case 'SAD':
-                $this->redirect('views/dashboard/superadmin/index.php');
+                $this->redirect('views/superadmin/index.php');
                 break;
             case 'ADM':
-                $this->redirect('views/dashboard/admin/index.php');
+                $this->redirect('views/admin/index.php');
                 break;
             case 'MED':
             default:
-                $this->redirect('views/dashboard/medico/index.php');
+                $this->redirect('views/medico/index.php');
                 break;
         }
     }

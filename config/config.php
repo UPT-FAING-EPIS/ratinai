@@ -18,3 +18,10 @@ class Database {
         return $this->conn;
     }
 }
+
+define('SMTP_HOST', 'smtp.gmail.com');
+define('SMTP_PORT', 587);
+define('SMTP_USER', 'gichevichin2020@gmail.com');
+define('SMTP_PASS', 'icvy ilbt twus dsuv');
+define('SMTP_FROM', 'gichevichin2020@gmail.com');
+define('SMTP_FROM_NAME', 'RetinAI Admins');

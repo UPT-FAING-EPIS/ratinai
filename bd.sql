@@ -15,6 +15,16 @@ INSERT INTO maestro (tipo, codigo, descripcion, orden) VALUES
 ('ROL_SISTEMA', 'ADM', 'Admin Establecimiento', 2),
 ('ROL_SISTEMA', 'MED', 'Médico Oftalmólogo', 3);
 
+INSERT INTO maestro (tipo, codigo, descripcion, orden) VALUES
+('TIPO_ESPECIALIDAD', 'OFT', 'Oftalmología',            1),
+('TIPO_ESPECIALIDAD', 'RET', 'Retinología',             2),
+('TIPO_ESPECIALIDAD', 'GLA', 'Glaucoma',                3),
+('TIPO_ESPECIALIDAD', 'COR', 'Córnea',                  4),
+('TIPO_ESPECIALIDAD', 'OOR', 'Órbita y Oculoplástica',  5),
+('TIPO_ESPECIALIDAD', 'EST', 'Estrabismo',              6),
+('TIPO_ESPECIALIDAD', 'UVE', 'Uveítis',                 7),
+('TIPO_ESPECIALIDAD', 'OTR', 'Otro',                    99);
+
 -- Tabla de establecimientos
 CREATE TABLE IF NOT EXISTS establecimientos (
     id INT AUTO_INCREMENT PRIMARY KEY,

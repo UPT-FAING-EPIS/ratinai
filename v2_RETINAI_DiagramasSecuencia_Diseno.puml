@@ -1,0 +1,588 @@
+' ============================================================
+' RETINAI — Diagramas de Secuencia
+' Nivel de Diseño (Clases Concretas · Métodos · Tecnologías)
+' Stack: PHP puro · MySQL/PostgreSQL en Railway · Flask API (TF Lite)
+' ============================================================
+
+
+' ============================================================
+' RF-01: Crear Cuenta de Oftalmólogo
+' ============================================================
+@startuml RF01_Diseno_CrearCuentaOftalmologo
+title RF-01: Crear Cuenta de Oftalmólogo [Diseño]
+
+skinparam backgroundColor #FFFFFF
+skinparam sequenceArrowThickness 1.5
+skinparam roundcorner 5
+skinparam ParticipantBackgroundColor #FFFFFF
+skinparam ParticipantBorderColor #000000
+skinparam ArrowColor #000000
+skinparam SequenceLifeLineBorderColor #888888
+
+actor "Administrador" as ADM
+
+boundary "views/admin/\ncreate_doctor.php" as V
+control "controllers/\nDoctorController.php\n::createDoctor()" as C
+control "services/\nMailService.php\n::sendTempPassword()" as MS
+entity "models/\nDoctor.php" as E
+database "Railway DB\n(tabla: doctors)" as BD
+
+== POST /admin/doctors/create ==
+
+ADM -> V : Envía formulario\nPOST: nombre, correo,\ncmp, especialidad, institucion
+V -> C : DoctorController::createDoctor(\n  $nombre, $correo, $cmp,\n  $especialidad, $institucion\n)
+
+C -> C : Validator::required([\n  'nombre','correo','cmp',\n  'especialidad','institucion'\n])\nValidator::email($correo)
+
+alt Campos vacíos o correo inválido
+    C --> V : return ['error' =>\n  'Campos inválidos', 'fields' => [...]]
+    V --> ADM : HTTP 422 — Resalta campos\ncon error en el formulario
+else Datos válidos
+    C -> E : Doctor::existsByCMP($cmp)\nDoctor::existsByEmail($correo)
+    E -> BD : SELECT id FROM doctors\nWHERE cmp=? OR email=? LIMIT 1
+    BD --> E : rows [ ] / rows [id]
+    E --> C : true / false
+
+    alt CMP o correo ya registrado
+        C --> V : return ['error' =>\n  'CMP o correo ya registrado']
+        V --> ADM : HTTP 409 — Muestra mensaje\nde duplicado en formulario
+    else Disponibles
+        C -> C : $tempPass =\n  PasswordHelper::generateTemp(12)\n$hash =\n  password_hash($tempPass,\n  PASSWORD_BCRYPT)
+        C -> E : Doctor::create([\n  'nombre'       => $nombre,\n  'email'        => $correo,\n  'cmp'          => $cmp,\n  'especialidad' => $especialidad,\n  'institucion'  => $institucion,\n  'password'     => $hash,\n  'is_temp_pass' => true,\n  'estado'       => 'activo',\n  'created_at'   => now()\n])
+        E -> BD : INSERT INTO doctors\n(nombre, email, cmp, especialidad,\ninstitucion, password,\nis_temp_pass, estado, created_at)\nVALUES (?, ?, ?, ?, ?, ?, 1,\n'activo', NOW())
+        BD --> E : INSERT OK — lastInsertId()
+        E --> C : $doctorId
+
+        C -> MS : MailService::sendTempPassword(\n  $correo, $nombre, $tempPass\n)
+
+        alt SMTP responde 250 OK
+            MS --> C : return true
+            C --> V : return ['success' =>\n  'Cuenta creada y correo enviado']
+            V --> ADM : HTTP 201 — "Cuenta creada.\nContraseña temporal enviada\nal correo del médico"
+        else SMTP falla / timeout
+            MS --> C : return false
+            C --> V : return ['success' => true,\n  'warning' => 'Fallo de correo',\n  'temp_pass' => $tempPass]
+            V --> ADM : HTTP 201 — Muestra contraseña\ntemporal en pantalla para\nentrega manual
+        end
+    end
+end
+
+@enduml
+
+
+' ============================================================
+' RF-02: Iniciar Sesión
+' ============================================================
+@startuml RF02_Diseno_IniciarSesion
+title RF-02: Iniciar Sesión [Diseño]
+
+skinparam backgroundColor #FFFFFF
+skinparam sequenceArrowThickness 1.5
+skinparam roundcorner 5
+skinparam ParticipantBackgroundColor #FFFFFF
+skinparam ParticipantBorderColor #000000
+skinparam ArrowColor #000000
+skinparam SequenceLifeLineBorderColor #888888
+
+actor "Médico Oftalmólogo" as MED
+
+boundary "views/auth/\nlogin.php" as V
+control "controllers/\nAuthController.php\n::login()" as C
+control "services/\nSessionService.php" as SS
+entity "models/\nDoctor.php" as E
+database "Railway DB\n(tabla: doctors)" as BD
+
+== POST /auth/login ==
+
+MED -> V : Envía formulario\nPOST: email, password
+V -> C : AuthController::login(\n  $email, $password\n)
+
+C -> E : Doctor::findByEmail($email)
+E -> BD : SELECT id, nombre, password,\nis_temp_pass, estado\nFROM doctors\nWHERE email = ? LIMIT 1
+BD --> E : row / null
+E --> C : $doctor / null
+
+alt Email no registrado
+    C --> V : return ['error' =>\n  'Credenciales incorrectas']
+    V --> MED : HTTP 401 — "Credenciales\nincorrectas. Verifique su\ncorreo y contraseña"
+else Email encontrado
+    C -> C : password_verify(\n  $password,\n  $doctor['password']\n)
+
+    alt Contraseña incorrecta
+        C --> V : return ['error' =>\n  'Credenciales incorrectas']
+        V --> MED : HTTP 401 — Mismo mensaje\ngenérico de error
+    else Contraseña correcta
+        C -> C : Verifica $doctor['estado']
+
+        alt estado === 'desactivado'
+            C --> V : return ['error' =>\n  'Cuenta desactivada']
+            V --> MED : HTTP 403 — "Su cuenta ha sido\ndesactivada. Comuníquese\ncon el administrador"
+        else estado === 'activo'
+            C -> C : Verifica $doctor['is_temp_pass']
+
+            alt is_temp_pass === true
+                C --> V : return ['redirect' =>\n  '/auth/change-password',\n  'doctor_id' => $id]
+                V --> MED : HTTP 302 — Redirige a\nviews/auth/change_password.php\n"Debe cambiar su contraseña\ntemporal antes de continuar"
+
+                MED -> V : POST: new_password,\nconfirm_password
+                V -> C : AuthController::changeTempPassword(\n  $doctorId, $newPassword,\n  $confirmPassword\n)
+                C -> C : Valida coincidencia\ny longitud mínima (8 chars)
+                C -> C : $hash =\n  password_hash($newPassword,\n  PASSWORD_BCRYPT)
+                C -> E : Doctor::update($doctorId, [\n  'password'     => $hash,\n  'is_temp_pass' => false,\n  'updated_at'   => now()\n])
+                E -> BD : UPDATE doctors\nSET password=?,\nis_temp_pass=0,\nupdated_at=NOW()\nWHERE id=?
+                BD --> E : UPDATE OK
+                E --> C : true
+                C -> SS : SessionService::start(\n  $doctorId, $nombre\n)
+                SS -> SS : session_start()\n$_SESSION['doctor_id'] = $id\n$_SESSION['nombre'] = $nombre\n$_SESSION['last_activity'] = time()
+                C --> V : return ['redirect' => '/dashboard']
+                V --> MED : HTTP 302 — Redirige\na views/dashboard/index.php
+            else is_temp_pass === false
+                C -> SS : SessionService::start(\n  $doctorId, $nombre\n)
+                SS -> SS : session_start()\n$_SESSION['doctor_id'] = $id\n$_SESSION['nombre'] = $nombre\n$_SESSION['last_activity'] = time()\n' Inactividad: 3600 seg
+                C --> V : return ['redirect' => '/dashboard']
+                V --> MED : HTTP 302 — Accede\nal panel principal
+            end
+        end
+    end
+end
+
+@enduml
+
+
+' ============================================================
+' RF-03: Gestionar Médicos Activos del Establecimiento
+' ============================================================
+@startuml RF03_Diseno_GestionarMedicos
+title RF-03: Gestionar Médicos Activos del Establecimiento [Diseño]
+
+skinparam backgroundColor #FFFFFF
+skinparam sequenceArrowThickness 1.5
+skinparam roundcorner 5
+skinparam ParticipantBackgroundColor #FFFFFF
+skinparam ParticipantBorderColor #000000
+skinparam ArrowColor #000000
+skinparam SequenceLifeLineBorderColor #888888
+
+actor "Administrador" as ADM
+
+boundary "views/admin/\ndoctors_list.php" as V
+control "controllers/\nDoctorController.php" as C
+control "services/\nMailService.php\n::sendTempPassword()" as MS
+entity "models/\nDoctor.php" as E
+database "Railway DB\n(tabla: doctors)" as BD
+
+== GET /admin/doctors ==
+
+ADM -> V : Accede al panel\nde gestión de médicos
+V -> C : DoctorController::listActive(\n  $establishmentId\n)
+C -> E : Doctor::findActiveByEstablishment(\n  $establishmentId\n)
+E -> BD : SELECT id, nombre, cmp,\nespecialidad, institucion\nFROM doctors\nWHERE estado='activo'\nAND establishment_id=?\nORDER BY nombre ASC
+BD --> E : rows[]
+E --> C : $doctors[]
+
+alt Lista vacía
+    C --> V : return ['doctors' => []]
+    V --> ADM : HTTP 200 — "No hay médicos\nactivos registrados"
+else Lista con registros
+    C --> V : return ['doctors' => $doctors]
+    V --> ADM : HTTP 200 — Tabla con\nnombre, CMP, especialidad,\ninstitución y acciones
+
+    alt Editar datos — POST /admin/doctors/{id}/update
+        ADM -> V : Envía formulario con\nnombre, especialidad, institucion
+        V -> C : DoctorController::update(\n  $id, $nombre,\n  $especialidad, $institucion\n)
+        C -> C : Validator::required([...])\nValidator::length($nombre, 3, 100)
+        C -> E : Doctor::update($id, [\n  'nombre'       => $nombre,\n  'especialidad' => $especialidad,\n  'institucion'  => $institucion,\n  'updated_at'   => now()\n])
+        E -> BD : UPDATE doctors\nSET nombre=?, especialidad=?,\ninstitucion=?, updated_at=NOW()\nWHERE id=?
+        BD --> E : UPDATE OK
+        E --> C : true
+        C --> V : return ['success' =>\n  'Datos actualizados']
+        V --> ADM : HTTP 200 — "Datos del médico\nactualizados exitosamente"
+
+    else Resetear contraseña — POST /admin/doctors/{id}/reset-password
+        ADM -> V : Solicita reseteo
+        V -> C : DoctorController::resetPassword($id)
+        C -> C : $tempPass =\n  PasswordHelper::generateTemp(12)\n$hash =\n  password_hash($tempPass,\n  PASSWORD_BCRYPT)
+        C -> E : Doctor::update($id, [\n  'password'     => $hash,\n  'is_temp_pass' => true,\n  'updated_at'   => now()\n])
+        E -> BD : UPDATE doctors\nSET password=?,\nis_temp_pass=1,\nupdated_at=NOW()\nWHERE id=?
+        BD --> E : UPDATE OK
+        E --> C : true
+        C -> E : Doctor::findById($id)\n' Para obtener email y nombre
+        E -> BD : SELECT email, nombre\nFROM doctors WHERE id=?
+        BD --> E : row
+        E --> C : $doctor
+        C -> MS : MailService::sendTempPassword(\n  $doctor['email'],\n  $doctor['nombre'],\n  $tempPass\n)
+
+        alt SMTP OK
+            MS --> C : return true
+            C --> V : return ['success' =>\n  'Contraseña temporal enviada']
+            V --> ADM : HTTP 200 — "Contraseña temporal\nenviada al correo del médico"
+        else SMTP falla
+            MS --> C : return false
+            C --> V : return ['success' => true,\n  'temp_pass' => $tempPass]
+            V --> ADM : HTTP 200 — Muestra contraseña\ntemporal en pantalla
+        end
+
+    else Desactivar acceso — POST /admin/doctors/{id}/deactivate
+        ADM -> V : Confirma desactivación\nen modal de confirmación
+        V -> C : DoctorController::deactivate($id)
+        C -> E : Doctor::update($id, [\n  'estado'     => 'desactivado',\n  'updated_at' => now()\n])
+        E -> BD : UPDATE doctors\nSET estado='desactivado',\nupdated_at=NOW()\nWHERE id=?
+        BD --> E : UPDATE OK
+        E --> C : true
+        C --> V : return ['success' =>\n  'Médico desactivado']
+        V --> ADM : HTTP 200 — "El acceso del médico\nha sido desactivado exitosamente"
+    end
+end
+
+@enduml
+
+
+' ============================================================
+' RF-04: Habilitar Establecimiento
+' ============================================================
+@startuml RF04_Diseno_HabilitarEstablecimiento
+title RF-04: Habilitar Establecimiento [Diseño]
+
+skinparam backgroundColor #FFFFFF
+skinparam sequenceArrowThickness 1.5
+skinparam roundcorner 5
+skinparam ParticipantBackgroundColor #FFFFFF
+skinparam ParticipantBorderColor #000000
+skinparam ArrowColor #000000
+skinparam SequenceLifeLineBorderColor #888888
+
+actor "Super Administrador" as SADM
+
+boundary "views/superadmin/\ncreate_establishment.php" as V
+control "controllers/\nEstablishmentController.php\n::create()" as C
+control "services/\nMailService.php\n::sendTempPassword()" as MS
+entity "models/\nEstablishment.php" as EE
+entity "models/\nAdmin.php" as EA
+database "Railway DB\n(tablas: establishments,\nadmins)" as BD
+
+== POST /superadmin/establishments/create ==
+
+SADM -> V : Envía formulario\nPOST: nombre, direccion, tipo,\nadmin_nombre, admin_email
+V -> C : EstablishmentController::create(\n  $nombre, $direccion, $tipo,\n  $adminNombre, $adminEmail\n)
+
+C -> C : Validator::required([\n  'nombre','direccion','tipo',\n  'adminNombre','adminEmail'\n])\nValidator::email($adminEmail)
+
+alt Datos incompletos o inválidos
+    C --> V : return ['error' =>\n  'Campos inválidos', 'fields' => [...]]
+    V --> SADM : HTTP 422 — Resalta campos\ncon error
+else Datos válidos
+    C -> EE : Establishment::create([\n  'nombre'     => $nombre,\n  'direccion'  => $direccion,\n  'tipo'       => $tipo,\n  'estado'     => 'activo',\n  'created_at' => now()\n])
+    EE -> BD : INSERT INTO establishments\n(nombre, direccion, tipo,\nestado, created_at)\nVALUES (?, ?, ?, 'activo', NOW())
+    BD --> EE : INSERT OK — lastInsertId()
+    EE --> C : $establishmentId
+
+    C -> C : $tempPass =\n  PasswordHelper::generateTemp(12)\n$hash =\n  password_hash($tempPass,\n  PASSWORD_BCRYPT)
+    C -> EA : Admin::create([\n  'nombre'           => $adminNombre,\n  'email'            => $adminEmail,\n  'password'         => $hash,\n  'is_temp_pass'     => true,\n  'rol'              => 'administrador',\n  'estado'           => 'activo',\n  'establishment_id' => $establishmentId,\n  'created_at'       => now()\n])
+    EA -> BD : INSERT INTO admins\n(nombre, email, password,\nis_temp_pass, rol, estado,\nestablishment_id, created_at)\nVALUES (?, ?, ?, 1,\n'administrador', 'activo', ?, NOW())
+    BD --> EA : INSERT OK
+    EA --> C : $adminId
+
+    C -> MS : MailService::sendTempPassword(\n  $adminEmail, $adminNombre,\n  $tempPass\n)
+    MS --> C : return true / false
+
+    C --> V : return ['success' =>\n  'Establecimiento y administrador\n  creados correctamente']
+    V --> SADM : HTTP 201 — "Establecimiento registrado\ny Administrador asignado\ncorrectamente"
+end
+
+@enduml
+
+
+' ============================================================
+' RF-05: Cargar, Procesar y Presentar el Análisis de Imagen Retinal
+' ============================================================
+@startuml RF05_Diseno_AnalisisRetinal
+title RF-05: Análisis de Imagen Retinal [Diseño]
+
+skinparam backgroundColor #FFFFFF
+skinparam sequenceArrowThickness 1.5
+skinparam roundcorner 5
+skinparam ParticipantBackgroundColor #FFFFFF
+skinparam ParticipantBorderColor #000000
+skinparam ArrowColor #000000
+skinparam SequenceLifeLineBorderColor #888888
+
+actor "Médico Oftalmólogo" as MED
+
+boundary "views/analysis/\nupload.php" as V
+control "controllers/\nAnalysisController.php" as C
+control "services/\nImageValidator.php" as IV
+control "services/\nPdfReportService.php\n::generate()" as PDF
+entity "models/\nAnalysis.php" as E
+entity "Flask API\n(Railway)\nPOST /predict" as FLASK
+database "Railway DB\n(tabla: analyses)" as BD
+
+== POST /analysis/upload ==
+
+MED -> V : Sube imagen mediante\nmultipart/form-data\n(campo: retina_image)
+V -> C : AnalysisController::upload(\n  $_FILES['retina_image'],\n  $_SESSION['doctor_id']\n)
+
+C -> IV : ImageValidator::validate(\n  $file['tmp_name'],\n  $file['type'],\n  $file['size']\n)
+IV -> IV : Verifica MIME:\n  in_array($type,\n  ['image/jpeg','image/png'])\nVerifica tamaño:\n  $size <= 10 * 1024 * 1024
+
+alt MIME no permitido
+    IV --> C : return ['error' => 'formato_invalido']
+    C --> V : return error
+    V --> MED : HTTP 415 — "Formato no permitido.\nSuba una imagen JPG o PNG"
+else Supera 10 MB
+    IV --> C : return ['error' => 'tamano_excedido']
+    C --> V : return error
+    V --> MED : HTTP 413 — "El archivo supera\nel tamaño máximo de 10 MB"
+else Archivo válido
+    IV -> IV : ImageQualityChecker::\n  analyze($file['tmp_name'])\n' Evalúa contraste y nitidez
+    IV --> C : return [\n  'valid' => true,\n  'low_quality' => bool\n]
+
+    alt low_quality === true
+        C --> V : return ['warning' =>\n  'baja_calidad']
+        V --> MED : HTTP 200 — Aviso amarillo:\n"La imagen puede presentar\nbaja calidad"
+    end
+
+    V --> MED : HTTP 200 — Muestra\nvista previa con nombre,\ntamaño y botón "Analizar imagen"
+
+    == POST /analysis/process ==
+
+    MED -> V : Presiona "Analizar imagen"
+    V -> C : AnalysisController::process(\n  $tmpPath,\n  $_SESSION['doctor_id'],\n  $patientHistoryId\n)
+    V --> MED : HTTP 200 — Spinner:\n"Procesando imagen…"
+
+    C -> FLASK : HTTP POST https://flask-api.railway.app/predict\nContent-Type: multipart/form-data\nbody: { image: $imageData }\n' Timeout configurado: 10 seg
+
+    alt HTTP 200 en menos de 5 seg
+        FLASK --> C : JSON {\n  "predicted_class": "retinopatia_diabetica",\n  "probabilities": {\n    "normal": 0.05,\n    "retinopatia_diabetica": 0.82,\n    "glaucoma": 0.08,\n    "catarata": 0.05\n  }\n}
+        C -> E : Analysis::create([\n  'doctor_id'         => $doctorId,\n  'patient_history_id'=> $historyId,\n  'predicted_class'   => $class,\n  'prob_normal'       => 0.05,\n  'prob_retinopatia'  => 0.82,\n  'prob_glaucoma'     => 0.08,\n  'prob_catarata'     => 0.05,\n  'image_path'        => $storedPath,\n  'created_at'        => now()\n])
+        E -> BD : INSERT INTO analyses\n(doctor_id, patient_history_id,\npredicted_class, prob_normal,\nprob_retinopatia, prob_glaucoma,\nprob_catarata, image_path,\ncreated_at)\nVALUES (?,?,?,?,?,?,?,?,NOW())
+        BD --> E : INSERT OK — lastInsertId()
+        E --> C : $analysisId
+        C --> V : return [\n  'analysis_id'    => $analysisId,\n  'predicted_class'=> $class,\n  'probabilities'  => [...]\n]
+        V --> MED : HTTP 200 — Muestra:\n- Clase principal + porcentaje\n- Barras de probabilidad\n- Alerta roja si prob > umbral\n- Advertencia clínica\n- Botón "Descargar reporte PDF"
+
+    else Timeout (> 10 seg) o HTTP 504
+        FLASK --> C : cURL error / timeout
+        C --> V : return ['error' =>\n  'timeout_modelo']
+        V --> MED : HTTP 200 — "El análisis está\ntardando más de lo esperado.\nVerifique su conexión\no intente nuevamente"
+
+    else HTTP 500 desde Flask
+        FLASK --> C : HTTP 500
+        C --> V : return ['error' =>\n  'fallo_modelo']
+        V --> MED : HTTP 200 — "No se pudo completar\nel análisis. Intente nuevamente\no contacte al administrador"
+    end
+
+    == GET /analysis/{id}/report ==
+
+    MED -> V : Presiona "Descargar reporte PDF"
+    V -> C : AnalysisController::downloadReport(\n  $analysisId\n)
+    C -> PDF : PdfReportService::generate([\n  'doctor_nombre'  => $_SESSION['nombre'],\n  'fecha'          => date('d/m/Y H:i'),\n  'image_path'     => $storedPath,\n  'predicted_class'=> $class,\n  'probabilities'  => [...],\n  'disclaimer'     => CLINICAL_DISCLAIMER\n])
+    PDF --> C : $pdfBinary (TCPDF / FPDF)
+    C --> V : header('Content-Type:\n  application/pdf')\nheader('Content-Disposition:\n  attachment;\n  filename="reporte_retinai.pdf"')
+    V --> MED : HTTP 200 — Descarga\nautomática del PDF
+
+    C -> C : AnalysisController::\n  enableNewAnalysis()\n' Limpia estado en sesión
+    C --> V : return ['ready' => true]
+    V --> MED : Muestra botón "Nuevo análisis"
+end
+
+@enduml
+
+
+' ============================================================
+' RF-06: Gestionar Historial por Paciente
+' ============================================================
+@startuml RF06_Diseno_GestionarHistorial
+title RF-06: Gestionar Historial por Paciente [Diseño]
+
+skinparam backgroundColor #FFFFFF
+skinparam sequenceArrowThickness 1.5
+skinparam roundcorner 5
+skinparam ParticipantBackgroundColor #FFFFFF
+skinparam ParticipantBorderColor #000000
+skinparam ArrowColor #000000
+skinparam SequenceLifeLineBorderColor #888888
+
+actor "Médico" as MED
+
+boundary "views/analysis/\nupload.php" as V
+control "controllers/\nPatientController.php" as C
+entity "models/\nPatient.php" as EP
+entity "models/\nAnalysis.php" as EA
+database "Railway DB\n(tablas: patients,\nanalyses)" as BD
+
+== POST /patients/identify ==
+
+MED -> V : Ingresa DNI antes\nde confirmar análisis\nPOST: dni
+V -> C : PatientController::identifyByDni(\n  $dni\n)
+
+C -> C : Validator::regex(\n  $dni, '/^\d{8}$/'\n)
+
+alt DNI no tiene 8 dígitos numéricos
+    C --> V : return ['error' =>\n  'dni_invalido']
+    V --> MED : HTTP 422 — "Ingrese un DNI\nválido de 8 dígitos"
+else DNI válido
+    C -> EP : Patient::findByDni($dni)
+    EP -> BD : SELECT id, history_code\nFROM patients\nWHERE dni = ? LIMIT 1
+    BD --> EP : row / null
+    EP --> C : $patient / null
+
+    alt Paciente nuevo (null)
+        C -> C : $historyCode =\n  strtoupper(substr(\n    str_replace('-','',\n    Uuid::uuid4()), 0, 10\n  ))\n' Ej: "A3F9B1C2D7"
+        C -> EP : Patient::create([\n  'dni'          => $dni,\n  'history_code' => $historyCode,\n  'created_at'   => now()\n])
+        EP -> BD : INSERT INTO patients\n(dni, history_code, created_at)\nVALUES (?, ?, NOW())
+        BD --> EP : INSERT OK
+        EP --> C : $historyCode
+        C --> V : return [\n  'new_patient' => true,\n  'history_code'=> $historyCode\n]
+        V --> MED : HTTP 201 — "Código de historial\nasignado al paciente:\n[CÓDIGO]"
+    else Paciente ya registrado
+        C --> V : return [\n  'new_patient'  => false,\n  'history_code' => $patient['history_code']\n]
+        V --> MED : HTTP 200 — "Paciente\nidentificado correctamente"
+    end
+
+    == GET /patients/history?code={history_code} ==
+
+    MED -> V : Ingresa código de historial
+    V -> C : PatientController::getHistory(\n  $historyCode\n)
+    C -> EP : Patient::findByHistoryCode(\n  $historyCode\n)
+    EP -> BD : SELECT id FROM patients\nWHERE history_code = ? LIMIT 1
+    BD --> EP : row / null
+    EP --> C : $patientId / null
+
+    alt Código no encontrado
+        C --> V : return ['error' =>\n  'historial_no_encontrado']
+        V --> MED : HTTP 404 — "No se encontró historial\ncon el código ingresado.\nVerifique el código o\nrecupérelo por DNI"
+    else Código encontrado
+        C -> EA : Analysis::findByPatient(\n  $patientId\n)
+        EA -> BD : SELECT id, predicted_class,\ncreated_at\nFROM analyses\nWHERE patient_history_id=?\nORDER BY created_at DESC
+        BD --> EA : rows[]
+        EA --> C : $analyses[]
+        C --> V : return ['analyses' => $analyses]
+        V --> MED : HTTP 200 — Lista de análisis\ncon fecha, hora, resultado\ny enlace "Ver detalle"
+    end
+end
+
+@enduml
+
+
+' ============================================================
+' RF-07: Recuperar Código de Historial por DNI
+' ============================================================
+@startuml RF07_Diseno_RecuperarCodigoHistorial
+title RF-07: Recuperar Código de Historial por DNI [Diseño]
+
+skinparam backgroundColor #FFFFFF
+skinparam sequenceArrowThickness 1.5
+skinparam roundcorner 5
+skinparam ParticipantBackgroundColor #FFFFFF
+skinparam ParticipantBorderColor #000000
+skinparam ArrowColor #000000
+skinparam SequenceLifeLineBorderColor #888888
+
+actor "Médico Oftalmólogo" as MED
+
+boundary "views/analysis/\nrecover_history.php" as V
+control "controllers/\nPatientController.php\n::recoverHistoryCode()" as C
+entity "models/\nPatient.php" as E
+database "Railway DB\n(tabla: patients)" as BD
+
+== GET /patients/recover-code ==
+
+MED -> V : Accede a\n"Recuperar código de historial"\ndesde el módulo de análisis
+V --> MED : HTTP 200 — Muestra campo\npara ingresar DNI
+
+== POST /patients/recover-code ==
+
+MED -> V : Envía formulario\nPOST: dni
+V -> C : PatientController::recoverHistoryCode(\n  $dni\n)
+
+C -> C : Validator::regex(\n  $dni, '/^\d{8}$/'\n)
+
+alt DNI con formato inválido
+    C --> V : return ['error' =>\n  'dni_invalido']
+    V --> MED : HTTP 422 — "Ingrese un DNI\nválido de 8 dígitos"
+else DNI válido
+    C -> E : Patient::findByDni($dni)
+    E -> BD : SELECT history_code\nFROM patients\nWHERE dni = ? LIMIT 1
+    BD --> E : row / null
+    E --> C : $patient / null
+
+    alt Paciente no encontrado
+        C --> V : return ['error' =>\n  'paciente_no_encontrado']
+        V --> MED : HTTP 404 — "No se encontró ningún\npaciente con ese DNI.\nVerifique el número o\nregistre al paciente\nen un nuevo análisis"
+    else Paciente encontrado
+        C --> V : return [\n  'history_code' =>\n  $patient['history_code']\n]
+        V --> MED : HTTP 200 — "El código de historial\nde este paciente es:\n[CÓDIGO]"
+        MED -> V : Anota el código\nde historial
+    end
+end
+
+@enduml
+
+
+' ============================================================
+' RF-08: Solicitar Registro de Centro Oftalmológico
+' ============================================================
+@startuml RF08_Diseno_RegistroCentroOftalmologico
+title RF-08: Solicitar Registro de Centro Oftalmológico [Diseño]
+
+skinparam backgroundColor #FFFFFF
+skinparam sequenceArrowThickness 1.5
+skinparam roundcorner 5
+skinparam ParticipantBackgroundColor #FFFFFF
+skinparam ParticipantBorderColor #000000
+skinparam ArrowColor #000000
+skinparam SequenceLifeLineBorderColor #888888
+
+actor "Dueño del Centro\nOftalmológico" as DUENO
+
+boundary "views/establishment/\nregister_form.php" as V
+control "controllers/\nEstablishmentController.php\n::requestRegister()" as C
+entity "models/\nEstablishment.php" as E
+database "Railway DB\n(tablas: establecimiento,\nmaestro)" as BD
+
+== GET /establishment/register ==
+
+DUENO -> V : Accede a la página\n"Registrar mi centro\noftalmológico"
+V -> C : EstablishmentController::showForm()
+C -> BD : SELECT id, valor FROM maestro\nWHERE tipo = 'TIPO_ESTABLECIMIENTO'\nAND activo = 1\nORDER BY orden
+BD --> C : [{id, valor: 'Público'},\n {id, valor: 'Privado'}]
+C --> V : return ['tipos' => $tipos]
+V --> DUENO : HTTP 200 — Formulario con campos:\nnombre_sede, direccion,\ntipo (select), ruc
+
+== POST /establishment/register ==
+
+DUENO -> V : Envía formulario completado
+V -> C : EstablishmentController\n::requestRegister(POST)
+
+C -> C : Valida campos obligatorios:\n$nombre_sede, $direccion,\n$tipo_id, $ruc (not empty)
+
+alt Campos incompletos (empty fields)
+    C --> V : return ['error' =>\n  'campos_incompletos']
+    V --> DUENO : HTTP 422 — Resalta campos faltantes:\n"Complete todos los campos requeridos"
+else Todos los campos presentes
+    C -> C : Valida formato RUC:\npreg_match('/^\d{11}$/', $ruc)
+
+    alt RUC inválido (no son 11 dígitos)
+        C --> V : return ['error' =>\n  'ruc_invalido']
+        V --> DUENO : HTTP 422 — "El RUC ingresado no\nes válido. Verifique\nel número e intente\nnuevamente."
+    else RUC con formato válido
+        C -> E : Establishment::findByRUC($ruc)
+        E -> BD : SELECT id FROM establecimiento\nWHERE ruc = ? LIMIT 1
+        BD --> E : row / null
+        E --> C : $existing / null
+
+        alt RUC ya registrado ($existing != null)
+            C --> V : return ['error' =>\n  'ruc_duplicado']
+            V --> DUENO : HTTP 409 — "Ya existe un centro\nregistrado con este RUC.\nContacte al administrador."
+        else RUC disponible (null)
+            C -> E : Establishment::create([\n  'id'          => UUID(),\n  'nombre_sede' => $nombre_sede,\n  'direccion'   => $direccion,\n  'tipo'        => $tipo_id,\n  'estado'      => maestro.ESTADO.PENDIENTE\n])
+            E -> BD : INSERT INTO establecimiento\n(id, nombre_sede, direccion,\ntipo, estado, ruc)\nVALUES (?, ?, ?, ?, ?, ?)
+            BD --> E : affected rows = 1
+            E --> C : $establishment->id
+            C --> V : return [\n  'success' => true,\n  'message' => 'solicitud_enviada'\n]
+            V --> DUENO : HTTP 201 — "Su solicitud ha sido\nenviada correctamente.\nEl administrador revisará\nsu información y le\nnotificará el resultado."
+        end
+    end
+end
+
+@enduml

@@ -1,27 +1,36 @@
 <?php
-require_once __DIR__ . '/../../../config/session_guard.php';
-require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../../config/session_guard.php';
+require_once __DIR__ . '/../../config/config.php';
 require_role('SAD');
 $user = current_user();
 $initials = get_initials($user['nombre']);
 $base = get_base_path();
 $logout_url = $base . 'controllers/AuthController.php?action=logout';
 
+$role_label   = '⚡ Super Administrador';
+$role_class   = 'role-sad';
+$avatar_class = 'avatar-sad';
+$header_sub   = 'Control Global';
+
 try {
     $db = (new Database())->getConnection();
     $total_establecimientos = $db->query("SELECT COUNT(*) FROM establecimientos")->fetchColumn();
     $total_medicos = $db->query("SELECT COUNT(*) FROM usuarios WHERE rol_codigo='MED' AND activo=1")->fetchColumn();
     $total_admins  = $db->query("SELECT COUNT(*) FROM usuarios WHERE rol_codigo='ADM' AND activo=1")->fetchColumn();
-    $establecimientos = $db->query("SELECT e.id, e.nombre, e.direccion,
-        COUNT(u.id) AS medicos
-        FROM establecimientos e
-        LEFT JOIN usuarios u ON u.establecimiento_id=e.id AND u.rol_codigo='MED' AND u.activo=1
-        GROUP BY e.id ORDER BY e.nombre")->fetchAll(PDO::FETCH_ASSOC);
-    $todos_usuarios = $db->query("SELECT u.nombre, u.correo, u.rol_codigo, u.activo, u.ultimo_acceso,
-        e.nombre AS establecimiento
-        FROM usuarios u
-        LEFT JOIN establecimientos e ON e.id=u.establecimiento_id
-        ORDER BY u.rol_codigo, u.nombre")->fetchAll(PDO::FETCH_ASSOC);
+    $establecimientos = $db->query(
+        "SELECT e.id, e.nombre, e.direccion,
+         COUNT(u.id) AS medicos
+         FROM establecimientos e
+         LEFT JOIN usuarios u ON u.establecimiento_id=e.id AND u.rol_codigo='MED' AND u.activo=1
+         GROUP BY e.id ORDER BY e.nombre"
+    )->fetchAll(PDO::FETCH_ASSOC);
+    $todos_usuarios = $db->query(
+        "SELECT u.nombre, u.correo, u.rol_codigo, u.activo, u.ultimo_acceso,
+         e.nombre AS establecimiento
+         FROM usuarios u
+         LEFT JOIN establecimientos e ON e.id=u.establecimiento_id
+         ORDER BY u.rol_codigo, u.nombre"
+    )->fetchAll(PDO::FETCH_ASSOC);
 } catch(Exception $ex) {
     $total_establecimientos=$total_medicos=$total_admins=0;
     $establecimientos=$todos_usuarios=[];
@@ -37,49 +46,11 @@ try {
 </head>
 <body>
 
-<header class="top-header">
-    <div class="header-brand">
-        <div class="logo-mark">
-            <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="white" stroke-width="1.5"/><circle cx="12" cy="12" r="3.5" fill="white" opacity=".6"/><circle cx="12" cy="12" r="1.2" fill="white"/></svg>
-        </div>
-        <span class="logo-text">Retin<em>AI</em></span>
-    </div>
-    <span class="role-pill role-sad">⚡ Super Administrador</span>
-    <div class="header-user">
-        <div class="avatar avatar-sad"><?= htmlspecialchars($initials) ?></div>
-        <div class="user-info">
-            <span class="user-name"><?= htmlspecialchars($user['nombre']) ?></span>
-            <span class="user-role">Control Global</span>
-        </div>
-        <a href="<?= $logout_url ?>" class="btn-logout" id="btn-logout">
-            <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            Salir
-        </a>
-    </div>
-</header>
+<?php require_once __DIR__ . '/../shared/header.php'; ?>
 
 <div class="app-shell">
-    <aside class="sidebar">
-        <nav class="sidebar-nav">
-            <div class="nav-section">
-                <span class="nav-section-label">Sistema Global</span>
-                <a href="#establecimientos" class="nav-item active" data-section="establecimientos">
-                    <svg class="nav-icon" viewBox="0 0 20 20" fill="none"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke="currentColor" stroke-width="1.3"/></svg>
-                    Establecimientos
-                </a>
-                <a href="#usuarios" class="nav-item" data-section="usuarios">
-                    <svg class="nav-icon" viewBox="0 0 20 20" fill="none"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8z" stroke="currentColor" stroke-width="1.3"/></svg>
-                    Usuarios del Sistema
-                </a>
-            </div>
-        </nav>
-        <div class="sidebar-footer">
-            <div class="session-info">
-                <svg viewBox="0 0 20 20" fill="none" width="13" height="13"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.3"/><path d="M10 6v4l2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-                Sesión: <span id="session-countdown">05:00</span>
-            </div>
-        </div>
-    </aside>
+
+    <?php require_once __DIR__ . '/../shared/sidebar.php'; ?>
 
     <main class="main-content">
         <div class="kpi-grid">

@@ -65,13 +65,13 @@ describe('RF-02 — Login: redirección por clave temporal', () => {
     });
 
     // ── Test 5: Login normal (sin clave temporal) → redirige al dashboard ──
-    it('debe redirigir al dashboard del médico tras login con clave permanente', () => {
+    it('debe redirigir al panel de administración tras login con clave permanente', () => {
         cy.visit(LOGIN_URL);
         cy.get('#email').type('admin@hospital.com');
         cy.get('#password').type('admin123');
         cy.get('#login-form').submit();
 
         cy.url().should('not.include', 'change_password.php');
-        cy.url().should('include', 'dashboard');
+        cy.url().should('include', 'views/admin');
     });
 });

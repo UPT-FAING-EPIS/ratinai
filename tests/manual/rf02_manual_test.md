@@ -35,7 +35,7 @@ Verificar manualmente que:
 | 4 | Hacer clic en "Iniciar sesión" | El botón muestra estado de carga (spinner) | | |
 | 5 | **Verificar redirección** | La URL cambia a `.../views/auth/change_password.php` | | |
 | 6 | Verificar que el formulario de cambio de contraseña está visible | Se muestran los campos "Nueva contraseña" y "Confirmar contraseña" | | |
-| 7 | Intentar navegar manualmente a `/views/dashboard/medico/index.php` | **El sistema DEBE redirigir de vuelta a `change_password.php`** (sesión con clave temporal bloquea acceso) | | |
+| 7 | Intentar navegar manualmente a `/views/medico/index.php` | **El sistema DEBE redirigir de vuelta a `change_password.php`** (sesión con clave temporal bloquea acceso) | | |
 
 > **CRITERIO PRINCIPAL**: El paso 7 es crítico. Si el médico puede acceder al dashboard con clave temporal, el test FALLA.
 
@@ -45,7 +45,7 @@ Verificar manualmente que:
 
 | # | Paso | Resultado Esperado | ✓/✗ |
 |---|------|--------------------|-----|
-| 1 | Con sesión de clave temporal activa, intentar acceder a `/views/dashboard/medico/index.php` | Redirigir a `change_password.php` | |
+| 1 | Con sesión de clave temporal activa, intentar acceder a `/views/medico/index.php` | Redirigir a `change_password.php` | |
 | 2 | Intentar acceder a cualquier otra ruta protegida | Redirigir a `change_password.php` | |
 | 3 | En el formulario de cambio, ingresar `nueva123` y `nueva123` y enviar | Redirigir al dashboard del médico | |
 | 4 | Verificar que ahora SÍ puede acceder al dashboard | El dashboard carga correctamente | |
@@ -68,7 +68,7 @@ Verificar manualmente que:
 
 > **NOTA PARA TEST RÁPIDO**: Para no esperar 60 minutos, modificar temporalmente en `session_guard.php`:  
 > `define('SESSION_TIMEOUT', 60); // 1 minuto para testing`  
-> Y en el `SessionService.init()` de la vista del dashboard:  
+> Y en el `SessionService.init()` de la vista principal:  
 > `timeout: 60000` → `timeout: 10000` (10 segundos)
 
 ---

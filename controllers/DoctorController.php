@@ -3,6 +3,7 @@ if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../models/DoctorModel.php';
 require_once __DIR__ . '/../services/MailService.php';
 require_once __DIR__ . '/../config/session_guard.php';
+require_once __DIR__ . '/../utils/PasswordHelper.php';
 
 class DoctorController {
     private $model;
@@ -36,7 +37,7 @@ class DoctorController {
             $cmp          = trim($_POST['cmp']          ?? '');
             $esp_sel      = trim($_POST['especialidad'] ?? '');
             $esp_nueva    = trim($_POST['esp_nueva']    ?? '');
-            $password_temp= trim($_POST['password_temp']?? '');
+            $password_temp = PasswordHelper::generateTemp(12);
 
             $especialidad_final = ($esp_sel === '__nueva__') ? $esp_nueva : $esp_sel;
 
@@ -45,7 +46,6 @@ class DoctorController {
             if (empty($correo) || !filter_var($correo, FILTER_VALIDATE_EMAIL)) $errors[] = "Ingrese un correo electrónico válido.";
             if (empty($cmp)) $errors[] = "El número CMP es obligatorio.";
             if (empty($especialidad_final)) $errors[] = "Seleccione o ingrese una especialidad.";
-            if (strlen($password_temp) < 6) $errors[] = "La contraseña temporal debe tener al menos 6 caracteres.";
 
             if (!empty($errors)) {
                 $_SESSION['flash_errors'] = $errors;

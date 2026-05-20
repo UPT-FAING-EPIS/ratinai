@@ -9,6 +9,7 @@ describe('RF-01 — Crear Médico: validación y envío de clave temporal', () =
         nombre: 'Dr. Cypress Test',
         correo: `cypress_doc_${Date.now()}@hospital.com`,
         cmp: `CMP${Math.floor(Math.random() * 10000)}`,
+        password: 'cypress123',
     };
 
     beforeEach(() => {
@@ -36,6 +37,9 @@ describe('RF-01 — Crear Médico: validación y envío de clave temporal', () =
         // Seleccionar una especialidad
         cy.get('#combo-display').click({force: true});
         cy.get('.combo-opt').not('.nueva').first().click({force: true});
+
+        // Inyectar contraseña fija para tests reproducibles
+        cy.get('#password_override').invoke('val', DOCTOR_TEST.password);
 
         // Enviar el formulario
         cy.get('#btn-guardar').click({force: true});

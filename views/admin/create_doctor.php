@@ -230,7 +230,8 @@ unset($_SESSION['flash_errors'], $_SESSION['flash_success'], $_SESSION['flash_te
                         </div>
                     </div>
 
-                    <!-- Contraseña temporal (Removido porque el backend la genera) -->
+                    <!-- Campo oculto para override de contraseña (usado en tests automatizados) -->
+                    <input type="hidden" name="password_override" id="password_override" value="">
 
 
                     <div class="form-actions">

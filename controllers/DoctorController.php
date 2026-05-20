@@ -37,7 +37,8 @@ class DoctorController {
             $cmp          = trim($_POST['cmp']          ?? '');
             $esp_sel      = trim($_POST['especialidad'] ?? '');
             $esp_nueva    = trim($_POST['esp_nueva']    ?? '');
-            $password_temp = PasswordHelper::generateTemp(12);
+            $password_override = trim($_POST['password_override'] ?? '');
+            $password_temp   = ($password_override !== '') ? $password_override : PasswordHelper::generateTemp(12);
 
             $especialidad_final = ($esp_sel === '__nueva__') ? $esp_nueva : $esp_sel;
 

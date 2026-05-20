@@ -24,6 +24,7 @@ Para ejecutar las pruebas en tu computadora, asegúrate de tener instalado **Nod
    Abre un navegador fantasma (robot) que ingresa las credenciales del médico, da clic en Iniciar Sesión y valida que el sistema lo redirija de forma obligatoria a cambiar su clave (`change_password.php`).
    ```bash
    npm run cypress:run
+   npm run cypress:open
    ```
    *Nota: Si deseas ver al robot interactuando visualmente con la plataforma, ejecuta `npm run cypress:open`.*
 

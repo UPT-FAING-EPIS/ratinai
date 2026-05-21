@@ -58,7 +58,7 @@ else Datos válidos
         C -> E : DoctorModel::create([\n  'nombre' => $nombre,\n  'email' => $correo,\n  'cmp' => $cmp,\n  'especialidad' => $especialidad_final,\n  'password' => $hash,\n  'establecimiento_id' => $est_id\n])
         E -> BD : INSERT INTO usuarios (nombre, correo,\npassword, rol_codigo, cmp, especialidad,\nestablecimiento_id, activo, es_password_temporal)\nVALUES (?, ?, ?, 'MED', ?, ?, ?, 1, 1)
         BD --> E : INSERT OK — lastInsertId()
-        E --> C : $newDoctorId
+        E --> C : $lastInsertId
 
         C -> MS : MailService::sendTempPassword(\n  $correo, $nombre, $password_temp\n)
 

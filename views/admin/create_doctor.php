@@ -262,7 +262,6 @@ setInterval(() => {
     if (remaining > 0) remaining--;
 }, 1000);
 
-// ── Combo buscable ──────────────────────────────────────
 const display   = document.getElementById('combo-display');
 const dropdown  = document.getElementById('combo-dropdown');
 const searchInp = document.getElementById('combo-search');
@@ -271,7 +270,6 @@ const hidden    = document.getElementById('campo-especialidad');
 const nuevaWrap = document.getElementById('nueva-esp-field');
 const nuevaInp  = document.getElementById('esp_nueva');
 
-// Abrir/cerrar
 if(display) {
     display.addEventListener('click', () => {
         dropdown.classList.toggle('open');
@@ -282,7 +280,6 @@ if(display) {
         }
     });
 
-    // Cerrar al hacer clic fuera
     document.addEventListener('click', e => {
         if (!document.getElementById('combo-wrap').contains(e.target)) {
             dropdown.classList.remove('open');
@@ -327,9 +324,6 @@ if(display) {
     hidden.value = '__nueva__';
     <?php endif; ?>
 }
-
-// Toggle visibilidad de contraseña eliminado
-
 
 // Copiar contraseña temporal
 function copyPass() {

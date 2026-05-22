@@ -1,10 +1,10 @@
 <?php
 class Database {
-    private $host = 'roundhouse.proxy.rlwy.net';
-    private $port = '23598';
+    private $host = 'kodama.proxy.rlwy.net';
+    private $port = '51343';
     private $dbname = 'railway';
     private $username = 'root';
-    private $password = 'gcwGXEGFxoKuBcTAyTJvOGILCPGHsAwm';
+    private $password = 'pqoacJffGYyQnDqAYSwDBJnjcZWKEczc';
     public $conn;
 
     public function getConnection() {

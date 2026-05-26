@@ -1,4 +1,4 @@
-' ============================================================
+﻿' ============================================================
 ' RETINAI — Diagramas de Secuencia
 ' Nivel de Diseño (Clases Concretas · Métodos · Tecnologías)
 ' Stack: PHP puro · MySQL/PostgreSQL en Railway · Flask API (TF Lite)
@@ -161,8 +161,8 @@ end
 ' ============================================================
 ' RF-03: Gestionar Médicos Activos del Establecimiento
 ' ============================================================
-@startuml RF03_Diseno_GestionarMedicos
-title RF-03: Gestionar Médicos Activos del Establecimiento [Diseño]
+@startuml RF03_Diseno_GestionarMedicos_Actualizado
+title RF-03: Gestionar Médicos Activos del Establecimiento [Diseño Actualizado]
 
 skinparam backgroundColor #FFFFFF
 skinparam sequenceArrowThickness 1.5
@@ -172,79 +172,112 @@ skinparam ParticipantBorderColor #000000
 skinparam ArrowColor #000000
 skinparam SequenceLifeLineBorderColor #888888
 
-actor "Administrador" as ADM
+actor "Administrador\n(Frontend)" as ADM
 
-boundary "views/admin/\ndoctors_list.php" as V
-control "controllers/\nDoctorController.php" as C
-control "services/\nMailService.php\n::sendTempPassword()" as MS
-entity "models/\nDoctor.php" as E
-database "Railway DB\n(tabla: doctors)" as BD
+boundary "views/admin/\ndoctor.php" as V
+control "controllers/\nDoctorController.php\n::editDoctor()\n::resetPassword()\n::deactivate()" as C
+control "utils/\nPasswordHelper.php\n::generateTemp()" as PH
+control "services/\nMailService.php\n::sendResetPassword()" as MS
+entity "models/\nDoctorModel.php" as E
+database "Railway DB\n(tabla: usuarios)" as BD
 
-== GET /admin/doctors ==
+== GET views/admin/doctor.php ==
 
-ADM -> V : Accede al panel\nde gestión de médicos
-V -> C : DoctorController::listActive(\n  $establishmentId\n)
-C -> E : Doctor::findActiveByEstablishment(\n  $establishmentId\n)
-E -> BD : SELECT id, nombre, cmp,\nespecialidad, institucion\nFROM doctors\nWHERE estado='activo'\nAND establishment_id=?\nORDER BY nombre ASC
-BD --> E : rows[]
-E --> C : $doctors[]
+ADM -> V : HTTP GET /admin/doctor.php
+V -> E : DoctorModel::getDoctors($est_id)
+E -> BD : SELECT id, nombre, correo, cmp, especialidad,\nultimo_acceso, es_password_temporal\nFROM usuarios WHERE rol_codigo='MED'\nAND activo=1 AND establecimiento_id=?
+BD --> E : rows[] (PDO::FETCH_ASSOC)
+E --> V : array $activos
+V --> ADM : HTTP 200 OK HTML\nRenderiza <table id="doctorsTable">
 
-alt Lista vacía
-    C --> V : return ['doctors' => []]
-    V --> ADM : HTTP 200 — "No hay médicos\nactivos registrados"
-else Lista con registros
-    C --> V : return ['doctors' => $doctors]
-    V --> ADM : HTTP 200 — Tabla con\nnombre, CMP, especialidad,\ninstitución y acciones
+== POST controllers/DoctorController.php?action=edit ==
 
-    alt Editar datos — POST /admin/doctors/{id}/update
-        ADM -> V : Envía formulario con\nnombre, especialidad, institucion
-        V -> C : DoctorController::update(\n  $id, $nombre,\n  $especialidad, $institucion\n)
-        C -> C : Validator::required([...])\nValidator::length($nombre, 3, 100)
-        C -> E : Doctor::update($id, [\n  'nombre'       => $nombre,\n  'especialidad' => $especialidad,\n  'institucion'  => $institucion,\n  'updated_at'   => now()\n])
-        E -> BD : UPDATE doctors\nSET nombre=?, especialidad=?,\ninstitucion=?, updated_at=NOW()\nWHERE id=?
-        BD --> E : UPDATE OK
-        E --> C : true
-        C --> V : return ['success' =>\n  'Datos actualizados']
-        V --> ADM : HTTP 200 — "Datos del médico\nactualizados exitosamente"
+ADM -> V : Envia datos desde modal #modal-edit
+V -> C : fetch('?action=edit') via FormData\n{edit_id: int, nombre: string, correo: string,\n cmp: string, especialidad: string}
+C -> E : DoctorModel::existsByEmail($correo, $edit_id)
+E -> BD : SELECT id FROM usuarios\nWHERE correo=? AND id!=? LIMIT 1
+BD --> E : row / false
+E --> C : boolean
 
-    else Resetear contraseña — POST /admin/doctors/{id}/reset-password
-        ADM -> V : Solicita reseteo
-        V -> C : DoctorController::resetPassword($id)
-        C -> C : $tempPass =\n  PasswordHelper::generateTemp(12)\n$hash =\n  password_hash($tempPass,\n  PASSWORD_BCRYPT)
-        C -> E : Doctor::update($id, [\n  'password'     => $hash,\n  'is_temp_pass' => true,\n  'updated_at'   => now()\n])
-        E -> BD : UPDATE doctors\nSET password=?,\nis_temp_pass=1,\nupdated_at=NOW()\nWHERE id=?
-        BD --> E : UPDATE OK
-        E --> C : true
-        C -> E : Doctor::findById($id)\n' Para obtener email y nombre
-        E -> BD : SELECT email, nombre\nFROM doctors WHERE id=?
-        BD --> E : row
-        E --> C : $doctor
-        C -> MS : MailService::sendTempPassword(\n  $doctor['email'],\n  $doctor['nombre'],\n  $tempPass\n)
+alt existsByEmail == true
 
-        alt SMTP OK
-            MS --> C : return true
-            C --> V : return ['success' =>\n  'Contraseña temporal enviada']
-            V --> ADM : HTTP 200 — "Contraseña temporal\nenviada al correo del médico"
-        else SMTP falla
-            MS --> C : return false
-            C --> V : return ['success' => true,\n  'temp_pass' => $tempPass]
-            V --> ADM : HTTP 200 — Muestra contraseña\ntemporal en pantalla
-        end
+    C --> V : HTTP 200 Content-Type: application/json\n{"success": false, "message": "El correo ya está en uso por otro médico."}
+    V --> ADM : JavaScript muestra toastify/alerta de error
 
-    else Desactivar acceso — POST /admin/doctors/{id}/deactivate
-        ADM -> V : Confirma desactivación\nen modal de confirmación
-        V -> C : DoctorController::deactivate($id)
-        C -> E : Doctor::update($id, [\n  'estado'     => 'desactivado',\n  'updated_at' => now()\n])
-        E -> BD : UPDATE doctors\nSET estado='desactivado',\nupdated_at=NOW()\nWHERE id=?
-        BD --> E : UPDATE OK
-        E --> C : true
-        C --> V : return ['success' =>\n  'Médico desactivado']
-        V --> ADM : HTTP 200 — "El acceso del médico\nha sido desactivado exitosamente"
+else existsByEmail == false
+
+    C -> E : DoctorModel::existsByCMP($cmp, $edit_id)
+    E -> BD : SELECT id FROM usuarios WHERE cmp=?\nAND rol_codigo='MED' AND id!=?\nLIMIT 1
+    BD --> E : row / false
+    E --> C : boolean
+
+    alt existsByCMP == true
+
+        C --> V : HTTP 200 Content-Type: application/json\n{"success": false, "message": "El CMP ya está en uso por otro médico."}
+        V --> ADM : JavaScript muestra toastify/alerta de error
+
+    else existsByCMP == false
+
+        C -> E : DoctorModel::updateDoctor($edit_id, $est_id, $data)
+        E -> BD : UPDATE usuarios SET nombre=?, correo=?,\ncmp=?, especialidad=? WHERE id=?\nAND establecimiento_id=? AND rol_codigo='MED'
+        BD --> E : PDOStatement::execute() OK
+        E --> C : boolean true
+
+        C --> V : HTTP 200 Content-Type: application/json\n{"success": true}
+        V --> ADM : JS recarga local window.location.reload()\nToastify "Médico actualizado exitosamente"
+
     end
 end
 
-@enduml
+== POST controllers/DoctorController.php?action=reset ==
 
+ADM -> V : Clic "Confirmar" en modal #modal-reset
+V -> C : fetch('?action=reset') via FormData\n{reset_id: int}
+C -> E : DoctorModel::findById($reset_id, $est_id)
+E -> BD : SELECT * FROM usuarios WHERE id=? AND establecimiento_id=?
+BD --> E : row(doctor)
+E --> C : array $doctor (contiene email, nombre)
+
+C -> PH : PasswordHelper::generateTemp(8)
+PH --> C : string $tempPass (ej. A1B2c3D4)
+
+C -> C : $hash = password_hash($tempPass, PASSWORD_BCRYPT)
+
+C -> E : DoctorModel::resetPassword($reset_id, $est_id, $hash)
+E -> BD : UPDATE usuarios SET password=?, es_password_temporal=1\nWHERE id=? AND establecimiento_id=?
+BD --> E : PDOStatement::execute() OK
+E --> C : boolean true
+
+C -> MS : MailService::sendResetPassword($doctor['correo'], $doctor['nombre'], $tempPass)
+MS -> MS : PHPMailer::send() a SMTP
+MS --> C : boolean
+
+alt Mailer successfully sent
+
+    C --> V : HTTP 200 Content-Type: application/json\n{"success": true}
+    V --> ADM : JS recarga local window.location.reload()
+
+else Mailer threw Exception
+
+    C --> V : HTTP 200 Content-Type: application/json\n{"success": false, "message": "No se pudo enviar el correo de recuperación..."}
+    V --> ADM : JavaScript muestra toastify de error
+
+end
+
+== POST controllers/DoctorController.php?action=deactivate ==
+
+ADM -> V : Form submit nativo <form method="POST">
+V -> C : HTTP POST payload: {target_id: int}
+C -> E : DoctorModel::deactivate($target_id, $est_id)
+E -> BD : UPDATE usuarios SET activo=0 WHERE id=?\nAND establecimiento_id=? AND rol_codigo='MED'
+BD --> E : PDOStatement::execute() OK
+E --> C : boolean true
+
+C -> C : $_SESSION['flash_success'] = "médico desactivado"
+C --> V : HTTP 302 Redirect Location: doctor.php
+V --> ADM : Renderiza tabla sin médico desactivado
+
+@enduml
 
 ' ============================================================
 ' RF-04: Habilitar Establecimiento

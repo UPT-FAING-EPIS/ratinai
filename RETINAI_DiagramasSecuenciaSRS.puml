@@ -1,13 +1,13 @@
-@startuml RF01_SRS_CrearCuentaOftalmologo
+﻿@startuml RF01_SRS_CrearCuentaOftalmologo
 
 title RF-01: Crear Cuenta de Oftalmólogo
 
 actor "Administrador" as Admin
-participant "Vista:\nGestión de Médicos" as Vista
-participant "Control:\nCuenta Médico" as Control
-participant "Servicio:\nNotificación por Correo" as Mail
-entity "Entidad:\nMédico" as Entidad
-database "Base de Datos" as BD
+participant "Vista (views/admin/create_doctor.php):\nGestión de Médicos" as Vista
+participant "Control (controllers/DoctorController.php):\nCuenta Médico" as Control
+participant "Servicio (services/MailService.php):\nNotificación por Correo" as Mail
+entity "Entidad (models/DoctorModel.php):\nMédico" as Entidad
+database "Base de Datos (Railway DB)" as BD
 
 box "Proceso de Registro de Médico" #White
     participant Admin
@@ -56,6 +56,85 @@ else [Datos válidos]
             Vista -> Admin : Muestra cuadro azul de advertencia con la\ncontraseña temporal para entrega manual.
         end
     end
+end
+
+@enduml
+
+@startuml RF03_SRS_GestionarMedicos
+
+title RF-03: Gestionar Médicos Activos del Establecimiento
+
+actor "Administrador" as Admin
+participant "Vista (views/admin/doctor.php):\nGestión de Médicos" as Vista
+participant "Control (controllers/DoctorController.php):\nCuenta Médico" as Control
+participant "Serv. Util (utils/PasswordHelper.php):\nGenerador Contraseñas" as Util
+participant "Servicio (services/MailService.php):\nNotificación por Correo" as Mail
+entity "Entidad (models/DoctorModel.php):\nMédico" as Entidad
+database "Base de Datos (Railway DB)" as BD
+
+box "Proceso de Gestión de Médicos" #White
+    participant Admin
+    participant Vista
+    participant Control
+    participant Util
+    participant Mail
+    participant Entidad
+    participant BD
+end box
+
+Admin -> Vista : Selecciona opción "Médicos"
+Vista -> Admin : Muestra lista de médicos activos
+Admin -> Vista : Elige acción (Editar, Resetear Contraseña o Desactivar)
+
+alt [Editar Médico]
+    Admin -> Vista : Clic en "Editar", modifica datos y guarda
+    Vista -> Control : Envía nuevos datos editados
+    Control -> BD : Verifica que correo y CMP no estén duplicados
+    
+    alt [Duplicidad]
+        BD --> Control : Duplicados encontrados
+        Control --> Vista : Informa error de duplicidad
+        Vista -> Admin : Muestra alerta en el formulario
+    else [Datos disponibles]
+        BD --> Control : Disponibles
+        Control -> Entidad : Actualiza información del médico
+        Entidad -> BD : Guarda los cambios (nombre, correo, CMP, especialidad)
+        BD --> Entidad : Confirmación
+        Entidad --> Control : Ok
+        Control --> Vista : Confirmación de actualización
+        Vista -> Admin : Muestra mensaje de éxito y tabla actualizada
+    end
+
+else [Resetear Contraseña]
+    Admin -> Vista : Clic en "Resetear contraseña" y confirma
+    Vista -> Control : Solicita reseteo
+    Control -> Util : Genera nueva contraseña temporal
+    Util --> Control : Contraseña temporal generada
+    Control -> Entidad : Asigna contraseña al médico y cambia estado temporal
+    Entidad -> BD : Guarda nueva clave encriptada
+    BD --> Entidad : OK
+    Entidad --> Control : OK
+    
+    Control -> Mail : Envía contraseña temporal por correo
+    alt [Correo exitoso]
+        Mail --> Control : Envío OK
+        Control --> Vista : Confirmación de reseteo y envío
+        Vista -> Admin : Muestra mensaje de éxito
+    else [Correo fallido]
+        Mail --> Control : Fallo
+        Control --> Vista : Informa fallo al enviar
+        Vista -> Admin : Muestra mensaje de error
+    end
+
+else [Desactivar Acceso]
+    Admin -> Vista : Clic en "Desactivar" y confirma
+    Vista -> Control : Solicita desactivación
+    Control -> Entidad : Cambia el estado del médico a inactivo
+    Entidad -> BD : Actualiza estado en BD (activo=0)
+    BD --> Entidad : Confirmación
+    Entidad --> Control : OK
+    Control --> Vista : Confirma desactivación
+    Vista -> Admin : Muestra mensaje y retira al médico de la lista
 end
 
 @enduml

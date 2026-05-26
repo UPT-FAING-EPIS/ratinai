@@ -136,3 +136,116 @@ else (sí)
 endif
 
 @enduml
+
+@startuml RF03_Actividad_GestionarMedicos
+
+title RF-03: Gestionar Médicos Activos del Establecimiento [Diagrama de Actividad SRS]
+
+|Administrador|
+start
+:Accede a la opción "Médicos";
+
+|Vista: Gestión de Médicos|
+:Muestra lista de médicos activos\ny sus datos con botones de acción;
+
+|Administrador|
+
+if (Acción seleccionada) then (Editar)
+
+    :Hace clic en "Editar";
+
+    |Vista: Gestión de Médicos|
+    :Muestra formulario con\ndatos del médico;
+
+    |Administrador|
+    :Modifica Nombre,\nCorreo, CMP y Especialidad;
+    :Hace clic en Guardar;
+
+    |Control: Cuenta Médico|
+    :Recibe datos;
+    :Valida campos;
+    :Verifica duplicidad;
+
+    if (¿Duplicidad?) then (Sí)
+
+        |Vista: Gestión de Médicos|
+        :Muestra error;
+
+        |Administrador|
+        :Visualiza error;
+
+    else (No)
+
+        |Entidad: Médico|
+        :Actualiza datos;
+
+        |Vista: Gestión de Médicos|
+        :Muestra éxito;
+        :Recarga lista;
+
+        |Administrador|
+        :Visualiza cambios;
+
+    endif
+
+elseif (Resetear Contraseña)
+
+    |Administrador|
+    :Hace clic en Resetear;
+
+    |Vista: Gestión de Médicos|
+    :Solicita confirmación;
+
+    |Administrador|
+    :Confirma;
+
+    |Control: Cuenta Médico|
+    :Genera contraseña temporal;
+
+    |Entidad: Médico|
+    :Guarda hash y activa\nclave temporal;
+
+    |Control: Cuenta Médico|
+    :Envía correo;
+
+    if (¿Correo enviado?) then (Sí)
+
+        |Vista: Gestión de Médicos|
+        :Muestra éxito;
+        :Recarga tabla;
+
+        |Administrador|
+        :Visualiza éxito;
+
+    else (No)
+
+        |Vista: Gestión de Médicos|
+        :Muestra error;
+
+        |Administrador|
+        :Visualiza error;
+
+    endif
+
+else (Desactivar)
+
+    |Administrador|
+    :Hace clic en Desactivar;
+
+    |Control: Cuenta Médico|
+    :Procesa solicitud;
+
+    |Entidad: Médico|
+    :Actualiza activo=0;
+
+    |Vista: Gestión de Médicos|
+    :Elimina médico\nde la lista;
+
+    |Administrador|
+    :Visualiza resultado;
+
+endif
+
+stop
+
+@enduml

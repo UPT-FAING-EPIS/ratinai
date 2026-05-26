@@ -1,7 +1,9 @@
 <?php
 require_once __DIR__ . '/../../utils/PasswordHelper.php';
 
-class PasswordHelperTest extends PHPUnit_Framework_TestCase {
+use PHPUnit\Framework\TestCase;
+
+class PasswordHelperTest extends TestCase {
     public function testGenerateTempLength() {
         $pass = PasswordHelper::generateTemp(12);
         $this->assertEquals(12, strlen($pass), "La longitud de la contraseña generada no es correcta.");

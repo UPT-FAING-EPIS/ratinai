@@ -1,0 +1,1 @@
+{"version":1,"defects":[],"times":{"DoctorModelTest::testResetPassword":0.04,"PasswordHelperTest::testGenerateTempLength":0,"PasswordHelperTest::testGenerateTempIsAlphanumeric":0.002,"PasswordHelperTest::testGenerateTempIsUnique":0}}

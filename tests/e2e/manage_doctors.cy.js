@@ -27,8 +27,8 @@ describe('RF-03: Gestionar Médicos Activos', () => {
 
     it('Debe editar a un médico y mostrar mensaje de éxito (AJAX + Reload)', () => {
         // Clic en editar del primer médico en la tabla
-        cy.get('table#doctorsTable tbody tr').first().within(() => {
-            cy.get('button.btn-edit').click();
+        cy.get('table#tabla-medicos tbody tr').first().within(() => {
+            cy.get('button[title="Editar"]').click();
         });
 
         // Asegurarse de que el modal está visible
@@ -49,17 +49,17 @@ describe('RF-03: Gestionar Médicos Activos', () => {
 
         // NOTA: Según el diagrama de secuencia, el frontend debería hacer un window.location.reload()
         // Cypress esperará automáticamente a que la página recargue.
-        cy.get('table#doctorsTable').should('contain', nuevoNombre);
+        cy.get('table#tabla-medicos').should('contain', nuevoNombre);
     });
 
     it('Debe resetear la contraseña de un médico temporalmente', () => {
         // Clic en reset password del primer médico
-        cy.get('table#doctorsTable tbody tr').first().within(() => {
-            cy.get('button.btn-reset').click();
+        cy.get('table#tabla-medicos tbody tr').first().within(() => {
+            cy.get('button[title="Resetear contraseña"]').click();
         });
 
         cy.get('#modal-reset').should('be.visible');
-        cy.get('#modal-reset button.btn-confirm').click();
+        cy.get('#modal-reset button.btn-save').click();
 
         cy.wait('@resetPassword').then((interception) => {
             expect(interception.response.statusCode).to.eq(200);
@@ -69,8 +69,8 @@ describe('RF-03: Gestionar Médicos Activos', () => {
 
     it('Debe desactivar a un médico por POST de formulario', () => {
         // Encontrar un médico y capturar su nombre para verificar que desaparece
-        cy.get('table#doctorsTable tbody tr').first().then(($row) => {
-            const nombreMedico = $row.find('td.col-nombre').text().trim();
+        cy.get('table#tabla-medicos tbody tr').first().then(($row) => {
+            const nombreMedico = $row.find('td').first().find('strong').text().trim();
 
             cy.wrap($row).within(() => {
                 // Si la desactivación es por un form submit tradicional
@@ -82,7 +82,7 @@ describe('RF-03: Gestionar Médicos Activos', () => {
             
             // Si el test se corre en una base real, descomentar para asegurar borrado.
             // Para mocks es seguro chequear.
-            // cy.get('table#doctorsTable').should('not.contain', nombreMedico);
+            // cy.get('table#tabla-medicos').should('not.contain', nombreMedico);
         });
     });
 });

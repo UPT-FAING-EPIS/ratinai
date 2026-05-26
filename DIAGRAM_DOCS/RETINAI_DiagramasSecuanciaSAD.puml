@@ -175,6 +175,8 @@ skinparam SequenceLifeLineBorderColor #888888
 actor "Administrador\n(Frontend)" as ADM
 
 boundary "views/admin/\ndoctor.php" as V
+boundary "Pop-up DOM\n#modal-edit" as MEdit
+boundary "Pop-up DOM\n#modal-reset" as MReset
 control "controllers/\nDoctorController.php\n::editDoctor()\n::resetPassword()\n::deactivate()" as C
 control "utils/\nPasswordHelper.php\n::generateTemp()" as PH
 control "services/\nMailService.php\n::sendResetPassword()" as MS
@@ -192,8 +194,10 @@ V --> ADM : HTTP 200 OK HTML\nRenderiza <table id="doctorsTable">
 
 == POST controllers/DoctorController.php?action=edit ==
 
-ADM -> V : Envia datos desde modal #modal-edit
-V -> C : fetch('?action=edit') via FormData\n{edit_id: int, nombre: string, correo: string,\n cmp: string, especialidad: string}
+ADM -> V : Clic "Editar" en la tabla
+V -> MEdit : Despliega modal de edición
+ADM -> MEdit : Ingresa nuevos datos y hace submmit
+MEdit -> C : fetch('?action=edit') via FormData\n{edit_id: int, nombre: string, correo: string,\n cmp: string, especialidad: string}
 C -> E : DoctorModel::existsByEmail($correo, $edit_id)
 E -> BD : SELECT id FROM usuarios\nWHERE correo=? AND id!=? LIMIT 1
 BD --> E : row / false
@@ -201,8 +205,8 @@ E --> C : boolean
 
 alt existsByEmail == true
 
-    C --> V : HTTP 200 Content-Type: application/json\n{"success": false, "message": "El correo ya está en uso por otro médico."}
-    V --> ADM : JavaScript muestra toastify/alerta de error
+    C --> MEdit : HTTP 200 Content-Type: application/json\n{"success": false, "message": "El correo ya está en uso por otro médico."}
+    MEdit --> ADM : JavaScript muestra toastify/alerta de error
 
 else existsByEmail == false
 
@@ -213,8 +217,8 @@ else existsByEmail == false
 
     alt existsByCMP == true
 
-        C --> V : HTTP 200 Content-Type: application/json\n{"success": false, "message": "El CMP ya está en uso por otro médico."}
-        V --> ADM : JavaScript muestra toastify/alerta de error
+        C --> MEdit : HTTP 200 Content-Type: application/json\n{"success": false, "message": "El CMP ya está en uso por otro médico."}
+        MEdit --> ADM : JavaScript muestra toastify/alerta de error
 
     else existsByCMP == false
 
@@ -223,16 +227,19 @@ else existsByEmail == false
         BD --> E : PDOStatement::execute() OK
         E --> C : boolean true
 
-        C --> V : HTTP 200 Content-Type: application/json\n{"success": true}
-        V --> ADM : JS recarga local window.location.reload()\nToastify "Médico actualizado exitosamente"
+        C --> MEdit : HTTP 200 Content-Type: application/json\n{"success": true}
+        MEdit -> V : Cierra modal y dispara\nwindow.location.reload()
+        V --> ADM : Toastify "Médico actualizado exitosamente"
 
     end
 end
 
 == POST controllers/DoctorController.php?action=reset ==
 
-ADM -> V : Clic "Confirmar" en modal #modal-reset
-V -> C : fetch('?action=reset') via FormData\n{reset_id: int}
+ADM -> V : Clic "Resetear contraseña" en la tabla
+V -> MReset : Despliega modal de confirmación
+ADM -> MReset : Clic "Confirmar"
+MReset -> C : fetch('?action=reset') via FormData\n{reset_id: int}
 C -> E : DoctorModel::findById($reset_id, $est_id)
 E -> BD : SELECT * FROM usuarios WHERE id=? AND establecimiento_id=?
 BD --> E : row(doctor)
@@ -254,13 +261,14 @@ MS --> C : boolean
 
 alt Mailer successfully sent
 
-    C --> V : HTTP 200 Content-Type: application/json\n{"success": true}
-    V --> ADM : JS recarga local window.location.reload()
+    C --> MReset : HTTP 200 Content-Type: application/json\n{"success": true}
+    MReset -> V : Cierra modal y dispara\nwindow.location.reload()
+    V --> ADM : Tabla recargada con Toastify de éxito
 
 else Mailer threw Exception
 
-    C --> V : HTTP 200 Content-Type: application/json\n{"success": false, "message": "No se pudo enviar el correo de recuperación..."}
-    V --> ADM : JavaScript muestra toastify de error
+    C --> MReset : HTTP 200 Content-Type: application/json\n{"success": false, "message": "No se pudo enviar el correo de recuperación..."}
+    MReset --> ADM : JavaScript muestra toastify de error
 
 end
 

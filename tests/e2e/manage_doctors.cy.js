@@ -11,8 +11,11 @@ describe('RF-03: Gestionar Médicos Activos', () => {
     };
 
     beforeEach(() => {
-        // Asumiendo que existe un comando personalizado que inicie sesión como admin
-        cy.login('admin@hospital.com', 'admin123'); // Credenciales de bd.sql
+        // Iniciar sesión manualmente a través de la UI
+        cy.visit('/views/auth/login.php');
+        cy.get('#email').type('admin@hospital.com');
+        cy.get('#password').type('admin123');
+        cy.get('#login-form').submit();
         
         // Interceptar llamadas AJAX
         cy.intercept('POST', '**/DoctorController.php?action=edit').as('editDoctor');

@@ -8,15 +8,29 @@ class DoctorModel {
         $this->db = (new Database())->getConnection();
     }
 
-    public function existsByEmail($correo) {
-        $stmt = $this->db->prepare("SELECT id FROM usuarios WHERE correo = :correo LIMIT 1");
-        $stmt->execute([':correo' => $correo]);
+    public function existsByEmail($correo, $exclude_id = null) {
+        $sql = "SELECT id FROM usuarios WHERE correo = :correo";
+        $params = [':correo' => $correo];
+        if ($exclude_id !== null) {
+            $sql .= " AND id != :exc";
+            $params[':exc'] = $exclude_id;
+        }
+        $sql .= " LIMIT 1";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
         return (bool)$stmt->fetch();
     }
 
-    public function existsByCMP($cmp) {
-        $stmt = $this->db->prepare("SELECT id FROM usuarios WHERE cmp = :cmp AND rol_codigo = 'MED' LIMIT 1");
-        $stmt->execute([':cmp' => $cmp]);
+    public function existsByCMP($cmp, $exclude_id = null) {
+        $sql = "SELECT id FROM usuarios WHERE cmp = :cmp AND rol_codigo = 'MED'";
+        $params = [':cmp' => $cmp];
+        if ($exclude_id !== null) {
+            $sql .= " AND id != :exc";
+            $params[':exc'] = $exclude_id;
+        }
+        $sql .= " LIMIT 1";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
         return (bool)$stmt->fetch();
     }
 
@@ -52,5 +66,38 @@ class DoctorModel {
     public function deactivate($id, $est_id) {
         $stmt = $this->db->prepare("UPDATE usuarios SET activo=0 WHERE id=:id AND establecimiento_id=:eid AND rol_codigo='MED'");
         return $stmt->execute([':id' => $id, ':eid' => $est_id]);
+    }
+
+    public function findById($id, $est_id) {
+        $stmt = $this->db->prepare("SELECT * FROM usuarios WHERE id=:id AND establecimiento_id=:eid AND rol_codigo='MED' LIMIT 1");
+        $stmt->execute([':id' => $id, ':eid' => $est_id]);
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+    
+    public function updateDoctor($id, $est_id, $data) {
+        $stmt = $this->db->prepare(
+            "UPDATE usuarios SET nombre=:nombre, correo=:correo, cmp=:cmp, especialidad=:esp 
+             WHERE id=:id AND establecimiento_id=:eid AND rol_codigo='MED'"
+        );
+        return $stmt->execute([
+            ':nombre' => $data['nombre'],
+            ':correo' => $data['email'],
+            ':cmp'    => $data['cmp'],
+            ':esp'    => $data['especialidad'],
+            ':id'     => $id,
+            ':eid'    => $est_id
+        ]);
+    }
+
+    public function resetPassword($id, $est_id, $hash) {
+        $stmt = $this->db->prepare(
+            "UPDATE usuarios SET password=:pwd, es_password_temporal=1
+             WHERE id=:id AND establecimiento_id=:eid AND rol_codigo='MED'"
+        );
+        return $stmt->execute([
+            ':pwd' => $hash,
+            ':id'  => $id,
+            ':eid' => $est_id
+        ]);
     }
 }

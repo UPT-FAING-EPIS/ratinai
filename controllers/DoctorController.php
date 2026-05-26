@@ -109,6 +109,81 @@ class DoctorController {
             $this->redirect('views/admin/doctor.php');
         }
     }
+
+    public function editDoctor() {
+        require_role('ADM');
+        $user = current_user();
+        $est_id = (int)($user['establecimiento_id'] ?? 0);
+        
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            header('Content-Type: application/json');
+            
+            $id = (int)($_POST['edit_id'] ?? 0);
+            $nombre = trim($_POST['nombre'] ?? '');
+            $correo = trim($_POST['correo'] ?? '');
+            $cmp = trim($_POST['cmp'] ?? '');
+            $especialidad = trim($_POST['especialidad'] ?? '');
+            
+            if (empty($nombre) || empty($correo) || empty($cmp) || empty($especialidad)) {
+                echo json_encode(['success' => false, 'message' => 'Todos los campos son obligatorios.']);
+                exit;
+            }
+            if (!filter_var($correo, FILTER_VALIDATE_EMAIL)) {
+                echo json_encode(['success' => false, 'message' => 'Correo inválido.']);
+                exit;
+            }
+            
+            if ($this->model->existsByEmail($correo, $id)) {
+                echo json_encode(['success' => false, 'message' => 'Ya existe otro médico con ese correo.']);
+                exit;
+            }
+            if ($this->model->existsByCMP($cmp, $id)) {
+                echo json_encode(['success' => false, 'message' => 'Ya existe otro médico con ese CMP.']);
+                exit;
+            }
+            
+            $this->model->updateDoctor($id, $est_id, [
+                'nombre' => $nombre,
+                'email' => $correo,
+                'cmp' => $cmp,
+                'especialidad' => $especialidad
+            ]);
+            
+            echo json_encode(['success' => true]);
+            exit;
+        }
+    }
+
+    public function resetPassword() {
+        require_role('ADM');
+        $user = current_user();
+        $est_id = (int)($user['establecimiento_id'] ?? 0);
+        
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            header('Content-Type: application/json');
+            $id = (int)($_POST['reset_id'] ?? 0);
+            
+            $doctor = $this->model->findById($id, $est_id);
+            if (!$doctor) {
+                echo json_encode(['success' => false, 'message' => 'Médico no encontrado.']);
+                exit;
+            }
+            
+            $tempPass = PasswordHelper::generateTemp(12);
+            $hash = password_hash($tempPass, PASSWORD_BCRYPT);
+            
+            $this->model->resetPassword($id, $est_id, $hash);
+            
+            $mailSent = MailService::sendResetPassword($doctor['correo'], $doctor['nombre'], $tempPass);
+            
+            if ($mailSent) {
+                echo json_encode(['success' => true]);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Contraseña reseteada, pero no se pudo enviar el correo.']);
+            }
+            exit;
+        }
+    }
 }
 
 // Router
@@ -117,5 +192,7 @@ if (isset($_GET['action'])) {
     switch ($_GET['action']) {
         case 'create':     $controller->createDoctor(); break;
         case 'deactivate': $controller->deactivate(); break;
+        case 'edit':       $controller->editDoctor(); break;
+        case 'reset':      $controller->resetPassword(); break;
     }
 }

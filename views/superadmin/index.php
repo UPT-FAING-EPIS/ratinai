@@ -17,30 +17,21 @@ try {
     $total_establecimientos = $db->query("SELECT COUNT(*) FROM establecimientos")->fetchColumn();
     $total_medicos = $db->query("SELECT COUNT(*) FROM usuarios WHERE rol_codigo='MED' AND activo=1")->fetchColumn();
     $total_admins  = $db->query("SELECT COUNT(*) FROM usuarios WHERE rol_codigo='ADM' AND activo=1")->fetchColumn();
-    $establecimientos = $db->query(
-        "SELECT e.id, e.nombre, e.direccion,
-         COUNT(u.id) AS medicos
-         FROM establecimientos e
-         LEFT JOIN usuarios u ON u.establecimiento_id=e.id AND u.rol_codigo='MED' AND u.activo=1
-         GROUP BY e.id ORDER BY e.nombre"
-    )->fetchAll(PDO::FETCH_ASSOC);
-    $todos_usuarios = $db->query(
-        "SELECT u.nombre, u.correo, u.rol_codigo, u.activo, u.ultimo_acceso,
-         e.nombre AS establecimiento
-         FROM usuarios u
-         LEFT JOIN establecimientos e ON e.id=u.establecimiento_id
-         ORDER BY u.rol_codigo, u.nombre"
-    )->fetchAll(PDO::FETCH_ASSOC);
+    $cnt_solicitudes_pendientes = 0;
+    try {
+        $cnt_solicitudes_pendientes = $db->query("SELECT COUNT(*) FROM solicitudes_establecimiento WHERE estado='pendiente'")->fetchColumn();
+    } catch(Exception $e) { $cnt_solicitudes_pendientes = 0; }
 } catch(Exception $ex) {
-    $total_establecimientos=$total_medicos=$total_admins=0;
-    $establecimientos=$todos_usuarios=[];
+    $total_establecimientos = $total_medicos = $total_admins = 0;
+    $cnt_solicitudes_pendientes = 0;
 }
 ?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>RetinAI — Super Administrador</title>
+<title>RetinAI — Dashboard del Sistema</title>
+<meta name="description" content="Panel de control global del Super Administrador de RetinAI.">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="<?= $base ?>assets/css/dashboard/dashboard.css">
 </head>
@@ -53,73 +44,80 @@ try {
     <?php require_once __DIR__ . '/../shared/sidebar.php'; ?>
 
     <main class="main-content">
-        <div class="kpi-grid">
-            <div class="kpi-card">
-                <div class="kpi-icon kpi-blue">🏥</div>
-                <div class="kpi-body"><span class="kpi-value"><?= (int)$total_establecimientos ?></span><span class="kpi-label">Establecimientos</span></div>
-            </div>
-            <div class="kpi-card">
-                <div class="kpi-icon kpi-green">👨‍⚕️</div>
-                <div class="kpi-body"><span class="kpi-value"><?= (int)$total_medicos ?></span><span class="kpi-label">Médicos Activos</span></div>
-            </div>
-            <div class="kpi-card">
-                <div class="kpi-icon kpi-purple">🛡️</div>
-                <div class="kpi-body"><span class="kpi-value"><?= (int)$total_admins ?></span><span class="kpi-label">Administradores</span></div>
-            </div>
+
+        <!-- ── Page title ── -->
+        <div class="section-header">
+            <h1 class="page-title">Dashboard del Sistema</h1>
+            <p class="page-sub">Resumen global de la plataforma RetinAI.</p>
         </div>
 
-        <section id="establecimientos" class="content-section">
+        <!-- ── KPIs ── -->
+        <div class="kpi-grid">
+            <a href="<?= $base ?>views/superadmin/Establecimientos.php" class="kpi-card kpi-link">
+                <div class="kpi-icon kpi-blue">🏥</div>
+                <div class="kpi-body">
+                    <span class="kpi-value"><?= (int)$total_establecimientos ?></span>
+                    <span class="kpi-label">Establecimientos</span>
+                </div>
+            </a>
+            <a href="<?= $base ?>views/superadmin/UsuariosSistema.php" class="kpi-card kpi-link">
+                <div class="kpi-icon kpi-green">👨‍⚕️</div>
+                <div class="kpi-body">
+                    <span class="kpi-value"><?= (int)$total_medicos ?></span>
+                    <span class="kpi-label">Médicos Activos</span>
+                </div>
+            </a>
+            <a href="<?= $base ?>views/superadmin/UsuariosSistema.php" class="kpi-card kpi-link">
+                <div class="kpi-icon kpi-purple">🛡️</div>
+                <div class="kpi-body">
+                    <span class="kpi-value"><?= (int)$total_admins ?></span>
+                    <span class="kpi-label">Administradores</span>
+                </div>
+            </a>
+            <a href="<?= $base ?>views/superadmin/Establecimientos.php#solicitudes" class="kpi-card kpi-link">
+                <div class="kpi-icon kpi-orange">📋</div>
+                <div class="kpi-body">
+                    <span class="kpi-value"><?= (int)$cnt_solicitudes_pendientes ?></span>
+                    <span class="kpi-label">Solicitudes Pendientes</span>
+                </div>
+            </a>
+        </div>
+
+        <!-- ── Accesos rápidos ── -->
+        <section class="content-section">
             <div class="section-header">
-                <h1 class="page-title">Establecimientos</h1>
-                <p class="page-sub">Vista global de todos los centros oftalmológicos.</p>
+                <h2 class="page-title" style="font-size:16px;">Accesos Rápidos</h2>
             </div>
-            <div class="card">
-                <?php if(empty($establecimientos)): ?>
-                <p class="empty-msg">No hay establecimientos registrados.</p>
-                <?php else: ?>
-                <table class="data-table">
-                    <thead><tr><th>#</th><th>Nombre</th><th>Dirección</th><th>Médicos</th><th>Estado</th></tr></thead>
-                    <tbody>
-                    <?php foreach($establecimientos as $e): ?>
-                    <tr>
-                        <td class="mono"><?= (int)$e['id'] ?></td>
-                        <td><strong><?= htmlspecialchars($e['nombre']) ?></strong></td>
-                        <td><?= htmlspecialchars($e['direccion'] ?? '—') ?></td>
-                        <td><span class="badge badge-info"><?= (int)$e['medicos'] ?></span></td>
-                        <td><span class="badge badge-active">Activo</span></td>
-                    </tr>
-                    <?php endforeach; ?>
-                    </tbody>
-                </table>
-                <?php endif; ?>
+            <div class="quick-grid">
+                <a href="<?= $base ?>views/superadmin/Establecimientos.php" class="quick-card">
+                    <div class="quick-icon">🏥</div>
+                    <div>
+                        <div class="quick-title">Ver Establecimientos</div>
+                        <div class="quick-desc">Lista y gestión de centros oftalmológicos registrados.</div>
+                    </div>
+                </a>
+                <a href="<?= $base ?>views/superadmin/UsuariosSistema.php" class="quick-card">
+                    <div class="quick-icon">👥</div>
+                    <div>
+                        <div class="quick-title">Usuarios del Sistema</div>
+                        <div class="quick-desc">Todos los usuarios registrados en RetinAI por rol.</div>
+                    </div>
+                </a>
+                <a href="<?= $base ?>views/superadmin/Establecimientos.php#solicitudes" class="quick-card <?= $cnt_solicitudes_pendientes > 0 ? 'quick-card-alert' : '' ?>">
+                    <div class="quick-icon">📋</div>
+                    <div>
+                        <div class="quick-title">
+                            Solicitudes de Registro
+                            <?php if ($cnt_solicitudes_pendientes > 0): ?>
+                                <span class="nav-badge" style="margin-left:6px;"><?= $cnt_solicitudes_pendientes ?></span>
+                            <?php endif; ?>
+                        </div>
+                        <div class="quick-desc">Revisar solicitudes de nuevos centros oftalmológicos.</div>
+                    </div>
+                </a>
             </div>
         </section>
 
-        <section id="usuarios" class="content-section" style="display:none">
-            <div class="section-header">
-                <h1 class="page-title">Usuarios del sistema</h1>
-                <p class="page-sub">Todos los usuarios registrados en RetinAI.</p>
-            </div>
-            <div class="card">
-                <table class="data-table">
-                    <thead><tr><th>Usuario</th><th>Rol</th><th>Establecimiento</th><th>Último acceso</th><th>Estado</th></tr></thead>
-                    <tbody>
-                    <?php
-                    $rolL=['SAD'=>'Super Admin','ADM'=>'Admin','MED'=>'Médico'];
-                    $rolC=['SAD'=>'badge-sad','ADM'=>'badge-adm','MED'=>'badge-med'];
-                    foreach($todos_usuarios as $u): ?>
-                    <tr>
-                        <td><strong><?= htmlspecialchars($u['nombre']) ?></strong><br><span class="text-muted small"><?= htmlspecialchars($u['correo']) ?></span></td>
-                        <td><span class="badge <?= $rolC[$u['rol_codigo']]??'badge-info' ?>"><?= $rolL[$u['rol_codigo']]??$u['rol_codigo'] ?></span></td>
-                        <td><?= htmlspecialchars($u['establecimiento']??'Global') ?></td>
-                        <td class="text-muted small"><?= $u['ultimo_acceso'] ? date('d M Y H:i', strtotime($u['ultimo_acceso'])) : '—' ?></td>
-                        <td><span class="badge <?= $u['activo']?'badge-active':'badge-disabled' ?>"><?= $u['activo']?'Activo':'Inactivo' ?></span></td>
-                    </tr>
-                    <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
-        </section>
     </main>
 </div>
 
@@ -129,15 +127,6 @@ SessionService.init({ timeout: 300000, loginUrl: '<?= htmlspecialchars($base."vi
 let remaining = 300;
 const cd = document.getElementById('session-countdown');
 setInterval(()=>{ const m=Math.floor(remaining/60).toString().padStart(2,'0'); const s=(remaining%60).toString().padStart(2,'0'); cd.textContent=m+':'+s; if(remaining>0)remaining--; },1000);
-document.querySelectorAll('.nav-item[data-section]').forEach(link=>{
-    link.addEventListener('click',function(e){
-        e.preventDefault();
-        const t=this.dataset.section;
-        document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
-        this.classList.add('active');
-        document.querySelectorAll('.content-section').forEach(s=>{ s.style.display=s.id===t?'block':'none'; });
-    });
-});
 </script>
 </body>
 </html>

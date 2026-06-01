@@ -732,3 +732,48 @@ body {
 .btn-danger-outline:hover { background:#FEF2F2; }
 .content-section { display:block; }
 
+/* ── KPI links (Dashboard SAD) ── */
+.kpi-link {
+  text-decoration: none;
+  cursor: pointer;
+  transition: box-shadow 0.18s, transform 0.18s, border-color 0.18s;
+}
+.kpi-link:hover {
+  box-shadow: 0 4px 14px rgba(26,86,219,0.13);
+  transform: translateY(-2px);
+  border-color: var(--accent3, #C7DCFF);
+}
+.kpi-orange { background: #FFF7ED; }
+
+/* ── Quick access grid (Dashboard SAD) ── */
+.quick-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+}
+.quick-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #DDE3EC);
+  border-radius: var(--radius, 10px);
+  padding: 18px 20px;
+  text-decoration: none;
+  color: inherit;
+  transition: box-shadow 0.18s, border-color 0.18s, transform 0.18s;
+  box-shadow: 0 1px 3px rgba(15,25,35,.05);
+}
+.quick-card:hover {
+  box-shadow: 0 4px 14px rgba(26,86,219,0.12);
+  border-color: var(--accent3, #C7DCFF);
+  transform: translateY(-2px);
+}
+.quick-card-alert {
+  border-color: #FCD34D;
+  background: #FFFBEB;
+}
+.quick-icon { font-size: 24px; flex-shrink: 0; margin-top: 2px; }
+.quick-title { font-size: 14px; font-weight: 700; color: var(--text, #0F1923); margin-bottom: 4px; display:flex; align-items:center; }
+.quick-desc  { font-size: 12px; color: var(--text3, #8897AB); line-height: 1.5; }
+

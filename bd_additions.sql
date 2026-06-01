@@ -69,3 +69,40 @@ INSERT INTO maestro (tipo, codigo, descripcion, orden) VALUES
 ('TIPO_ESPECIALIDAD', 'UVE', 'Uveítis',                 7),
 ('TIPO_ESPECIALIDAD', 'OTR', 'Otro',                    99)
 ON DUPLICATE KEY UPDATE descripcion = VALUES(descripcion), orden = VALUES(orden);
+
+-- =========================================================================
+-- RF-08: Solicitudes de registro de centros oftalmológicos
+-- =========================================================================
+
+-- Si ya existe la tabla, eliminarla para recrearla con todos los campos
+DROP TABLE IF EXISTS solicitudes_establecimiento;
+
+CREATE TABLE solicitudes_establecimiento (
+    id                  INT AUTO_INCREMENT PRIMARY KEY,
+    -- Datos del centro
+    nombre_centro       VARCHAR(100)  NOT NULL,
+    direccion           VARCHAR(200)  NOT NULL,
+    tipo                ENUM('publico','privado') NOT NULL,
+    ruc                 VARCHAR(11)   NOT NULL,
+    -- Datos del titular/dueño
+    dni_titular         VARCHAR(8)    NOT NULL,
+    nombres_titular     VARCHAR(100)  NOT NULL,
+    apellidos_titular   VARCHAR(100)  NOT NULL,
+    telefono            VARCHAR(15)   NOT NULL,
+    correo_contacto     VARCHAR(100)  NOT NULL,
+    -- Evidencias (base64, máx 200KB c/u)
+    evidencia_1         MEDIUMTEXT    NULL,
+    evidencia_1_nombre  VARCHAR(255)  NULL,
+    evidencia_2         MEDIUMTEXT    NULL,
+    evidencia_2_nombre  VARCHAR(255)  NULL,
+    -- Estado
+    estado              ENUM('pendiente','aprobado','rechazado') NOT NULL DEFAULT 'pendiente',
+    fecha_solicitud     DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Agregar columnas tipo y ruc a establecimientos
+-- NOTA: Si ya existen, MySQL mostrará error que puede ignorarse
+ALTER TABLE establecimientos ADD COLUMN tipo ENUM('publico','privado') NULL;
+ALTER TABLE establecimientos ADD COLUMN ruc  VARCHAR(11)              NULL;
+
+

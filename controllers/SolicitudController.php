@@ -25,6 +25,12 @@ switch ($action) {
         handleSolicitar();
         break;
 
+    // ── ADM: Envío desde el admin ────────────────────────────────────────────
+    case 'solicitar_admin':
+        require_role('ADM');
+        handleSolicitarAdmin();
+        break;
+
     // ── SAD: Aprobar solicitud ───────────────────────────────────────────────
     case 'aprobar':
         require_role('SAD');
@@ -195,7 +201,7 @@ function handleSolicitar(): void
         exit;
 
     } catch (Exception $ex) {
-        $_SESSION['solicitud_error'] = 'Ocurrió un error al procesar su solicitud. Intente nuevamente.';
+        $_SESSION['solicitud_error'] = 'Ocurrió un error al procesar su solicitud. Error: ' . $ex->getMessage();
         header('Location: ' . $redirect_form);
         exit;
     }
@@ -302,4 +308,116 @@ function handleRechazar(): void
 
     header('Location: ' . $base . 'views/superadmin/SolicitudesRegistro.php');
     exit;
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+
+function handleSolicitarAdmin(): void
+{
+    $base = get_base_path();
+    $redirect_form = $base . 'views/admin/nuevoestablecimiento.php';
+
+    // Recoger y sanear datos Centro
+    $nombre_centro    = trim($_POST['nombre_centro']    ?? '');
+    $direccion        = trim($_POST['direccion']        ?? '');
+    $tipo             = trim($_POST['tipo']             ?? '');
+    $ruc              = trim($_POST['ruc']              ?? '');
+    
+    // Datos Titular
+    $dni_titular      = trim($_POST['dni_titular']      ?? '');
+    $nombres_titular  = trim($_POST['nombres_titular']  ?? '');
+    $apellidos_titular= trim($_POST['apellidos_titular']?? '');
+    $telefono         = trim($_POST['telefono']         ?? '');
+    
+    // El correo es el del usuario admin actual
+    $user = current_user();
+    if (!$user || empty($user['id'])) {
+        header('Location: ' . $base . 'views/auth/login.php');
+        exit;
+    }
+
+    // Evidencias Base64
+    $evidencia_1_b64    = $_POST['evidencia_1_b64'] ?? null;
+    $evidencia_1_nombre = $_POST['evidencia_1_nombre'] ?? null;
+    $evidencia_2_b64    = $_POST['evidencia_2_b64'] ?? null;
+    $evidencia_2_nombre = $_POST['evidencia_2_nombre'] ?? null;
+
+    if (!$nombre_centro || !$direccion || !$tipo || !$ruc || !$dni_titular || !$nombres_titular || !$apellidos_titular || !$telefono) {
+        $_SESSION['solicitud_error'] = 'Por favor, complete todos los campos requeridos.';
+        header('Location: ' . $redirect_form);
+        exit;
+    }
+
+    if (!in_array($tipo, ['publico', 'privado'], true)) {
+        $_SESSION['solicitud_error'] = 'Tipo de establecimiento no válido.';
+        header('Location: ' . $redirect_form);
+        exit;
+    }
+    if (!preg_match('/^\d{11}$/', $ruc)) {
+        $_SESSION['solicitud_error'] = 'El RUC ingresado no es válido.';
+        header('Location: ' . $redirect_form);
+        exit;
+    }
+    if (!preg_match('/^\d{8}$/', $dni_titular)) {
+        $_SESSION['solicitud_error'] = 'El DNI ingresado no es válido.';
+        header('Location: ' . $redirect_form);
+        exit;
+    }
+    if (empty($evidencia_1_b64)) {
+        $_SESSION['solicitud_error'] = 'Debe adjuntar al menos una evidencia.';
+        header('Location: ' . $redirect_form);
+        exit;
+    }
+
+    try {
+        $db = (new Database())->getConnection();
+
+        // Obtener el correo del usuario
+        $stmtCorreo = $db->prepare("SELECT correo FROM usuarios WHERE id = ?");
+        $stmtCorreo->execute([$user['id']]);
+        $correo_contacto = $stmtCorreo->fetchColumn();
+
+        if (!$correo_contacto) {
+            $_SESSION['solicitud_error'] = 'No se pudo obtener el correo de su usuario.';
+            header('Location: ' . $redirect_form);
+            exit;
+        }
+
+        $stmtEst = $db->prepare("SELECT COUNT(*) FROM establecimientos WHERE ruc = ?");
+        $stmtEst->execute([$ruc]);
+        if ((int)$stmtEst->fetchColumn() > 0) {
+            $_SESSION['solicitud_error'] = 'Ya existe un centro registrado con este RUC.';
+            header('Location: ' . $redirect_form);
+            exit;
+        }
+
+        $stmtSol = $db->prepare("SELECT COUNT(*) FROM solicitudes_establecimiento WHERE ruc = ? AND estado IN ('pendiente','aprobado')");
+        $stmtSol->execute([$ruc]);
+        if ((int)$stmtSol->fetchColumn() > 0) {
+            $_SESSION['solicitud_error'] = 'Ya existe una solicitud en proceso con este RUC.';
+            header('Location: ' . $redirect_form);
+            exit;
+        }
+
+        $stmt = $db->prepare(
+            "INSERT INTO solicitudes_establecimiento
+                (nombre_centro, direccion, tipo, ruc, dni_titular, nombres_titular, apellidos_titular, telefono, correo_contacto, evidencia_1, evidencia_1_nombre, evidencia_2, evidencia_2_nombre, estado, fecha_solicitud)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pendiente', NOW())"
+        );
+        $stmt->execute([
+            $nombre_centro, $direccion, $tipo, $ruc,
+            $dni_titular, $nombres_titular, $apellidos_titular, $telefono, $correo_contacto,
+            $evidencia_1_b64, $evidencia_1_nombre, 
+            $evidencia_2_b64 ?: null, $evidencia_2_nombre ?: null
+        ]);
+
+        $_SESSION['solicitud_success'] = 'Su solicitud ha sido enviada correctamente.';
+        header('Location: ' . $base . 'views/admin/misestablecimientos.php');
+        exit;
+
+    } catch (Exception $ex) {
+        $_SESSION['solicitud_error'] = 'Ocurrió un error: ' . $ex->getMessage();
+        header('Location: ' . $redirect_form);
+        exit;
+    }
 }

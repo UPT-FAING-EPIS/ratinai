@@ -178,7 +178,7 @@ if (isset($_SESSION['solicitud_error'])) {
                         <input class="form-input" type="email" id="correo_contacto" name="correo_contacto"
                             placeholder="contacto@micentro.pe" maxlength="100" required autocomplete="email">
                     </div>
-                    <button type="button" class="btn-send-code" id="btn-send-code" onclick="enviarCodigo()">
+                    <button type="button" class="btn-send-code" id="btn-send-code">
                         Enviar código
                     </button>
                 </div>
@@ -188,7 +188,7 @@ if (isset($_SESSION['solicitud_error'])) {
             <div class="code-sent-msg" id="code-sent-msg">
                 <svg width="14" height="14" viewBox="0 0 20 20" fill="none"><path d="M16 4l-10 10-4-4" stroke="#059669" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 <span id="code-sent-text">Código enviado.</span>
-                <span class="code-resend-link disabled" id="resend-link" onclick="reenviarCodigo()">Reenviar (<span id="resend-cd">60</span>s)</span>
+                <span class="code-resend-link disabled" id="resend-link">Reenviar (<span id="resend-cd">60</span>s)</span>
             </div>
 
             <div class="code-input-wrap" id="code-input-wrap">

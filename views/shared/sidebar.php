@@ -17,6 +17,11 @@ $_rol = $_SESSION['rol_codigo'] ?? '';
                     <span class="nav-badge"><?= $cnt_pendientes ?></span>
                 <?php endif; ?>
             </a>
+            <a href="<?= $base ?>views/admin/misestablecimientos.php"
+               class="nav-item <?= $_page === 'misestablecimientos.php' || $_page === 'nuevoestablecimiento.php' ? 'active' : '' ?>">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke="currentColor" stroke-width="1.3"/></svg>
+                Mis Establecimientos
+            </a>
             <a href="<?= $base ?>views/admin/doctor.php"
                class="nav-item <?= $_page === 'doctor.php' || $_page === 'create_doctor.php' ? 'active' : '' ?>">
                 <svg class="nav-icon" viewBox="0 0 20 20" fill="none"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 14a6 6 0 10-12 0" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>

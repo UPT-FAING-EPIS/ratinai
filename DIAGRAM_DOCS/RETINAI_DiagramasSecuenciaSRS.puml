@@ -1,4 +1,4 @@
-﻿@startuml RF01_SRS_CrearCuentaOftalmologo
+@startuml RF01_SRS_CrearCuentaOftalmologo
 
 title RF-01: Crear Cuenta de Oftalmólogo
 
@@ -150,3 +150,90 @@ else [Desactivar Acceso]
 end
 
 @enduml
+
+@startuml RF08_SRS_RegistroCentroOftalmologico
+
+title RF-08: Solicitar Registro de Centro Oftalmológico y Aprobación [Diagrama de Secuencia SRS]
+
+actor "Titular del Centro\nOftalmológico" as Titular
+actor "Super Administrador" as SADM
+participant "Página Principal\n(index.php)" as Index
+participant "Vista: Registro de Centro\n(views/auth/solicitud_registro.php)" as VistaReg
+participant "Lógica JS\n(assets/js/auth/solicitud_registro.js)" as JS
+participant "Vista: Solicitudes\n(views/superadmin/SolicitudesRegistro.php)" as VistaSAD
+participant "Control: Solicitud\n(controllers/SolicitudController.php)" as Control
+participant "Servicio: Correo\n(services/MailService.php)" as Mail
+database "Base de Datos (Railway DB)" as BD
+
+box "Fase 1: Solicitud de Registro" #White
+    participant Titular
+    participant Index
+    participant VistaReg
+    participant JS
+    participant Control
+    participant Mail
+    participant BD
+end box
+
+Titular -> Index : Visita la página principal
+Index --> Titular : Muestra botón "Registrar centro oftalmológico"
+Titular -> Index : Clic en "Registrar centro oftalmológico"\n(enlace a views/auth/solicitud_registro.php)
+Index -> VistaReg : HTTP GET views/auth/solicitud_registro.php
+VistaReg --> Titular : Muestra formulario de registro\n(Datos del centro, titular, correo, evidencias)
+
+Titular -> JS : Llena correo y hace clic en "Enviar código"
+JS -> Control : fetch POST action=send_code\n{correo, nombres}
+Control -> Mail : Solicita envío de código de verificación (6 dígitos)
+Mail --> Control : Código enviado al correo del titular
+Control --> JS : {success: true}
+JS --> VistaReg : Habilita campo de código + muestra countdown
+
+Titular -> VistaReg : Ingresa código recibido en el correo
+Titular -> VistaReg : Adjunta evidencias del establecimiento (JPG/PNG/PDF)
+JS -> JS : Convierte archivos a Base64 y rellena campos ocultos
+Titular -> VistaReg : Clic en "Enviar solicitud"
+JS -> JS : Valida todos los campos del formulario en el cliente
+VistaReg -> Control : HTTP POST action=solicitar\n(todos los datos + evidencias en Base64)
+
+Control -> Control : Valida código OTP, datos y evidencias en el servidor
+Control -> BD : Verifica que RUC no esté duplicado
+
+alt RUC ya registrado o solicitud en proceso
+    BD --> Control : Duplicado encontrado
+    Control --> VistaReg : Redirige con mensaje de error
+    VistaReg -> Titular : Muestra alerta de duplicidad de RUC
+else Datos válidos y RUC disponible
+    BD --> Control : OK
+    Control -> BD : Guarda solicitud en estado 'pendiente'
+    BD --> Control : Confirmación
+    Control --> VistaReg : Redirige con mensaje de éxito
+    VistaReg -> Titular : Muestra pantalla "¡Solicitud enviada!"\ny enlace para volver al inicio
+end
+
+box "Fase 2: Aprobación del Super Administrador" #f8fafc
+    participant SADM
+    participant VistaSAD
+    participant Control
+    participant Mail
+    participant BD
+end box
+
+SADM -> VistaSAD : Accede a "Solicitudes de Registro"
+VistaSAD -> BD : Consulta todas las solicitudes (orden: pendientes primero)
+BD --> VistaSAD : Lista de solicitudes con sus datos y evidencias
+VistaSAD --> SADM : Muestra tabla con botones [✓ Aprobar] [✗ Rechazar]
+SADM -> VistaSAD : Revisa evidencias (previsualización en modal)\ny da clic en "✓ Aprobar"
+VistaSAD -> Control : HTTP POST action=aprobar {id}
+
+Control -> BD : Crea el establecimiento en la tabla principal
+Control -> BD : Crea cuenta de Administrador ('ADM') para el titular\n(con contraseña temporal generada)
+Control -> BD : Actualiza solicitud a estado 'aprobado'
+
+Control -> Mail : Envía correo "¡Su solicitud fue aprobada!" al titular
+Control -> Mail : Envía correo con contraseña temporal al titular
+Mail --> Control : Correos enviados
+
+Control --> VistaSAD : Redirige con mensaje de éxito
+VistaSAD -> SADM : Muestra alerta verde "Solicitud aprobada\ny credenciales enviadas al titular"
+
+@enduml

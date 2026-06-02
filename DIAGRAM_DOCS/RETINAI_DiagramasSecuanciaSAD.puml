@@ -1,4 +1,4 @@
-﻿' ============================================================
+' ============================================================
 ' RETINAI — Diagramas de Secuencia
 ' Nivel de Diseño (Clases Concretas · Métodos · Tecnologías)
 ' Stack: PHP puro · MySQL/PostgreSQL en Railway · Flask API (TF Lite)
@@ -573,7 +573,7 @@ end
 ' RF-08: Solicitar Registro de Centro Oftalmológico
 ' ============================================================
 @startuml RF08_Diseno_RegistroCentroOftalmologico
-title RF-08: Solicitar Registro de Centro Oftalmológico [Diseño]
+title RF-08: Solicitar Registro de Centro Oftalmológico y Aprobación [Diseño]
 
 skinparam backgroundColor #FFFFFF
 skinparam sequenceArrowThickness 1.5
@@ -583,56 +583,127 @@ skinparam ParticipantBorderColor #000000
 skinparam ArrowColor #000000
 skinparam SequenceLifeLineBorderColor #888888
 
-actor "Dueño del Centro\nOftalmológico" as DUENO
+actor "Titular del Centro\nOftalmológico" as DUENO
+actor "Super Administrador" as SADM
 
-boundary "views/establishment/\nregister_form.php" as V
-control "controllers/\nEstablishmentController.php\n::requestRegister()" as C
-entity "models/\nEstablishment.php" as E
-database "Railway DB\n(tablas: establecimiento,\nmaestro)" as BD
+boundary "index.php" as IDX
+boundary "views/auth/\nsolicitud_registro.php" as V_REG
+boundary "assets/js/auth/\nsolicitud_registro.js" as JS
+boundary "views/superadmin/\nSolicitudesRegistro.php" as V_SAD
+control "controllers/\nSolicitudController.php" as C
+control "services/\nMailService.php" as MS
+database "Railway DB" as BD
 
-== GET /establishment/register ==
+== GET index.php ==
 
-DUENO -> V : Accede a la página\n"Registrar mi centro\noftalmológico"
-V -> C : EstablishmentController::showForm()
-C -> BD : SELECT id, valor FROM maestro\nWHERE tipo = 'TIPO_ESTABLECIMIENTO'\nAND activo = 1\nORDER BY orden
-BD --> C : [{id, valor: 'Público'},\n {id, valor: 'Privado'}]
-C --> V : return ['tipos' => $tipos]
-V --> DUENO : HTTP 200 — Formulario con campos:\nnombre_sede, direccion,\ntipo (select), ruc
+DUENO -> IDX : Visita index.php
+IDX --> DUENO : HTTP 200 — Landing con botones:\n[Ingresar a la Plataforma]\n[Registrar centro oftalmológico]
 
-== POST /establishment/register ==
+DUENO -> IDX : Clic <a href="views/auth/solicitud_registro.php"\nclass="btn btn-outline btn-lg">\n"Registrar centro oftalmológico"
 
-DUENO -> V : Envía formulario completado
-V -> C : EstablishmentController\n::requestRegister(POST)
+== GET views/auth/solicitud_registro.php ==
 
-C -> C : Valida campos obligatorios:\n$nombre_sede, $direccion,\n$tipo_id, $ruc (not empty)
+IDX -> V_REG : HTTP GET views/auth/solicitud_registro.php
+V_REG -> V_REG : session_start()\nlee $_SESSION['solicitud_success']\ny $_SESSION['solicitud_error'] — luego unset()
+V_REG --> DUENO : HTTP 200 — Formulario:\n<form id="form-solicitud"\n  action="../../controllers/SolicitudController.php"\n  method="POST" enctype="multipart/form-data">\n  <input hidden name="action" value="solicitar">\n  <input hidden id="evidencia_1_b64">\n  <input hidden id="evidencia_1_nombre">\n  <input hidden id="evidencia_2_b64">\n  <input hidden id="evidencia_2_nombre">\n  Campos: nombre_centro, direccion,\n  tipo (radio publico|privado), ruc,\n  dni_titular, nombres_titular,\n  apellidos_titular, telefono,\n  correo_contacto + #btn-send-code\n  codigo_verificacion (hidden hasta enviar código)\n  #upload-area (drag&drop, JPG/PNG/PDF ≤200KB)
+V_REG --> DUENO : Carga <script\n  src="../../assets/js/auth/solicitud_registro.js">
 
-alt Campos incompletos (empty fields)
-    C --> V : return ['error' =>\n  'campos_incompletos']
-    V --> DUENO : HTTP 422 — Resalta campos faltantes:\n"Complete todos los campos requeridos"
-else Todos los campos presentes
-    C -> C : Valida formato RUC:\npreg_match('/^\d{11}$/', $ruc)
+== Paso 1: Envío de código OTP (AJAX fetch) ==
 
-    alt RUC inválido (no son 11 dígitos)
-        C --> V : return ['error' =>\n  'ruc_invalido']
-        V --> DUENO : HTTP 422 — "El RUC ingresado no\nes válido. Verifique\nel número e intente\nnuevamente."
-    else RUC con formato válido
-        C -> E : Establishment::findByRUC($ruc)
-        E -> BD : SELECT id FROM establecimiento\nWHERE ruc = ? LIMIT 1
-        BD --> E : row / null
-        E --> C : $existing / null
+DUENO -> JS : Completa correo_contacto y nombres_titular\nClic en button#btn-send-code "Enviar código"
+JS -> JS : enviarCodigo():\n  correo = correo_contacto.value.trim()\n  nombres = nombres_titular.value.trim()\n  Valida regex /^[^\s@]+@[^\s@]+\.[^\s@]+$/\n  btn.disabled=true; btn.classList.add('loading')
+JS -> C : fetch('../../controllers/SolicitudController.php\n  ?action=send_code', {\n  method:'POST',\n  headers:{'Content-Type':\n    'application/x-www-form-urlencoded'},\n  body: 'correo='+encodeURIComponent(correo)\n        +'&nombres='+encodeURIComponent(nombres) })
+C -> C : $action = $_GET['action'] = 'send_code'\nhandleSendCode():\n  header('Content-Type: application/json')\n  $correo = trim($_POST['correo'])\n  $nombres = trim($_POST['nombres'] ?? 'Solicitante')\n  filter_var($correo, FILTER_VALIDATE_EMAIL)
+C -> C : $codigo = sprintf("%06d", mt_rand(1, 999999))\n$_SESSION['verification_code'] = $codigo\n$_SESSION['verification_email'] = $correo\n$_SESSION['verification_time'] = time()
+C -> MS : MailService::sendVerificationCode(\n  $correo, $nombres, $codigo)
+MS -> MS : PHPMailer SMTP:\nSubject: "RetinAI — Código de verificación para registro"\nBody: código en span monospace 34px + timer "10 min"
+MS --> C : return true / false
 
-        alt RUC ya registrado ($existing != null)
-            C --> V : return ['error' =>\n  'ruc_duplicado']
-            V --> DUENO : HTTP 409 — "Ya existe un centro\nregistrado con este RUC.\nContacte al administrador."
-        else RUC disponible (null)
-            C -> E : Establishment::create([\n  'id'          => UUID(),\n  'nombre_sede' => $nombre_sede,\n  'direccion'   => $direccion,\n  'tipo'        => $tipo_id,\n  'estado'      => maestro.ESTADO.PENDIENTE\n])
-            E -> BD : INSERT INTO establecimiento\n(id, nombre_sede, direccion,\ntipo, estado, ruc)\nVALUES (?, ?, ?, ?, ?, ?)
-            BD --> E : affected rows = 1
-            E --> C : $establishment->id
-            C --> V : return [\n  'success' => true,\n  'message' => 'solicitud_enviada'\n]
-            V --> DUENO : HTTP 201 — "Su solicitud ha sido\nenviada correctamente.\nEl administrador revisará\nsu información y le\nnotificará el resultado."
-        end
+alt SMTP responde 250 OK
+    C --> JS : echo json_encode(['success' => true])
+    JS -> JS : codeSent = true\nmostrarCodigoEnviado(correo):\n  #code-sent-msg.classList.add('show')\n  #code-input-wrap.classList.add('show')\n  inicia setInterval resend 60s\n  inicia setInterval expire 600s → "10:00"
+    JS --> DUENO : Muestra "Código enviado a {correo}."\n#codigo_verificacion visible con countdown
+else SMTP falla
+    C --> JS : json_encode(['success'=>false,\n  'message'=>'No se pudo enviar...'])
+    JS --> DUENO : errEl.textContent = message\nbtn-send-code.disabled = false
+end
+
+== Paso 2: Selección de evidencias (FileReader API) ==
+
+DUENO -> JS : Selecciona archivo(s) en #file-input\no arrastra sobre #upload-area (ondrop)
+JS -> JS : agregarArchivos(files[]):\n  Valida ALLOWED_TYPES:\n  ['image/jpeg','image/png','application/pdf']\n  Valida file.size <= 200*1024 bytes\n  Valida uploadedFiles.length < 2
+JS -> JS : leerComoBase64(file):\n  FileReader.readAsDataURL(file)\n  uploadedFiles.push({name,type,b64})\n  renderPreviews()\n  actualizarHiddenInputs():\n    #evidencia_1_b64.value = uploadedFiles[0]?.b64\n    #evidencia_1_nombre.value = uploadedFiles[0]?.name\n    #evidencia_2_b64.value = uploadedFiles[1]?.b64\n    #evidencia_2_nombre.value = uploadedFiles[1]?.name
+JS --> DUENO : Renderiza .file-preview-item\n(img preview si image/*, icono 📄 si PDF)\nBotón ✕ onclick="removerArchivo(idx)"
+
+== Paso 3: Submit del formulario ==
+
+DUENO -> JS : Clic en button#submit-btn "Enviar solicitud"
+JS -> JS : handleFormSubmit(e): e.preventDefault()\nValida nombre_centro (not empty)\nValida direccion (not empty)\nValida tipo = document.querySelector('input[name="tipo"]:checked')\nValida ruc: /^\d{11}$/\nValida dni: /^\d{8}$/\nValida nombres_titular, apellidos_titular (not empty)\nValida telefono: /^[\d\s\+\-\(\)]{7,15}$/\nValida correo regex\nValida codeSent === true\nValida codigo: /^\d{6}$/\nValida uploadedFiles.length >= 1
+
+alt Validación client-side falla
+    JS --> DUENO : fieldErr() → input.classList.add('error')\n#client-error-box.style.display='flex'\n"Por favor, complete todos los campos..."
+else Validación OK
+    JS -> JS : submitBtn.classList.add('loading')\nsubmitBtn.disabled = true
+    JS -> C : document.getElementById('form-solicitud').submit()\nHTTP POST controllers/SolicitudController.php\n  action=solicitar\n  nombre_centro, direccion, tipo (publico|privado),\n  ruc, dni_titular, nombres_titular,\n  apellidos_titular, telefono,\n  correo_contacto, codigo_verificacion,\n  evidencia_1_b64 (data:...;base64,...),\n  evidencia_1_nombre, evidencia_2_b64?, evidencia_2_nombre?
+end
+
+C -> C : $action = $_POST['action'] = 'solicitar'\nhandleSolicitar():\n  $nombre_centro = trim($_POST['nombre_centro'])\n  $ruc = trim($_POST['ruc'])\n  $correo_contacto = trim($_POST['correo_contacto'])\n  $codigo_verificacion = trim($_POST['codigo_verificacion'])\n  $evidencia_1_b64 = $_POST['evidencia_1_b64'] ?? null\n  ... (todos los campos)
+
+C -> C : Validaciones servidor:\n1) Todos los campos not empty\n2) $_SESSION['verification_code'] existe\n3) $_SESSION['verification_email'] == $correo_contacto\n4) time()-$_SESSION['verification_time'] <= 600\n5) $_SESSION['verification_code'] == $codigo_verificacion\n6) in_array($tipo,['publico','privado'])\n7) preg_match('/^\d{11}$/', $ruc)\n8) preg_match('/^\d{8}$/', $dni_titular)\n9) !empty($evidencia_1_b64)
+
+alt Alguna validación de servidor falla
+    C -> C : $_SESSION['solicitud_error'] = "mensaje"
+    C --> V_REG : HTTP 302 Location: views/auth/solicitud_registro.php
+    V_REG --> DUENO : Renderiza .alert-box.alert-danger con\nhtmlspecialchars($error_msg)
+else Todas las validaciones OK
+    C -> BD : (new Database())->getConnection()\nSELECT COUNT(*) FROM establecimientos\nWHERE ruc = ? → execute([$ruc])
+    BD --> C : 0
+    C -> BD : SELECT COUNT(*) FROM solicitudes_establecimiento\nWHERE ruc = ? AND estado IN ('pendiente','aprobado')
+    BD --> C : 0
+
+    alt RUC duplicado
+        C -> C : $_SESSION['solicitud_error'] = "Ya existe..."
+        C --> V_REG : HTTP 302 Redirect
+        V_REG --> DUENO : Muestra error
+    else RUC disponible
+        C -> BD : $stmt->prepare(\n  "INSERT INTO solicitudes_establecimiento\n   (nombre_centro, direccion, tipo, ruc,\n    dni_titular, nombres_titular, apellidos_titular,\n    telefono, correo_contacto,\n    evidencia_1, evidencia_1_nombre,\n    evidencia_2, evidencia_2_nombre,\n    estado, fecha_solicitud)\n   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'pendiente',NOW())")\n  ->execute([...13 valores...])
+        BD --> C : affected rows = 1
+        C -> C : unset($_SESSION['verification_code'],\n  $_SESSION['verification_email'],\n  $_SESSION['verification_time'])
+        C -> C : $_SESSION['solicitud_success'] =\n  "Su solicitud ha sido enviada correctamente.\n  El administrador revisará su información\n  y le notificará el resultado."
+        C --> V_REG : HTTP 302 Location: views/auth/solicitud_registro.php
+        V_REG --> DUENO : if($success_msg): renderiza .success-screen:\n  ✅ "¡Solicitud enviada!" + $success_msg\n  <a href="../../index.php">Volver al inicio</a>
     end
 end
+
+== Aprobación — Super Administrador ==
+
+SADM -> V_SAD : HTTP GET views/superadmin/SolicitudesRegistro.php
+V_SAD -> V_SAD : require_role('SAD'):\n  verifica $_SESSION['rol_codigo']==='SAD'\n$user = current_user()\nlee y unset $_SESSION['solicitud_msg']
+V_SAD -> BD : $db->query(\n  "SELECT id, nombre_centro, direccion, tipo, ruc,\n   dni_titular, nombres_titular, apellidos_titular,\n   telefono, correo_contacto,\n   evidencia_1, evidencia_1_nombre,\n   evidencia_2, evidencia_2_nombre,\n   estado, fecha_solicitud\n   FROM solicitudes_establecimiento\n   ORDER BY FIELD(estado,'pendiente','aprobado','rechazado'),\n   fecha_solicitud DESC")\n  ->fetchAll(PDO::FETCH_ASSOC)
+BD --> V_SAD : $solicitudes[]
+V_SAD -> BD : SELECT COUNT(*) FROM solicitudes_establecimiento\nWHERE estado='pendiente' → $cnt_solicitudes_pendientes
+BD --> V_SAD : int
+V_SAD --> SADM : HTTP 200 — <table.data-table>:\n  Columnas: Centro Oftalmológico, Titular,\n  Contacto (tel + email), Evidencias (btn-preview),\n  Fecha, Estado (badge-pending/approved/rejected),\n  Acciones [✓ Aprobar] [✗ Rechazar]\n  (solo si estado==='pendiente')\n  Carga: assets/js/dashboard/solicitudes.js\n  (modal preview base64 img/PDF)
+
+SADM -> V_SAD : Clic button.btn-approve "✓ Aprobar"\nconfirm('¿Aprobar esta solicitud, crear el\n  establecimiento y enviar correo al titular?')
+V_SAD -> C : <form method="POST"\n  action="{$base}controllers/SolicitudController.php">\nHTTP POST:\n  action=aprobar\n  id={$s['id']} (int)
+C -> C : require_role('SAD')\n$action = $_POST['action'] = 'aprobar'\nhandleAprobar():\n  $id = (int)($_POST['id'] ?? 0)
+C -> BD : SELECT * FROM solicitudes_establecimiento\nWHERE id = ? AND estado = 'pendiente'\n→ fetch(PDO::FETCH_ASSOC)
+BD --> C : $sol[] con todos los campos
+C -> BD : $ins->prepare(\n  "INSERT INTO establecimientos\n   (nombre, direccion, tipo, ruc)\n   VALUES (?, ?, ?, ?)")\n  ->execute([$sol['nombre_centro'],\n    $sol['direccion'], $sol['tipo'], $sol['ruc']])
+BD --> C : lastInsertId() → $establecimiento_id
+C -> BD : UPDATE solicitudes_establecimiento\nSET estado = 'aprobado'\nWHERE id = ?
+C -> C : $tempPass = bin2hex(random_bytes(4)) // "a1b2c3d4"\n$hashPass = password_hash($tempPass, PASSWORD_DEFAULT)\n$nombreCompleto = trim($sol['nombres_titular']\n  . ' ' . $sol['apellidos_titular'])
+C -> BD : $insUser->prepare(\n  "INSERT INTO usuarios\n   (rol_codigo, establecimiento_id, nombre,\n    correo, password, es_password_temporal, activo)\n   VALUES ('ADM', ?, ?, ?, ?, 1, 1)")\n  ->execute([$establecimiento_id, $nombreCompleto,\n    $sol['correo_contacto'], $hashPass])
+BD --> C : INSERT OK
+C -> MS : MailService::sendSolicitudAprobada(\n  $sol['correo_contacto'],\n  $nombreCompleto,\n  $sol['nombre_centro'])
+MS -> MS : PHPMailer SMTP:\nSubject: "RetinAI — ¡Su solicitud fue aprobada!"\nBody: ✅ "Solicitud Aprobada"\n"En breve recibirá sus credenciales..."
+MS --> C : return bool
+C -> MS : MailService::sendTempPassword(\n  $sol['correo_contacto'],\n  $nombreCompleto, $tempPass)
+MS -> MS : PHPMailer SMTP:\nSubject: "Acceso a RetinAI - Su cuenta ha sido creada"\nBody: contraseña $tempPass en caja monospace\n+ <a href="login.php">Iniciar Sesión Ahora</a>
+MS --> C : return bool
+C -> C : $_SESSION['solicitud_msg'] =\n  "Solicitud aprobada. El centro\n  «{$sol['nombre_centro']}» ha sido registrado\n  y se enviaron las credenciales al titular."
+C --> V_SAD : HTTP 302 Location:\n  views/superadmin/SolicitudesRegistro.php
+V_SAD --> SADM : if($msg_success): renderiza .alert-flash\n(background:#D1FAE5, border:#6EE7B7):\n  "Solicitud aprobada. El centro «...»..."
 
 @enduml

@@ -249,3 +249,120 @@ endif
 stop
 
 @enduml
+
+@startuml RF08_Actividad_RegistroCentroOftalmologico
+
+title RF-08: Solicitar Registro de Centro Oftalmológico [Diagrama de Actividad SRS]
+
+|Titular del Centro Oftalmológico|
+start
+:Visita la página principal (index.php);
+:Hace clic en el botón\n"Registrar centro oftalmológico";
+
+|Vista: Registro de Centro\n(solicitud_registro.php)|
+:Muestra formulario de registro\n(Datos del centro, titular, correo y evidencias);
+
+|Titular del Centro Oftalmológico|
+:Completa datos del centro:\nnombre, dirección, tipo (público/privado), RUC;
+:Completa datos del titular:\nDNI, nombres, apellidos, teléfono;
+:Ingresa correo y hace clic en "Enviar código";
+
+|Lógica JS (solicitud_registro.js)|
+:Valida formato del correo;
+:fetch POST action=send_code {correo, nombres};
+
+|Control: Solicitud\n(SolicitudController.php)|
+:Genera código de 6 dígitos (mt_rand);
+:Guarda código en $_SESSION['verification_code'];
+:Solicita enviar correo;
+
+|Servicio: Correo\n(MailService.php)|
+:Envía código OTP al correo del titular\n(válido 10 minutos);
+
+|Lógica JS (solicitud_registro.js)|
+:Habilita campo "Código de verificación"\ny muestra countdown de 10:00;
+
+|Titular del Centro Oftalmológico|
+:Recibe código en su correo;
+:Ingresa el código en el formulario;
+:Adjunta evidencias (JPG/PNG/PDF, máx. 200KB c/u);
+
+|Lógica JS (solicitud_registro.js)|
+:Convierte archivos a Base64 via FileReader API;
+:Rellena campos ocultos evidencia_1_b64 y evidencia_2_b64;
+
+|Titular del Centro Oftalmológico|
+:Hace clic en "Enviar solicitud";
+
+|Lógica JS (solicitud_registro.js)|
+:Valida todos los campos del formulario\n(RUC 11 dígitos, DNI 8 dígitos,\ncódigo 6 dígitos, al menos 1 evidencia);
+
+if (¿Datos inválidos en el cliente?) then (Sí)
+    |Vista: Registro de Centro\n(solicitud_registro.php)|
+    :Marca campos con error y muestra\n#client-error-box con mensaje;
+    |Titular del Centro Oftalmológico|
+    :Corrige los campos indicados;
+    stop
+else (No)
+    |Control: Solicitud\n(SolicitudController.php)|
+    :Valida código OTP y tiempo de expiración (≤600s);
+    :Valida formato RUC (/^\d{11}$/) y DNI (/^\d{8}$/);
+    :Valida que evidencia_1_b64 no esté vacía;
+
+    if (¿Código expirado o incorrecto?) then (Sí)
+        |Vista: Registro de Centro\n(solicitud_registro.php)|
+        :Muestra error .alert-box.alert-danger;
+        stop
+    else (No)
+        |Base de Datos|
+        :SELECT COUNT(*) FROM establecimientos WHERE ruc=?;
+        :SELECT COUNT(*) FROM solicitudes_establecimiento\nWHERE ruc=? AND estado IN ('pendiente','aprobado');
+
+        if (¿RUC ya registrado o solicitud en proceso?) then (Sí)
+            |Vista: Registro de Centro\n(solicitud_registro.php)|
+            :Muestra error de RUC duplicado;
+            stop
+        else (No)
+            |Base de Datos|
+            :INSERT INTO solicitudes_establecimiento\n(todos los campos + estado='pendiente' + NOW());
+            :Limpia variables de sesión OTP;
+            |Vista: Registro de Centro\n(solicitud_registro.php)|
+            :Muestra pantalla de éxito\n"¡Solicitud enviada!" con enlace al inicio;
+        endif
+    endif
+endif
+
+|Super Administrador|
+:Inicia sesión y accede a "Solicitudes de Registro";
+
+|Vista: Solicitudes\n(SolicitudesRegistro.php)|
+:Consulta solicitudes ORDER BY FIELD\n(pendiente → aprobado → rechazado);
+:Muestra tabla con evidencias y botones\n[✓ Aprobar] [✗ Rechazar];
+
+|Super Administrador|
+:Revisa datos y previsualiza evidencias en modal;
+if (Decisión) then (Rechazar)
+    :Clic en "✗ Rechazar";
+    |Control: Solicitud\n(SolicitudController.php)|
+    :UPDATE estado='rechazado' WHERE id=?;
+    stop
+else (Aprobar)
+    :Clic en "✓ Aprobar" y confirma diálogo;
+    |Control: Solicitud\n(SolicitudController.php)|
+    :INSERT INTO establecimientos (nombre, ruc, tipo, dirección);
+    |Base de Datos|
+    :Retorna $establecimiento_id = lastInsertId();
+    |Control: Solicitud\n(SolicitudController.php)|
+    :UPDATE solicitudes_establecimiento SET estado='aprobado';
+    :Genera $tempPass = bin2hex(random_bytes(4));
+    :INSERT INTO usuarios rol_codigo='ADM'\n(activo=1, es_password_temporal=1);
+    |Servicio: Correo\n(MailService.php)|
+    :sendSolicitudAprobada() →\n"RetinAI — ¡Su solicitud fue aprobada!";
+    :sendTempPassword() →\n"Acceso a RetinAI - Su cuenta ha sido creada";
+    |Vista: Solicitudes\n(SolicitudesRegistro.php)|
+    :Muestra alerta verde "Solicitud aprobada\ny credenciales enviadas al titular";
+    stop
+endif
+
+@enduml
+

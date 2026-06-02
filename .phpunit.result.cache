@@ -1,1 +1,1 @@
-{"version":1,"defects":[],"times":{"DoctorModelTest::testResetPassword":0.042,"PasswordHelperTest::testGenerateTempLength":0,"PasswordHelperTest::testGenerateTempIsAlphanumeric":0.002,"PasswordHelperTest::testGenerateTempIsUnique":0}}
+{"version":2,"defects":[],"times":{"MailServiceTest::testSendVerificationCodeInvalidEmail":0,"MailServiceTest::testSendSolicitudAprobadaInvalidEmail":0,"MailServiceTest::testSendTempPasswordInvalidEmail":0}}

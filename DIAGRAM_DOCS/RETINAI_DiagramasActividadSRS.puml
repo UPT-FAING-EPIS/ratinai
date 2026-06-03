@@ -137,7 +137,129 @@ endif
 
 @enduml
 
+@startuml RF02_Actividad_IniciarSesion
+
+title RF-02: Iniciar Sesión [Diagrama de Actividad SRS]
+
+|Usuario (Médico / Admin / SuperAdmin)|
+start
+:Accede a la página de inicio de sesión\\n(views/auth/login.php);
+:Ingresa correo electrónico y contraseña\\ny presiona "Ingresar";
+
+|Control: Autenticación|
+:Recibe credenciales del formulario;
+
+note right
+  **Datos recibidos**
+  - email: string
+  - password: string
+end note
+
+:Verifica que los campos no estén vacíos;
+
+if (¿Algún campo vacío?) then (sí)
+  :$_SESSION['login_error'] =\\n"Por favor ingrese correo y contraseña.";
+
+  |Vista: Login (login.php)|
+  :Muestra alerta de error;
+
+  |Usuario (Médico / Admin / SuperAdmin)|
+  :Visualiza mensaje de error;
+  end
+
+else (no)
+  |Control: Autenticación|
+  :Consulta usuario por correo en BD\\nAuthModel::getUserByEmail($email);
+
+  note right
+    **SQL:**
+    SELECT * FROM usuarios
+    WHERE correo=:correo AND activo=1
+  end note
+
+  if (¿Usuario encontrado y activo?) then (no)
+    :$_SESSION['login_error'] =\\n"Credenciales incorrectas.";
+
+    |Vista: Login (login.php)|
+    :Muestra mensaje de error genérico;
+
+    |Usuario (Médico / Admin / SuperAdmin)|
+    :Visualiza mensaje;
+    end
+
+  else (sí)
+    |Control: Autenticación|
+    :Verifica contraseña\\npassword_verify($password, $user['password']);
+
+    if (¿Contraseña correcta?) then (no)
+      :$_SESSION['login_error'] =\\n"Credenciales incorrectas.";
+
+      |Vista: Login (login.php)|
+      :Muestra mensaje de error genérico;
+
+      |Usuario (Médico / Admin / SuperAdmin)|
+      :Visualiza mensaje;
+      end
+
+    else (sí)
+      |Control: Autenticación|
+      :Registra último acceso\\nAuthModel::updateLastAccess($id);
+      :Inicia sesión:\\n$_SESSION['user_id'], 'rol_codigo',\\n'nombre', 'establecimiento_id',\\n'es_password_temporal', 'last_activity';
+
+      if (¿Contraseña es temporal?) then (sí)
+        |Vista: Cambio de Contraseña\\n(change_password.php)|
+        :Redirige y muestra formulario de\\ncambio de contraseña obligatorio;
+
+        |Usuario (Médico / Admin / SuperAdmin)|
+        :Ingresa nueva contraseña y confirmación;
+
+        |Control: Autenticación|
+        :Valida mínimo 6 caracteres\\ny que ambos campos coincidan;
+
+        if (¿Contraseña válida?) then (no)
+          :$_SESSION['cp_error'] = mensaje de error;
+
+          |Vista: Cambio de Contraseña\\n(change_password.php)|
+          :Muestra mensaje de error;
+
+          |Usuario (Médico / Admin / SuperAdmin)|
+          :Corrige la contraseña;
+          end
+
+        else (sí)
+          |Control: Autenticación|
+          :Cifra con password_hash(PASSWORD_BCRYPT)\\ny actualiza en BD (es_password_temporal=0);
+          :Redirige según rol del usuario;
+
+          |Vista: Panel de trabajo|
+          :Muestra panel correspondiente al rol;
+
+          |Usuario (Médico / Admin / SuperAdmin)|
+          :Accede a su panel de trabajo;
+          end
+
+        endif
+
+      else (no — contraseña definitiva)
+        |Control: Autenticación|
+        :redirectByRole($user['rol_codigo']):\\nSAD → views/superadmin/index.php\\nADM → views/admin/index.php\\nMED → views/medico/index.php;
+
+        |Vista: Panel de trabajo|
+        :Muestra el panel correspondiente al rol;
+
+        |Usuario (Médico / Admin / SuperAdmin)|
+        :Accede a su panel de trabajo;
+        end
+
+      endif
+    endif
+  endif
+endif
+
+@enduml
+
 @startuml RF03_Actividad_GestionarMedicos
+
 
 title RF-03: Gestionar Médicos Activos del Establecimiento [Diagrama de Actividad SRS]
 

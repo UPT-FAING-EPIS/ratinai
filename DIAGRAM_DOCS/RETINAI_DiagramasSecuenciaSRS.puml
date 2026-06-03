@@ -60,6 +60,91 @@ end
 
 @enduml
 
+@startuml RF02_SRS_IniciarSesion
+
+title RF-02: Iniciar Sesión
+
+actor "Usuario\n(Médico / Administrador / SuperAdmin)" as Usuario
+participant "Página de Acceso\n(views/auth/login.php):\nFormulario de Inicio de Sesión" as PantallaLogin
+participant "Página de Cambio de Contraseña\n(views/auth/change_password.php)" as PantallaCP
+participant "Control: Acceso\n(controllers/AuthController.php):\nGestión de Autenticación" as Control
+entity "Entidad: Usuario\n(models/AuthModel.php):\nUsuario del Sistema" as Entidad
+database "Base de Datos (Railway DB)" as BD
+
+box "Proceso de Inicio de Sesión" #White
+    participant Usuario
+    participant PantallaLogin
+    participant PantallaCP
+    participant Control
+    participant Entidad
+    participant BD
+end box
+
+Usuario -> PantallaLogin : Accede a la página de inicio de sesión
+PantallaLogin --> Usuario : Muestra formulario con campos\ncorreo electrónico y contraseña
+Usuario -> PantallaLogin : Ingresa su correo y contraseña,\ny hace clic en "Ingresar"
+PantallaLogin -> Control : Envía los datos ingresados
+Control -> Control : Verifica que los campos no estén vacíos
+
+alt [Campos vacíos]
+    Control --> PantallaLogin : Informa que faltan datos
+    PantallaLogin --> Usuario : Muestra aviso:\n"Por favor ingrese correo y contraseña."
+else [Campos completos]
+    Control -> Entidad : Busca al usuario por correo electrónico
+    Entidad -> BD : Consulta si existe un usuario activo con ese correo
+    BD --> Entidad : Resultado de la búsqueda
+    Entidad --> Control : Datos del usuario o indicación de que no existe
+
+    alt [Correo no registrado]
+        Control --> PantallaLogin : Informa error de acceso
+        PantallaLogin --> Usuario : Muestra aviso genérico:\n"Credenciales incorrectas. Verifique\nsu correo y contraseña."
+    else [Correo encontrado]
+        Control -> Control : Compara la contraseña ingresada\ncon la contraseña guardada (encriptada)
+
+        alt [Contraseña incorrecta]
+            Control --> PantallaLogin : Informa error de acceso
+            PantallaLogin --> Usuario : Muestra el mismo aviso genérico de error
+        else [Contraseña correcta]
+            Control -> Control : Verifica si la cuenta está activa
+
+            alt [Cuenta desactivada o pendiente de aprobación]
+                Control --> PantallaLogin : Informa cuenta inactiva
+                PantallaLogin --> Usuario : Muestra aviso:\n"Su cuenta aún no ha sido aprobada\npor el administrador."
+            else [Cuenta activa]
+                Control -> Entidad : Registra el último acceso del usuario
+                Entidad -> BD : Guarda la fecha y hora de acceso
+                Control -> Control : Inicia la sesión del usuario\n(guarda sus datos de acceso)
+
+                alt [La cuenta tiene contraseña temporal]
+                    Control --> PantallaLogin : Redirige a pantalla de cambio de contraseña
+                    PantallaLogin --> Usuario : Muestra mensaje:\n"Debe establecer una nueva contraseña\nantes de continuar"
+
+                    Usuario -> PantallaCP : Ingresa nueva contraseña y la confirma
+                    PantallaCP -> Control : Envía nueva contraseña
+                    Control -> Control : Verifica que tenga al menos 6 caracteres\ny que ambos campos coincidan
+
+                    alt [Contraseña demasiado corta o no coincide]
+                        Control --> PantallaCP : Informa el error
+                        PantallaCP --> Usuario : Muestra el mensaje de error correspondiente
+                    else [Contraseña válida]
+                        Control -> Entidad : Guarda la nueva contraseña y quita la marca de temporal
+                        Entidad -> BD : Actualiza la contraseña del usuario
+                        BD --> Entidad : Confirmación
+                        Control --> PantallaCP : Redirige al panel correspondiente
+                        PantallaCP --> Usuario : Accede a su panel de trabajo
+                    end
+
+                else [La cuenta tiene contraseña definitiva]
+                    Control --> PantallaLogin : Redirige al panel correspondiente según su tipo de usuario
+                    PantallaLogin --> Usuario : Accede a su panel:\n- Super Administrador → Panel de gestión global\n- Administrador → Panel del centro oftalmólogico\n- Médico → Panel de análisis retinal
+                end
+            end
+        end
+    end
+end
+
+@enduml
+
 @startuml RF03_SRS_GestionarMedicos
 
 title RF-03: Gestionar Médicos Activos del Establecimiento
@@ -159,7 +244,7 @@ actor "Titular del Centro\nOftalmológico" as Titular
 actor "Super Administrador" as SADM
 participant "Página Principal\n(index.php)" as Index
 participant "Vista: Registro de Centro\n(views/auth/solicitud_registro.php)" as VistaReg
-participant "Lógica JS\n(assets/js/auth/solicitud_registro.js)" as JS
+participant "Lógica del Formulario\n(assets/js/auth/solicitud_registro.js)" as JS
 participant "Vista: Solicitudes\n(views/superadmin/SolicitudesRegistro.php)" as VistaSAD
 participant "Control: Solicitud\n(controllers/SolicitudController.php)" as Control
 participant "Servicio: Correo\n(services/MailService.php)" as Mail
@@ -178,36 +263,56 @@ end box
 Titular -> Index : Visita la página principal
 Index --> Titular : Muestra botón "Registrar centro oftalmológico"
 Titular -> Index : Clic en "Registrar centro oftalmológico"\n(enlace a views/auth/solicitud_registro.php)
-Index -> VistaReg : HTTP GET views/auth/solicitud_registro.php
+Index -> VistaReg : Carga el formulario de registro
 VistaReg --> Titular : Muestra formulario de registro\n(Datos del centro, titular, correo, evidencias)
 
 Titular -> JS : Llena correo y hace clic en "Enviar código"
-JS -> Control : fetch POST action=send_code\n{correo, nombres}
-Control -> Mail : Solicita envío de código de verificación (6 dígitos)
-Mail --> Control : Código enviado al correo del titular
-Control --> JS : {success: true}
-JS --> VistaReg : Habilita campo de código + muestra countdown
+JS -> JS : Valida formato del correo antes de enviarlo
+JS -> Control : Solicita envío de código de verificación {correo, nombres}
+Control -> Control : Genera código de 6 dígitos y lo guarda temporalmente
+Control -> Mail : Solicita envío del código al correo del titular
+Mail --> Control : Código enviado (o fallo)
+
+alt [No se pudo enviar el correo]
+    Control --> JS : Informa fallo de envío
+    JS --> VistaReg : Muestra aviso de error al titular
+else [Código enviado correctamente]
+    Control --> JS : Confirma envío exitoso
+    JS --> VistaReg : Habilita campo de código + muestra\ncuenta regresiva de 10 minutos
+end
 
 Titular -> VistaReg : Ingresa código recibido en el correo
-Titular -> VistaReg : Adjunta evidencias del establecimiento (JPG/PNG/PDF)
-JS -> JS : Convierte archivos a Base64 y rellena campos ocultos
+Titular -> VistaReg : Adjunta evidencias del establecimiento (JPG/PNG/PDF, máx. 200KB c/u)
+JS -> JS : Convierte los archivos a formato Base64\ny los asocia al formulario de forma oculta
 Titular -> VistaReg : Clic en "Enviar solicitud"
-JS -> JS : Valida todos los campos del formulario en el cliente
-VistaReg -> Control : HTTP POST action=solicitar\n(todos los datos + evidencias en Base64)
+JS -> JS : Valida todos los campos del formulario en el navegador\n(RUC 11 dígitos, DNI 8 dígitos, código 6 dígitos, al menos 1 evidencia)
 
-Control -> Control : Valida código OTP, datos y evidencias en el servidor
-Control -> BD : Verifica que RUC no esté duplicado
+alt [Datos inválidos en el formulario]
+    JS --> VistaReg : Resalta los campos con error y muestra\nel mensaje de qué se debe corregir
+    VistaReg --> Titular : Visualiza errores y corrige
+else [Datos completos y válidos en el formulario]
+    VistaReg -> Control : Envía todos los datos del formulario\más las evidencias adjuntas
+    Control -> Control : Valida el código OTP, su vigencia (máx. 10 minutos)\ny el formato de todos los datos recibidos
 
-alt RUC ya registrado o solicitud en proceso
-    BD --> Control : Duplicado encontrado
-    Control --> VistaReg : Redirige con mensaje de error
-    VistaReg -> Titular : Muestra alerta de duplicidad de RUC
-else Datos válidos y RUC disponible
-    BD --> Control : OK
-    Control -> BD : Guarda solicitud en estado 'pendiente'
-    BD --> Control : Confirmación
-    Control --> VistaReg : Redirige con mensaje de éxito
-    VistaReg -> Titular : Muestra pantalla "¡Solicitud enviada!"\ny enlace para volver al inicio
+    alt [Código expirado, incorrecto o datos inválidos]
+        Control --> VistaReg : Redirige con mensaje de error
+        VistaReg --> Titular : Muestra el error correspondiente
+    else [Validaciones correctas]
+        Control -> BD : Verifica que el RUC no esté registrado\nni tenga una solicitud en proceso
+
+        alt [RUC ya registrado o solicitud pendiente]
+            BD --> Control : Informa duplicado
+            Control --> VistaReg : Redirige con mensaje de duplicidad
+            VistaReg --> Titular : Muestra aviso de RUC ya existente
+        else [RUC disponible]
+            BD --> Control : Confirmación de disponibilidad
+            Control -> BD : Guarda la solicitud en estado "pendiente"\n(con todos los datos y evidencias)
+            BD --> Control : Confirmación de guardado
+            Control -> Control : Elimina el código de verificación de la sesión
+            Control --> VistaReg : Redirige con mensaje de éxito
+            VistaReg --> Titular : Muestra pantalla "¡Solicitud enviada!"\ny enlace para volver al inicio
+        end
+    end
 end
 
 box "Fase 2: Aprobación del Super Administrador" #f8fafc
@@ -219,21 +324,35 @@ box "Fase 2: Aprobación del Super Administrador" #f8fafc
 end box
 
 SADM -> VistaSAD : Accede a "Solicitudes de Registro"
-VistaSAD -> BD : Consulta todas las solicitudes (orden: pendientes primero)
+VistaSAD -> BD : Consulta todas las solicitudes (pendientes primero)
 BD --> VistaSAD : Lista de solicitudes con sus datos y evidencias
 VistaSAD --> SADM : Muestra tabla con botones [✓ Aprobar] [✗ Rechazar]
-SADM -> VistaSAD : Revisa evidencias (previsualización en modal)\ny da clic en "✓ Aprobar"
-VistaSAD -> Control : HTTP POST action=aprobar {id}
 
-Control -> BD : Crea el establecimiento en la tabla principal
-Control -> BD : Crea cuenta de Administrador ('ADM') para el titular\n(con contraseña temporal generada)
-Control -> BD : Actualiza solicitud a estado 'aprobado'
+SADM -> VistaSAD : Revisa evidencias (prevista en ventana emergente)\ny da clic en "✓ Aprobar"
+VistaSAD -> Control : Envía la solicitud de aprobación
 
-Control -> Mail : Envía correo "¡Su solicitud fue aprobada!" al titular
-Control -> Mail : Envía correo con contraseña temporal al titular
-Mail --> Control : Correos enviados
+Control -> BD : Busca si el correo del titular ya tiene\nuna cuenta de Administrador en el sistema
+BD --> Control : Resultado de la búsqueda
+
+alt [El titular ya tiene cuenta de Administrador]
+    Control -> BD : Crea el nuevo centro oftalmológico y lo vincula\na la cuenta existente del titular
+    BD --> Control : Centro creado
+    Control -> BD : Marca la solicitud como "aprobada"
+    Control -> Mail : Envía correo de aprobación al titular\n(sin generar nueva cuenta)
+    Mail --> Control : Correo enviado
+else [El titular no tiene cuenta aún]
+    Control -> BD : Crea la cuenta de Administrador del titular\n(con contraseña temporal generada automáticamente)
+    BD --> Control : Cuenta creada
+    Control -> BD : Crea el nuevo centro oftalmológico\ny lo vincula a la nueva cuenta
+    BD --> Control : Centro creado
+    Control -> BD : Marca la solicitud como "aprobada"
+    Control -> Mail : Envía correo de aprobación al titular
+    Mail --> Control : Correo enviado
+    Control -> Mail : Envía correo con la contraseña temporal\npara que el titular pueda ingresar al sistema
+    Mail --> Control : Correo enviado
+end
 
 Control --> VistaSAD : Redirige con mensaje de éxito
-VistaSAD -> SADM : Muestra alerta verde "Solicitud aprobada\ny credenciales enviadas al titular"
+VistaSAD --> SADM : Muestra alerta verde "Solicitud aprobada\ny credenciales enviadas al titular"
 
-@enduml
+@enduml

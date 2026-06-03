@@ -16,125 +16,62 @@ skinparam nodesep 50
 skinparam ranksep 60
 
 ' ============================================================
-' MODELOS (Entidades de dominio)
+' MODELOS (Clases PHP reales en /models)
 ' ============================================================
 
 class AuthModel {
   -db
   --
   +__construct()
-  +getUserByEmail(email : string)
-  +updateLastAccess(id : int)
-  +updatePassword(id : int, hashedPassword : string)
+  +getUserByEmail(email : string) : array|false
+  +updateLastAccess(id : int) : void
+  +updatePassword(id : int, hashedPassword : string) : void
 }
 
 class DoctorModel {
   -db
   --
   +__construct()
-  +existsByEmail(correo : string, exclude_id : int = null)
-  +existsByCMP(cmp : string, exclude_id : int = null)
-  +addSpecialty(descripcion : string)
-  +create(data : array)
-  +deactivate(id : int, est_id : int)
-  +findById(id : int, est_id : int)
-  +updateDoctor(id : int, est_id : int, data : array)
-  +resetPassword(id : int, est_id : int, hash : string)
+  +existsByEmail(correo : string, exclude_id : int = null) : bool
+  +existsByCMP(cmp : string, exclude_id : int = null) : bool
+  +addSpecialty(descripcion : string) : void
+  +create(data : array) : int
+  +deactivate(id : int, est_ids : array) : bool
+  +findById(id : int, est_ids : array) : array|false
+  +updateDoctor(id : int, est_ids : array, data : array) : bool
+  +resetPassword(id : int, est_ids : array, hash : string) : bool
+  +countPendingByEstablishments(ids_array : array) : int
+  +countActiveByEstablishments(ids_array : array) : int
+  +getActiveDoctorsByEstablishments(ids_array : array) : array
+  +getPendingDoctorsByEstablishments(ids_array : array) : array
 }
 
-class Doctor {
-  -id : INT
-  -nombre : VARCHAR(100)
-  -email : VARCHAR(150)
-  -cmp : VARCHAR(20)
-  -especialidad : VARCHAR(100)
-  -institucion : VARCHAR(150)
-  -password : VARCHAR(255)
-  -isTempPass : BOOL
-  -estado : VARCHAR(20)
-  -establishmentId : INT
-  -createdAt : DATETIME
+class EstablecimientoModel {
+  -db
   --
-  +create(data : array) : INT
-  +findByEmail(email : string) : Doctor
-  +findById(id : int) : Doctor
-  +existsByCMP(cmp : string) : BOOL
-  +existsByEmail(email : string) : BOOL
-  +findActiveByEstablishment(id : int) : List
-  +update(id : int, data : array) : BOOL
+  +__construct()
+  +getById(id : int) : array|null
+  +getByOwnerId(userId : int) : array
 }
 
-class Admin {
-  -id : INT
-  -nombre : VARCHAR(100)
-  -email : VARCHAR(150)
-  -password : VARCHAR(255)
-  -isTempPass : BOOL
-  -rol : VARCHAR(30)
-  -estado : VARCHAR(20)
-  -establishmentId : INT
-  -createdAt : DATETIME
+class MaestroModel {
+  -db
   --
-  +create(data : array) : INT
-  +findByEmail(email : string) : Admin
+  +__construct()
+  +getEspecialidades() : array
 }
 
-class Establishment {
-  -id : INT
-  -nombre : VARCHAR(150)
-  -direccion : VARCHAR(255)
-  -tipo : VARCHAR(100)
-  -estado : VARCHAR(20)
-  -createdAt : DATETIME
+class SolicitudModel {
+  -db
   --
-  +create(data : array) : INT
-  +findById(id : int) : Establishment
-}
-
-class Patient {
-  -id : INT
-  -dni : CHAR(8)
-  -historyCode : VARCHAR(10)
-  -createdAt : DATETIME
-  --
-  +create(data : array) : INT
-  +findByDni(dni : string) : Patient
-  +findByHistoryCode(code : string) : Patient
-}
-
-class Analysis {
-  -id : INT
-  -doctorId : INT
-  -patientHistoryId : INT
-  -predictedClass : VARCHAR(100)
-  -probNormal : DECIMAL(5,4)
-  -probRetinopatia : DECIMAL(5,4)
-  -probGlaucoma : DECIMAL(5,4)
-  -probCatarata : DECIMAL(5,4)
-  -imagePath : VARCHAR(500)
-  -createdAt : DATETIME
-  --
-  +create(data : array) : INT
-  +findByPatient(patientId : int) : List
-  +findById(id : int) : Analysis
-}
-
-class ModelConfig {
-  -id : INT
-  -accuracy : DECIMAL(5,4)
-  -sensitivity : DECIMAL(5,4)
-  -specificity : DECIMAL(5,4)
-  -dataset : VARCHAR(100)
-  -modelVersion : VARCHAR(50)
-  -limitations : TEXT
-  -disclaimer : TEXT
-  -active : BOOL
-  --
-  +getActive() : ModelConfig
+  +__construct()
+  +getSolicitudesByContactEmailOrOwner(email : string, userId : int) : array
+  +getAllSolicitudesConOrigen() : array
+  +countPendientes() : int
 }
 
 ' ============================================================
-' CONTROLADORES
+' CONTROLADORES (Clases PHP reales en /controllers)
 ' ============================================================
 
 class DoctorController {
@@ -142,11 +79,11 @@ class DoctorController {
   --
   +__construct()
   -baseUrl() : string
-  -redirect(path : string)
-  +createDoctor(nombre : string, correo : string, cmp : string, especialidad : string, esp_nueva : string, password_override : string)
-  +deactivate(target_id : int)
-  +editDoctor(edit_id : int, nombre : string, correo : string, cmp : string, especialidad : string)
-  +resetPassword(reset_id : int)
+  -redirect(path : string) : void
+  +createDoctor() : void
+  +deactivate() : void
+  +editDoctor() : void
+  +resetPassword() : void
 }
 
 class AuthController {
@@ -154,91 +91,56 @@ class AuthController {
   --
   +__construct()
   -baseUrl() : string
-  +login(email : string, password : string)
-  +changePassword(nueva_password : string, confirma_password : string)
-  +logout()
+  +login() : void
+  +changePassword() : void
+  +logout() : void
   -redirect(path : string) : void
   -redirectWithError(error : string) : void
   -redirectByRole(rol : string) : void
 }
 
-class EstablishmentController {
-  +create(nombre : string, direccion : string, tipo : string, adminNombre : string, adminEmail : string) : array
-}
-
-class AnalysisController {
-  +upload(file : array, doctorId : int) : array
-  +process(tmpPath : string, doctorId : int, patientHistoryId : int) : array
-  +downloadReport(analysisId : int) : void
-  +enableNewAnalysis() : array
-}
-
-class PatientController {
-  +identifyByDni(dni : string) : array
-  +getHistory(historyCode : string) : array
-  +recoverHistoryCode(dni : string) : array
-}
-
-class ModelInfoController {
-  +show() : array
+class SolicitudController <<procedural>> {
+  ' Módulo procedimental (no instanciable)
+  --
+  +{static} handleSendCode() : void
+  +{static} handleSolicitar() : void
+  +{static} handleSolicitarAdmin() : void
+  +{static} handleAprobar() : void
+  +{static} handleRechazar() : void
 }
 
 ' ============================================================
-' SERVICIOS
+' SERVICIOS (Clases PHP reales en /services y /utils)
 ' ============================================================
 
 class MailService {
-  +sendTempPassword(email : string, nombre : string, tempPass : string) : BOOL
+  +{static} sendTempPassword(email : string, nombre : string, tempPass : string) : bool
+  +{static} sendResetPassword(email : string, nombre : string, tempPass : string) : bool
+  +{static} sendVerificationCode(email : string, nombres : string, codigo : string) : bool
+  +{static} sendSolicitudAprobada(email : string, nombre : string, centro : string) : bool
 }
 
-class SessionService {
-  -sessionLifetime : INT = 3600
-  +start(doctorId : int, nombre : string) : void
-  +destroy() : void
-  +isActive() : BOOL
+class PasswordHelper <<utility>> {
+  +{static} generateTemp(length : int) : string
 }
-
-class ImageValidator {
-  -allowedMimes : array
-  -maxSizeBytes : INT = 10485760
-  +validate(tmpName : string, mime : string, size : int) : array
-}
-
-class PdfReportService {
-  +generate(reportData : array) : binary
-}
-
-class FlaskAPI {
-  -baseUrl : STRING
-  -timeout : INT = 10
-  +predict(imageData : binary) : array
-}
-
-' ============================================================
-' RELACIONES — Dominio (asociaciones)
-' ============================================================
-
-Establishment "1" --> "0..*" Doctor      : registra >
-Establishment "1" --> "1..*" Admin       : administra >
-Doctor        "1" --> "0..*" Analysis    : realiza >
-Patient       "1" --> "0..*" Analysis    : genera >
 
 ' ============================================================
 ' RELACIONES — Controladores → Modelos (dependencias)
 ' ============================================================
 
-DoctorController        ..> DoctorModel   : <<usa>>
-DoctorController        ..> MailService   : <<usa>>
-AuthController          ..> AuthModel     : <<usa>>
-EstablishmentController ..> Establishment : <<usa>>
-EstablishmentController ..> Admin         : <<usa>>
-EstablishmentController ..> MailService   : <<usa>>
-AnalysisController      ..> Analysis      : <<usa>>
-AnalysisController      ..> ImageValidator: <<usa>>
-AnalysisController      ..> PdfReportService : <<usa>>
-AnalysisController      ..> FlaskAPI      : <<invoca>>
-PatientController       ..> Patient       : <<usa>>
-PatientController       ..> Analysis      : <<usa>>
-ModelInfoController     ..> ModelConfig   : <<usa>>
+DoctorController  ..> DoctorModel       : <<usa>>
+DoctorController  ..> MailService        : <<usa>>
+DoctorController  ..> PasswordHelper     : <<usa>>
+AuthController    ..> AuthModel          : <<usa>>
+SolicitudController ..> SolicitudModel   : <<usa>>
+SolicitudController ..> EstablecimientoModel : <<usa>>
+SolicitudController ..> MailService      : <<usa>>
+
+' ============================================================
+' RELACIONES — Modelos → Datos (asociaciones lógicas)
+' ============================================================
+
+DoctorModel       ..> EstablecimientoModel : <<consulta>>
+MaestroModel      ..> DoctorModel          : <<provee especialidades>>
 
 @enduml

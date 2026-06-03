@@ -93,63 +93,95 @@ skinparam ParticipantBorderColor #000000
 skinparam ArrowColor #000000
 skinparam SequenceLifeLineBorderColor #888888
 
-actor "Médico Oftalmólogo" as MED
+actor "Usuario\n(Médico / Admin / SuperAdmin)" as USR
 
-boundary "views/auth/\nlogin.php" as V
+boundary "views/auth/\nlogin.php" as V_LOGIN
+boundary "views/auth/\nchange_password.php" as V_CP
 control "controllers/\nAuthController.php\n::login()" as C
-control "services/\nSessionService.php" as SS
-entity "models/\nDoctor.php" as E
-database "Railway DB\n(tabla: doctors)" as BD
+control "controllers/\nAuthController.php\n::changePassword()" as C_CP
+entity "models/\nAuthModel.php" as E
+database "Railway DB\n(tabla: usuarios)" as BD
 
-== POST /auth/login ==
+== GET views/auth/login.php ==
 
-MED -> V : Envía formulario\nPOST: email, password
-V -> C : AuthController::login(\n  $email, $password\n)
+USR -> V_LOGIN : HTTP GET views/auth/login.php
+V_LOGIN --> USR : HTTP 200 — Formulario:\n<form method="POST"\n  action="...AuthController.php?action=login">\n  <input name="email">\n  <input name="password" type="password">\n  (muestra $_SESSION['login_error'] si existe)
 
-C -> E : Doctor::findByEmail($email)
-E -> BD : SELECT id, nombre, password,\nis_temp_pass, estado\nFROM doctors\nWHERE email = ? LIMIT 1
-BD --> E : row / null
-E --> C : $doctor / null
+== POST controllers/AuthController.php?action=login ==
 
-alt Email no registrado
-    C --> V : return ['error' =>\n  'Credenciales incorrectas']
-    V --> MED : HTTP 401 — "Credenciales\nincorrectas. Verifique su\ncorreo y contraseña"
-else Email encontrado
-    C -> C : password_verify(\n  $password,\n  $doctor['password']\n)
+USR -> V_LOGIN : Submit formulario\nPOST: email, password
+V_LOGIN -> C : HTTP POST AuthController.php?action=login
 
-    alt Contraseña incorrecta
-        C --> V : return ['error' =>\n  'Credenciales incorrectas']
-        V --> MED : HTTP 401 — Mismo mensaje\ngenérico de error
-    else Contraseña correcta
-        C -> C : Verifica $doctor['estado']
+C -> C : $email = trim($_POST['email'] ?? '')\n$password = $_POST['password'] ?? ''\nif (empty($email) || empty($password)):
 
-        alt estado === 'desactivado'
-            C --> V : return ['error' =>\n  'Cuenta desactivada']
-            V --> MED : HTTP 403 — "Su cuenta ha sido\ndesactivada. Comuníquese\ncon el administrador"
-        else estado === 'activo'
-            C -> C : Verifica $doctor['is_temp_pass']
+alt Campos vacíos
+    C -> C : $_SESSION['login_error'] =\n  "Por favor ingrese correo y contraseña."
+    C --> V_LOGIN : HTTP 302 Redirect\n→ views/auth/login.php
+    V_LOGIN --> USR : Muestra alerta de error
+else Campos presentes
+    C -> E : AuthModel::getUserByEmail($email)
+    E -> BD : SELECT * FROM usuarios\nWHERE correo = :correo\nAND activo = 1 LIMIT 1
+    BD --> E : row / false
+    E --> C : $user[] / false
 
-            alt is_temp_pass === true
-                C --> V : return ['redirect' =>\n  '/auth/change-password',\n  'doctor_id' => $id]
-                V --> MED : HTTP 302 — Redirige a\nviews/auth/change_password.php\n"Debe cambiar su contraseña\ntemporal antes de continuar"
+    alt Usuario no encontrado (false)
+        C -> C : $_SESSION['login_error'] =\n  "Credenciales incorrectas. Verifique\n  su correo y contraseña."
+        C --> V_LOGIN : HTTP 302 Redirect\n→ views/auth/login.php
+        V_LOGIN --> USR : Muestra alerta de error genérico
+    else Usuario encontrado
+        C -> C : password_verify($password, $user['password'])
 
-                MED -> V : POST: new_password,\nconfirm_password
-                V -> C : AuthController::changeTempPassword(\n  $doctorId, $newPassword,\n  $confirmPassword\n)
-                C -> C : Valida coincidencia\ny longitud mínima (8 chars)
-                C -> C : $hash =\n  password_hash($newPassword,\n  PASSWORD_BCRYPT)
-                C -> E : Doctor::update($doctorId, [\n  'password'     => $hash,\n  'is_temp_pass' => false,\n  'updated_at'   => now()\n])
-                E -> BD : UPDATE doctors\nSET password=?,\nis_temp_pass=0,\nupdated_at=NOW()\nWHERE id=?
-                BD --> E : UPDATE OK
-                E --> C : true
-                C -> SS : SessionService::start(\n  $doctorId, $nombre\n)
-                SS -> SS : session_start()\n$_SESSION['doctor_id'] = $id\n$_SESSION['nombre'] = $nombre\n$_SESSION['last_activity'] = time()
-                C --> V : return ['redirect' => '/dashboard']
-                V --> MED : HTTP 302 — Redirige\na views/dashboard/index.php
-            else is_temp_pass === false
-                C -> SS : SessionService::start(\n  $doctorId, $nombre\n)
-                SS -> SS : session_start()\n$_SESSION['doctor_id'] = $id\n$_SESSION['nombre'] = $nombre\n$_SESSION['last_activity'] = time()\n' Inactividad: 3600 seg
-                C --> V : return ['redirect' => '/dashboard']
-                V --> MED : HTTP 302 — Accede\nal panel principal
+        alt Hash no coincide
+            C -> C : $_SESSION['login_error'] =\n  "Credenciales incorrectas..."
+            C --> V_LOGIN : HTTP 302 Redirect\n→ views/auth/login.php
+            V_LOGIN --> USR : Muestra alerta de error genérico
+        else Hash coincide
+            C -> C : Verifica $user['activo'] == 1
+
+            alt activo == 0
+                C -> C : $_SESSION['login_error'] =\n  "Su cuenta aún no ha sido aprobada\n  por el administrador."
+                C --> V_LOGIN : HTTP 302 Redirect\n→ views/auth/login.php
+                V_LOGIN --> USR : Muestra alerta cuenta inactiva
+            else activo == 1 — Sesión exitosa
+                C -> E : AuthModel::updateLastAccess($user['id'])
+                E -> BD : UPDATE usuarios\nSET ultimo_acceso = NOW()\nWHERE id = :id
+                BD --> E : OK
+
+                C -> C : $_SESSION['user_id'] = $user['id']\n$_SESSION['rol_codigo'] = $user['rol_codigo']\n$_SESSION['nombre'] = $user['nombre']\n$_SESSION['establecimiento_id'] = $user['establecimiento_id']\n$_SESSION['es_password_temporal'] = (bool)$user['es_password_temporal']\n$_SESSION['last_activity'] = time()
+
+                alt $user['es_password_temporal'] == true
+                    C --> V_LOGIN : HTTP 302 Redirect\n→ views/auth/change_password.php
+                    V_LOGIN --> USR : Redirige a pantalla de\ncambio de contraseña obligatorio
+
+                    == POST controllers/AuthController.php?action=change_password ==
+
+                    USR -> V_CP : Ingresa nueva contraseña\ny confirmación
+                    V_CP -> C_CP : HTTP POST AuthController.php?action=change_password
+                    C_CP -> C_CP : $nueva = $_POST['nueva_password']\n$confirma = $_POST['confirma_password']\nif (strlen($nueva) < 6):
+
+                    alt Contraseña < 6 chars
+                        C_CP -> C_CP : $_SESSION['cp_error'] =\n  "La contraseña debe tener al menos 6 caracteres."
+                        C_CP --> V_CP : HTTP 302 Redirect\n→ views/auth/change_password.php
+                        V_CP --> USR : Muestra mensaje de error
+                    else Contraseñas no coinciden
+                        C_CP -> C_CP : if ($nueva !== $confirma):\n  $_SESSION['cp_error'] =\n  "Las contraseñas no coinciden."
+                        C_CP --> V_CP : HTTP 302 Redirect
+                        V_CP --> USR : Muestra mensaje de error
+                    else Contraseña válida
+                        C_CP -> C_CP : $hash = password_hash($nueva, PASSWORD_BCRYPT)
+                        C_CP -> E : AuthModel::updatePassword(\n  $_SESSION['user_id'], $hash)
+                        E -> BD : UPDATE usuarios\nSET password = :password,\nes_password_temporal = 0\nWHERE id = :id
+                        BD --> E : UPDATE OK
+                        C_CP -> C_CP : $_SESSION['es_password_temporal'] = false\nredirectByRole($_SESSION['rol_codigo'])
+                        C_CP --> V_CP : HTTP 302 Redirect según rol
+                        V_CP --> USR : Accede al panel correspondiente
+                    end
+
+                else $user['es_password_temporal'] == false
+                    C -> C : redirectByRole($user['rol_codigo']):\n  'SAD' → views/superadmin/index.php\n  'ADM' → views/admin/index.php\n  'MED' → views/medico/index.php
+                    C --> V_LOGIN : HTTP 302 Redirect según rol
+                    V_LOGIN --> USR : Accede al panel correspondiente
+                end
             end
         end
     end
@@ -186,11 +218,11 @@ database "Railway DB\n(tabla: usuarios)" as BD
 == GET views/admin/doctor.php ==
 
 ADM -> V : HTTP GET /admin/doctor.php
-V -> E : DoctorModel::getDoctors($est_id)
-E -> BD : SELECT id, nombre, correo, cmp, especialidad,\nultimo_acceso, es_password_temporal\nFROM usuarios WHERE rol_codigo='MED'\nAND activo=1 AND establecimiento_id=?
+V -> E : DoctorModel::getActiveDoctorsByEstablishments($est_ids[])
+E -> BD : SELECT u.id, u.nombre, u.correo, u.cmp,\nu.especialidad, u.ultimo_acceso,\nu.es_password_temporal, u.establecimiento_id,\ne.nombre AS est_nombre\nFROM usuarios u\nLEFT JOIN establecimientos e ON e.id=u.establecimiento_id\nWHERE u.rol_codigo='MED' AND u.activo=1\nAND u.establecimiento_id IN (?) ORDER BY e.nombre, u.nombre
 BD --> E : rows[] (PDO::FETCH_ASSOC)
 E --> V : array $activos
-V --> ADM : HTTP 200 OK HTML\nRenderiza <table id="doctorsTable">
+V --> ADM : HTTP 200 OK HTML\nRenderiza <table id="doctorsTable">\nModales #modal-edit y #modal-reset\nembebidos en el mismo doctor.php
 
 == POST controllers/DoctorController.php?action=edit ==
 
@@ -679,10 +711,10 @@ end
 
 SADM -> V_SAD : HTTP GET views/superadmin/SolicitudesRegistro.php
 V_SAD -> V_SAD : require_role('SAD'):\n  verifica $_SESSION['rol_codigo']==='SAD'\n$user = current_user()\nlee y unset $_SESSION['solicitud_msg']
-V_SAD -> BD : $db->query(\n  "SELECT id, nombre_centro, direccion, tipo, ruc,\n   dni_titular, nombres_titular, apellidos_titular,\n   telefono, correo_contacto,\n   evidencia_1, evidencia_1_nombre,\n   evidencia_2, evidencia_2_nombre,\n   estado, fecha_solicitud\n   FROM solicitudes_establecimiento\n   ORDER BY FIELD(estado,'pendiente','aprobado','rechazado'),\n   fecha_solicitud DESC")\n  ->fetchAll(PDO::FETCH_ASSOC)
+V_SAD -> BD : SolicitudModel::getAllSolicitudesConOrigen()\nSELECT s.*, u.nombre AS nombre_usuario_solicitante\nFROM solicitudes_establecimiento s\nLEFT JOIN usuarios u ON u.id = s.id_usuario_solicitante\nORDER BY FIELD(s.estado,'pendiente','aprobado','rechazado'),\ns.fecha_solicitud DESC
 BD --> V_SAD : $solicitudes[]
-V_SAD -> BD : SELECT COUNT(*) FROM solicitudes_establecimiento\nWHERE estado='pendiente' → $cnt_solicitudes_pendientes
-BD --> V_SAD : int
+V_SAD -> BD : SolicitudModel::countPendientes()\nSELECT COUNT(*) FROM solicitudes_establecimiento\nWHERE estado='pendiente'
+BD --> V_SAD : int $cnt
 V_SAD --> SADM : HTTP 200 — <table.data-table>:\n  Columnas: Centro Oftalmológico, Titular,\n  Contacto (tel + email), Evidencias (btn-preview),\n  Fecha, Estado (badge-pending/approved/rejected),\n  Acciones [✓ Aprobar] [✗ Rechazar]\n  (solo si estado==='pendiente')\n  Carga: assets/js/dashboard/solicitudes.js\n  (modal preview base64 img/PDF)
 
 SADM -> V_SAD : Clic button.btn-approve "✓ Aprobar"\nconfirm('¿Aprobar esta solicitud, crear el\n  establecimiento y enviar correo al titular?')
@@ -690,20 +722,35 @@ V_SAD -> C : <form method="POST"\n  action="{$base}controllers/SolicitudControll
 C -> C : require_role('SAD')\n$action = $_POST['action'] = 'aprobar'\nhandleAprobar():\n  $id = (int)($_POST['id'] ?? 0)
 C -> BD : SELECT * FROM solicitudes_establecimiento\nWHERE id = ? AND estado = 'pendiente'\n→ fetch(PDO::FETCH_ASSOC)
 BD --> C : $sol[] con todos los campos
-C -> BD : $ins->prepare(\n  "INSERT INTO establecimientos\n   (nombre, direccion, tipo, ruc)\n   VALUES (?, ?, ?, ?)")\n  ->execute([$sol['nombre_centro'],\n    $sol['direccion'], $sol['tipo'], $sol['ruc']])
-BD --> C : lastInsertId() → $establecimiento_id
-C -> BD : UPDATE solicitudes_establecimiento\nSET estado = 'aprobado'\nWHERE id = ?
-C -> C : $tempPass = bin2hex(random_bytes(4)) // "a1b2c3d4"\n$hashPass = password_hash($tempPass, PASSWORD_DEFAULT)\n$nombreCompleto = trim($sol['nombres_titular']\n  . ' ' . $sol['apellidos_titular'])
-C -> BD : $insUser->prepare(\n  "INSERT INTO usuarios\n   (rol_codigo, establecimiento_id, nombre,\n    correo, password, es_password_temporal, activo)\n   VALUES ('ADM', ?, ?, ?, ?, 1, 1)")\n  ->execute([$establecimiento_id, $nombreCompleto,\n    $sol['correo_contacto'], $hashPass])
-BD --> C : INSERT OK
-C -> MS : MailService::sendSolicitudAprobada(\n  $sol['correo_contacto'],\n  $nombreCompleto,\n  $sol['nombre_centro'])
-MS -> MS : PHPMailer SMTP:\nSubject: "RetinAI — ¡Su solicitud fue aprobada!"\nBody: ✅ "Solicitud Aprobada"\n"En breve recibirá sus credenciales..."
-MS --> C : return bool
-C -> MS : MailService::sendTempPassword(\n  $sol['correo_contacto'],\n  $nombreCompleto, $tempPass)
-MS -> MS : PHPMailer SMTP:\nSubject: "Acceso a RetinAI - Su cuenta ha sido creada"\nBody: contraseña $tempPass en caja monospace\n+ <a href="login.php">Iniciar Sesión Ahora</a>
-MS --> C : return bool
+
+C -> BD : SELECT id FROM usuarios\nWHERE correo = ? AND rol_codigo = 'ADM'
+BD --> C : $usuario_existente_id / false
+
+alt ADM ya existe con ese correo
+    C -> BD : INSERT INTO establecimientos\n  (nombre, direccion, tipo, ruc, id_usuario)\n  VALUES (?, ?, ?, ?, $usuario_existente_id)
+    BD --> C : lastInsertId() → $establecimiento_id
+    C -> BD : UPDATE solicitudes_establecimiento\n  SET estado = 'aprobado' WHERE id = ?
+    C -> MS : MailService::sendSolicitudAprobada(\n  $sol['correo_contacto'],\n  $nombreCompleto, $sol['nombre_centro'])
+    MS -> MS : PHPMailer SMTP:\nSubject: "RetinAI — ¡Su solicitud fue aprobada!"
+    MS --> C : return bool
+else ADM nuevo — crear cuenta y establecimiento
+    C -> C : $tempPass = bin2hex(random_bytes(4))\n$hashPass = password_hash($tempPass, PASSWORD_DEFAULT)\n$nombreCompleto = trim($sol['nombres_titular']\n  . ' ' . $sol['apellidos_titular'])
+    C -> BD : INSERT INTO usuarios\n  (rol_codigo, establecimiento_id, nombre,\n   correo, password, es_password_temporal, activo)\n  VALUES ('ADM', NULL, ?, ?, ?, 1, 1)
+    BD --> C : lastInsertId() → $nuevo_usuario_id
+    C -> BD : INSERT INTO establecimientos\n  (nombre, direccion, tipo, ruc, id_usuario)\n  VALUES (?, ?, ?, ?, $nuevo_usuario_id)
+    BD --> C : lastInsertId() → $establecimiento_id
+    C -> BD : UPDATE usuarios\n  SET establecimiento_id = ?\n  WHERE id = $nuevo_usuario_id
+    C -> BD : UPDATE solicitudes_establecimiento\n  SET estado = 'aprobado' WHERE id = ?
+    C -> MS : MailService::sendSolicitudAprobada(\n  $sol['correo_contacto'],\n  $nombreCompleto, $sol['nombre_centro'])
+    MS -> MS : PHPMailer SMTP:\nSubject: "RetinAI — ¡Su solicitud fue aprobada!"
+    MS --> C : return bool
+    C -> MS : MailService::sendTempPassword(\n  $sol['correo_contacto'],\n  $nombreCompleto, $tempPass)
+    MS -> MS : PHPMailer SMTP:\nSubject: "Acceso a RetinAI - Su cuenta ha sido creada"\nBody: contraseña $tempPass en caja monospace\n+ <a href="login.php">Iniciar Sesión Ahora</a>
+    MS --> C : return bool
+end
+
 C -> C : $_SESSION['solicitud_msg'] =\n  "Solicitud aprobada. El centro\n  «{$sol['nombre_centro']}» ha sido registrado\n  y se enviaron las credenciales al titular."
 C --> V_SAD : HTTP 302 Location:\n  views/superadmin/SolicitudesRegistro.php
-V_SAD --> SADM : if($msg_success): renderiza .alert-flash\n(background:#D1FAE5, border:#6EE7B7):\n  "Solicitud aprobada. El centro «...»..."
+V_SAD --> SADM : if($solicitud_msg): renderiza .alert-flash\n(background:#D1FAE5, border:#6EE7B7):\n  "Solicitud aprobada. El centro «...»..."
 
 @enduml

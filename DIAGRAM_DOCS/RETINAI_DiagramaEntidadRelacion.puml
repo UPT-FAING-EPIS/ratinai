@@ -1,0 +1,92 @@
+@startuml
+skinparam linetype ortho
+skinparam backgroundColor #FFFFFF
+skinparam classBackgroundColor #EEEDFE
+skinparam classHeaderBackgroundColor #534AB7
+skinparam classFontColor #FFFFFF
+skinparam classFontSize 13
+skinparam classAttributeFontSize 12
+skinparam classBorderColor #534AB7
+skinparam ArrowColor #3C3489
+skinparam roundcorner 6
+
+entity "usuarios" {
+  * id : Integer <<PK>>
+  --
+  * rol_codigo : String
+  * establecimiento_id : Integer <<FK>>
+  * nombre : String
+  * correo : String <<unique>>
+  * password : String
+  * cmp : String
+  * especialidad : String
+  * es_password_temporal : Boolean
+  * activo : Boolean
+  * ultimo_acceso : Datetime
+}
+
+entity "maestro" {
+  * id : Integer <<PK>>
+  --
+  * tipo : String
+  * codigo : String
+  * descripcion : String
+  * orden : Integer
+}
+
+entity "establecimientos" {
+  * id : Integer <<PK>>
+  --
+  * nombre : String
+  * direccion : String
+  * tipo : Enum('publico','privado')
+  * ruc : String
+}
+
+entity "solicitudes_establecimiento" {
+  * id : Integer <<PK>>
+  --
+  * nombre_centro : String
+  * direccion : String
+  * tipo : Enum('publico','privado')
+  * ruc : String
+  * dni_titular : String
+  * nombres_titular : String
+  * apellidos_titular : String
+  * telefono : String
+  * correo_contacto : String
+  * evidencia_1 : MediumText
+  * evidencia_1_nombre : String
+  * evidencia_2 : MediumText
+  * evidencia_2_nombre : String
+  * estado : Enum('pendiente','aprobado','rechazado')
+  * fecha_solicitud : Datetime
+}
+
+entity "Paciente" {
+  * id : UUID <<PK>>
+  --
+  * dni : String <<unique>>
+}
+
+entity "AnalisisRetinal" {
+  * id : UUID <<PK>>
+  --
+  * fecha : Date
+  * hora : Time
+  * imagen_referencia : String
+  * resultado_principal : String
+  * prob_normal : Float
+  * prob_retinopatia : Float
+  * prob_glaucoma : Float
+  * prob_catarata : Float
+  * alerta_visual : Boolean
+}
+
+' Relaciones
+establecimientos ||--o{ usuarios : posee
+usuarios ||--o{ AnalisisRetinal : realiza (si es Médico)
+Paciente ||--o{ AnalisisRetinal : posee historial de
+maestro ||--o{ usuarios : define rol (rol_codigo)
+
+@enduml

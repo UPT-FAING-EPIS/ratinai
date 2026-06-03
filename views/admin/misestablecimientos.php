@@ -9,32 +9,43 @@ $base     = get_base_path();
 $est_id   = (int)($user['establecimiento_id'] ?? 0);
 $logout_url = $base . 'controllers/AuthController.php?action=logout';
 
+require_once __DIR__ . '/../../models/EstablecimientoModel.php';
+require_once __DIR__ . '/../../models/SolicitudModel.php';
+require_once __DIR__ . '/../../models/DoctorModel.php';
+
 $role_label   = '🛡️ Administrador';
 $role_class   = 'role-adm';
 $avatar_class = 'avatar-adm';
 
 try {
-    $db   = (new Database())->getConnection();
-    // Establecimiento actual
-    $stmt = $db->prepare("SELECT nombre, direccion, tipo, ruc FROM establecimientos WHERE id = :id");
-    $stmt->execute([':id' => $est_id]);
-    $est_actual = $stmt->fetch(PDO::FETCH_ASSOC);
+    $estModel = new EstablecimientoModel();
+    $solModel = new SolicitudModel();
+    $docModel = new DoctorModel();
+
+    $user_id = (int)($user['id'] ?? 0);
+
+    // Todos los establecimientos que pertenecen al usuario
+    $mis_establecimientos = $estModel->getByOwnerId($user_id);
 
     // Solicitudes del admin actual
-    $q = $db->prepare(
-        "SELECT id, nombre_centro, direccion, tipo, ruc, estado, fecha_solicitud
-         FROM solicitudes_establecimiento WHERE correo_contacto = :correo
-         ORDER BY fecha_solicitud DESC"
-    );
-    $q->execute([':correo' => $user['correo']]);
-    $solicitudes = $q->fetchAll(PDO::FETCH_ASSOC);
+    $solicitudes = $solModel->getSolicitudesByContactEmailOrOwner($user['correo'], $user_id);
 
-    // Badge del sidebar (pendientes medicos)
-    $cnt_pendientes = (int)$db->query(
-        "SELECT COUNT(*) FROM usuarios WHERE rol_codigo='MED' AND activo=0 AND establecimiento_id=$est_id"
-    )->fetchColumn();
+    // Badge del sidebar (pendientes médicos de CUALQUIER establecimiento del admin)
+    $cnt_pendientes = 0;
+    if (!empty($mis_establecimientos)) {
+        $ids = array_map('intval', array_column($mis_establecimientos, 'id'));
+        $cnt_pendientes = $docModel->countPendingByEstablishments($ids);
+    }
+    // también incluir el establecimiento original asignado (por compatibilidad)
+    if ($est_id > 0) {
+        // Agregamos al arreglo si no estaba o lo contamos individualmente si no hay previos
+        if (empty($mis_establecimientos)) {
+            $cnt_pendientes = $docModel->countPendingByEstablishments([$est_id]);
+        }
+    }
+
 } catch (Exception $ex) {
-    $est_actual = null; $solicitudes = [];
+    $mis_establecimientos = []; $solicitudes = [];
     $cnt_pendientes = 0;
 }
 
@@ -56,8 +67,18 @@ if (isset($_SESSION['solicitud_success'])) {
 .btn-add { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; background: linear-gradient(135deg, #1A56DB 0%, #1e40af 100%); color: #fff; font-size: 13px; font-weight: 600; border-radius: 10px; text-decoration: none; border: none; cursor: pointer; transition: transform .15s, box-shadow .15s; box-shadow: 0 4px 14px rgba(26,86,219,.35); white-space: nowrap; }
 .btn-add:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(26,86,219,.45); }
 .badge-pendiente { background-color: #fef08a; color: #854d0e; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; }
-.badge-aprobado { background-color: #bbf7d0; color: #166534; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; }
+.badge-aprobado  { background-color: #bbf7d0; color: #166534; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; }
 .badge-rechazado { background-color: #fecaca; color: #991b1b; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; }
+
+/* Grid de establecimientos */
+.est-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-bottom: 28px; }
+.est-card  { background: #fff; border: 1px solid #e2e8f0; border-left: 4px solid #10b981; border-radius: 12px; padding: 20px; transition: box-shadow .2s; }
+.est-card:hover { box-shadow: 0 4px 18px rgba(0,0,0,.08); }
+.est-card-title { font-size: 15px; font-weight: 700; margin: 0 0 10px; color: #0f172a; }
+.est-card p { margin: 4px 0; font-size: 13px; color: #475569; }
+.est-card strong { color: #0f172a; }
+.badge-tipo { display: inline-block; margin-top: 8px; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; background: #e0f2fe; color: #0369a1; }
+.badge-tipo.privado { background: #fce7f3; color: #9d174d; }
 </style>
 </head>
 <body>
@@ -74,28 +95,39 @@ if (isset($_SESSION['solicitud_success'])) {
             <div class="section-top">
                 <div>
                     <h1 class="page-title">Mis Establecimientos</h1>
-                    <p class="page-sub">Revise el estado de sus establecimientos y registre nuevos.</p>
+                    <p class="page-sub">Gestione sus centros oftalmológicos y solicite el registro de nuevos.</p>
                 </div>
                 <a href="<?= $base ?>views/admin/nuevoestablecimiento.php" class="btn-add">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                        <circle cx="12" cy="8" r="4" stroke="white" stroke-width="1.8"/>
-                        <path d="M4 20c0-4 3.582-7 8-7s8 3 8 7" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
-                        <path d="M19 3v6M16 6h6" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+                        <path d="M12 5v14M5 12h14" stroke="white" stroke-width="2" stroke-linecap="round"/>
                     </svg>
                     Añadir establecimiento
                 </a>
             </div>
 
-            <?php if ($est_actual): ?>
-            <div class="card full-width-card" style="margin-bottom: 24px; border-left: 4px solid #10b981;">
-                <h3 style="margin-top:0; font-size: 16px; margin-bottom: 12px;">Establecimiento Activo</h3>
-                <p style="margin: 4px 0; font-size: 14px;"><strong>Nombre:</strong> <?= htmlspecialchars($est_actual['nombre']) ?></p>
-                <p style="margin: 4px 0; font-size: 14px;"><strong>RUC:</strong> <?= htmlspecialchars($est_actual['ruc'] ?? '—') ?></p>
-                <p style="margin: 4px 0; font-size: 14px;"><strong>Dirección:</strong> <?= htmlspecialchars($est_actual['direccion'] ?? '—') ?></p>
-                <p style="margin: 4px 0; font-size: 14px;"><strong>Tipo:</strong> <?= ucfirst(htmlspecialchars($est_actual['tipo'] ?? '—')) ?></p>
+            <!-- ── Establecimientos activos ─────────────────────────────── -->
+            <h3 style="font-size:15px; margin-bottom:14px; color:#0f172a;">Establecimientos a su cargo (<?= count($mis_establecimientos) ?>)</h3>
+
+            <?php if (empty($mis_establecimientos)): ?>
+            <div class="card full-width-card" style="margin-bottom:24px;">
+                <p class="empty-msg">Aún no tiene establecimientos registrados. Solicite uno usando el botón de arriba.</p>
+            </div>
+            <?php else: ?>
+            <div class="est-grid">
+                <?php foreach ($mis_establecimientos as $e): ?>
+                <div class="est-card">
+                    <p class="est-card-title">🏥 <?= htmlspecialchars($e['nombre']) ?></p>
+                    <p><strong>RUC:</strong> <?= htmlspecialchars($e['ruc'] ?? '—') ?></p>
+                    <p><strong>Dirección:</strong> <?= htmlspecialchars($e['direccion'] ?? '—') ?></p>
+                    <span class="badge-tipo <?= $e['tipo'] === 'privado' ? 'privado' : '' ?>">
+                        <?= ucfirst(htmlspecialchars($e['tipo'] ?? '—')) ?>
+                    </span>
+                </div>
+                <?php endforeach; ?>
             </div>
             <?php endif; ?>
 
+            <!-- ── Historial de solicitudes ────────────────────────────── -->
             <div class="card full-width-card">
                 <h3 style="margin-top:0; font-size: 16px; margin-bottom: 16px;">Historial de Solicitudes</h3>
                 <?php if (empty($solicitudes)): ?>

@@ -51,6 +51,18 @@ if (isset($_SESSION['solicitud_error'])) {
 .page-title { margin-bottom: 4px; }
 .back-link { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 500; color: #64748b; text-decoration: none; margin-bottom: 20px; transition: color .2s; }
 .back-link:hover { color: #0f172a; }
+
+/* Estilos de inputs faltantes copiados de login.css */
+.form-group { margin-bottom: 18px; text-align: left; }
+.form-row { display: flex; gap: 14px; }
+.form-row .form-group { flex: 1; }
+.form-label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); margin-bottom: 6px; letter-spacing: 0.2px; text-transform: uppercase; }
+.form-input { width: 100%; padding: 11px 14px; border: 1.5px solid var(--border2); border-radius: var(--radius-sm); font-family: 'DM Sans', sans-serif; font-size: 14px; color: var(--text); background: var(--surface); transition: border 0.15s, box-shadow 0.15s; outline: none; }
+.form-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(26,86,219,0.12); }
+.form-input.error { border-color: var(--danger); box-shadow: 0 0 0 3px rgba(220,38,38,0.10); }
+.form-input::placeholder { color: var(--text3); }
+.form-hint  { font-size: 11px; color: var(--text3); margin-top: 4px; display: block; }
+.form-error { font-size: 11px; color: var(--danger); margin-top: 4px; display: block; }
 </style>
 </head>
 <body>

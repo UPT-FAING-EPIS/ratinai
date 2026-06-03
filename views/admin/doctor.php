@@ -9,35 +9,49 @@ $base     = get_base_path();
 $est_id   = (int)($user['establecimiento_id'] ?? 0);
 $logout_url = $base . 'controllers/AuthController.php?action=logout';
 
+require_once __DIR__ . '/../../models/EstablecimientoModel.php';
+require_once __DIR__ . '/../../models/DoctorModel.php';
+
 $role_label   = '🛡️ Administrador';
 $role_class   = 'role-adm';
 $avatar_class = 'avatar-adm';
 
 try {
-    $db   = (new Database())->getConnection();
-    $stmt = $db->prepare("SELECT nombre FROM establecimientos WHERE id = :id");
-    $stmt->execute([':id' => $est_id]);
-    $est        = $stmt->fetch(PDO::FETCH_ASSOC);
-    $est_nombre = $est['nombre'] ?? 'Mi Establecimiento';
-    $header_sub = $est_nombre;
+    $estModel = new EstablecimientoModel();
+    $docModel = new DoctorModel();
 
-    // Médicos activos
-    $q = $db->prepare(
-        "SELECT id, nombre, correo, cmp, especialidad, ultimo_acceso, es_password_temporal
-         FROM usuarios WHERE rol_codigo='MED' AND activo=1 AND establecimiento_id=:eid
-         ORDER BY nombre"
-    );
-    $q->execute([':eid' => $est_id]);
-    $activos = $q->fetchAll(PDO::FETCH_ASSOC);
+    $user_id = (int)($user['id'] ?? 0);
+
+    // Todos los establecimientos del admin
+    $mis_establecimientos = $estModel->getByOwnerId($user_id);
+
+    // Fallback: si no tiene ninguno vinculado por id_usuario, usar el de sesión
+    if (empty($mis_establecimientos) && $est_id > 0) {
+        $est = $estModel->getById($est_id);
+        if ($est) $mis_establecimientos = [$est];
+    }
+
+    $est_nombre = $mis_establecimientos[0]['nombre'] ?? 'Mi Establecimiento';
+    $header_sub = $est_nombre;
+    $tiene_multi = count($mis_establecimientos) > 1;
+
+    if (!empty($mis_establecimientos)) {
+        $ids_est = array_map('intval', array_column($mis_establecimientos, 'id'));
+
+        // Médicos activos de todos sus establecimientos
+        $activos = $docModel->getActiveDoctorsByEstablishments($ids_est);
+
+        // Badge del sidebar
+        $cnt_pendientes = $docModel->countPendingByEstablishments($ids_est);
+    } else {
+        $activos = [];
+        $cnt_pendientes = 0;
+    }
     $cnt_activos = count($activos);
 
-    // Badge del sidebar (pendientes)
-    $cnt_pendientes = (int)$db->query(
-        "SELECT COUNT(*) FROM usuarios WHERE rol_codigo='MED' AND activo=0 AND establecimiento_id=$est_id"
-    )->fetchColumn();
 } catch (Exception $ex) {
-    $est_nombre = ''; $activos = [];
-    $cnt_activos = 0; $cnt_pendientes = 0; $header_sub = '';
+    $mis_establecimientos = []; $est_nombre = ''; $activos = [];
+    $cnt_activos = 0; $cnt_pendientes = 0; $header_sub = ''; $tiene_multi = false;
 }
 
 // Leer flash messages desde la sesión
@@ -101,6 +115,7 @@ if (isset($_GET['ok'])) {
                     <thead>
                         <tr>
                             <th>Médico</th>
+                            <?php if ($tiene_multi): ?><th>Establecimiento</th><?php endif; ?>
                             <th>CMP</th>
                             <th>Especialidad</th>
                             <th>Último acceso</th>
@@ -115,6 +130,9 @@ if (isset($_GET['ok'])) {
                             <strong><?= htmlspecialchars($m['nombre']) ?></strong><br>
                             <span class="text-muted small"><?= htmlspecialchars($m['correo']) ?></span>
                         </td>
+                        <?php if ($tiene_multi): ?>
+                        <td class="small"><?= htmlspecialchars($m['est_nombre'] ?? '—') ?></td>
+                        <?php endif; ?>
                         <td class="mono"><?= htmlspecialchars($m['cmp'] ?? '—') ?></td>
                         <td><?= htmlspecialchars($m['especialidad'] ?? '—') ?></td>
                         <td class="text-muted small">

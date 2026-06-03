@@ -235,44 +235,77 @@ function handleAprobar(): void
             exit;
         }
 
-        // Crear el establecimiento en la tabla principal
-        $ins = $db->prepare(
-            "INSERT INTO establecimientos (nombre, direccion, tipo, ruc)
-             VALUES (?, ?, ?, ?)"
-        );
-        $ins->execute([$sol['nombre_centro'], $sol['direccion'], $sol['tipo'], $sol['ruc']]);
-        $establecimiento_id = $db->lastInsertId();
+        // Verificar si ya existe un usuario ADM con ese correo (solicitante del admin)
+        $stmtUser = $db->prepare("SELECT id FROM usuarios WHERE correo = ? AND rol_codigo = 'ADM'");
+        $stmtUser->execute([$sol['correo_contacto']]);
+        $usuario_existente_id = $stmtUser->fetchColumn();
 
-        // Marcar solicitud como aprobada
-        $upd = $db->prepare(
-            "UPDATE solicitudes_establecimiento SET estado = 'aprobado' WHERE id = ?"
-        );
-        $upd->execute([$id]);
-
-        // TODO: Crear cuenta de usuario Admin de Establecimiento
-        $tempPass = bin2hex(random_bytes(4)); // 8 caracteres hex
-        $hashPass = password_hash($tempPass, PASSWORD_DEFAULT);
-        
-        $insUser = $db->prepare("
-            INSERT INTO usuarios (rol_codigo, establecimiento_id, nombre, correo, password, es_password_temporal, activo) 
-            VALUES ('ADM', ?, ?, ?, ?, 1, 1)
-        ");
+        // Determinar el id_usuario propietario del nuevo establecimiento
         $nombreCompleto = trim($sol['nombres_titular'] . ' ' . $sol['apellidos_titular']);
-        $insUser->execute([
-            $establecimiento_id,
-            $nombreCompleto,
-            $sol['correo_contacto'],
-            $hashPass
-        ]);
 
-        // Enviar correo de aprobación
-        MailService::sendSolicitudAprobada($sol['correo_contacto'], $nombreCompleto, $sol['nombre_centro']);
-        
-        // Enviar contraseña temporal (reutilizando el método existente o similar)
-        // Por simplicidad, enviaremos la pass temporal usando el mismo método que envía a los médicos
-        MailService::sendTempPassword($sol['correo_contacto'], $nombreCompleto, $tempPass);
+        if ($usuario_existente_id) {
+            // El ADM ya existe: solo crear el establecimiento y vincularlo
+            $ins = $db->prepare(
+                "INSERT INTO establecimientos (nombre, direccion, tipo, ruc, id_usuario)
+                 VALUES (?, ?, ?, ?, ?)"
+            );
+            $ins->execute([$sol['nombre_centro'], $sol['direccion'], $sol['tipo'], $sol['ruc'], $usuario_existente_id]);
+            $establecimiento_id = $db->lastInsertId();
 
-        $_SESSION['solicitud_msg'] = "Solicitud aprobada. El centro «{$sol['nombre_centro']}» ha sido registrado y se enviaron las credenciales al titular.";
+            // Marcar solicitud como aprobada
+            $upd = $db->prepare(
+                "UPDATE solicitudes_establecimiento SET estado = 'aprobado' WHERE id = ?"
+            );
+            $upd->execute([$id]);
+
+            // Notificar sin crear nueva cuenta
+            MailService::sendSolicitudAprobada($sol['correo_contacto'], $nombreCompleto, $sol['nombre_centro']);
+
+        } else {
+            // El usuario no existe: crear establecimiento + cuenta ADM + enviar credenciales
+            $tempPass = bin2hex(random_bytes(4)); // 8 caracteres hex
+            $hashPass = password_hash($tempPass, PASSWORD_DEFAULT);
+
+            // Crear primero el usuario para obtener su id
+            $insUser = $db->prepare("
+                INSERT INTO usuarios (rol_codigo, establecimiento_id, nombre, correo, password, es_password_temporal, activo)
+                VALUES ('ADM', NULL, ?, ?, ?, 1, 1)
+            ");
+            $insUser->execute([$nombreCompleto, $sol['correo_contacto'], $hashPass]);
+            $nuevo_usuario_id = $db->lastInsertId();
+
+            // Crear el establecimiento vinculado al nuevo usuario
+            $ins = $db->prepare(
+                "INSERT INTO establecimientos (nombre, direccion, tipo, ruc, id_usuario)
+                 VALUES (?, ?, ?, ?, ?)"
+            );
+            $ins->execute([$sol['nombre_centro'], $sol['direccion'], $sol['tipo'], $sol['ruc'], $nuevo_usuario_id]);
+            $establecimiento_id = $db->lastInsertId();
+
+            // Actualizar el establecimiento_id principal en el usuario
+            $db->prepare("UPDATE usuarios SET establecimiento_id = ? WHERE id = ?")
+               ->execute([$establecimiento_id, $nuevo_usuario_id]);
+
+            // Marcar solicitud como aprobada
+            $upd = $db->prepare(
+                "UPDATE solicitudes_establecimiento SET estado = 'aprobado' WHERE id = ?"
+            );
+            $upd->execute([$id]);
+
+            MailService::sendSolicitudAprobada($sol['correo_contacto'], $nombreCompleto, $sol['nombre_centro']);
+            MailService::sendTempPassword($sol['correo_contacto'], $nombreCompleto, $tempPass);
+        }
+
+        $usuario_final_id = $usuario_existente_id ?: ($nuevo_usuario_id ?? null);
+        unset($usuario_existente_id, $nuevo_usuario_id);
+
+        // (Correos ya enviados dentro del bloque condicional anterior)
+
+        if ($usuario_existente_id ?? false) {
+            $_SESSION['solicitud_msg'] = "Solicitud aprobada. El centro «{$sol['nombre_centro']}» fue vinculado al ADM existente. Se le notificó por correo.";
+        } else {
+            $_SESSION['solicitud_msg'] = "Solicitud aprobada. El centro «{$sol['nombre_centro']}» ha sido registrado y se enviaron las credenciales al titular.";
+        }
 
     } catch (Exception $ex) {
         $_SESSION['solicitud_msg'] = 'Error al aprobar la solicitud. ' . $ex->getMessage();
@@ -401,13 +434,14 @@ function handleSolicitarAdmin(): void
 
         $stmt = $db->prepare(
             "INSERT INTO solicitudes_establecimiento
-                (nombre_centro, direccion, tipo, ruc, dni_titular, nombres_titular, apellidos_titular, telefono, correo_contacto, evidencia_1, evidencia_1_nombre, evidencia_2, evidencia_2_nombre, estado, fecha_solicitud)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pendiente', NOW())"
+                (nombre_centro, direccion, tipo, ruc, dni_titular, nombres_titular, apellidos_titular, telefono, correo_contacto, id_usuario_solicitante, evidencia_1, evidencia_1_nombre, evidencia_2, evidencia_2_nombre, estado, fecha_solicitud)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pendiente', NOW())"
         );
         $stmt->execute([
             $nombre_centro, $direccion, $tipo, $ruc,
             $dni_titular, $nombres_titular, $apellidos_titular, $telefono, $correo_contacto,
-            $evidencia_1_b64, $evidencia_1_nombre, 
+            $user['id'],
+            $evidencia_1_b64, $evidencia_1_nombre,
             $evidencia_2_b64 ?: null, $evidencia_2_nombre ?: null
         ]);
 

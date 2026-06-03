@@ -6,28 +6,47 @@ require_role('ADM');
 $user       = current_user();
 $initials   = get_initials($user['nombre']);
 $base       = get_base_path();
-$est_id     = (int)($user['establecimiento_id'] ?? 0);
+$est_id   = (int)($user['establecimiento_id'] ?? 0);
 $logout_url = $base . 'controllers/AuthController.php?action=logout';
+
+require_once __DIR__ . '/../../models/EstablecimientoModel.php';
+require_once __DIR__ . '/../../models/MaestroModel.php';
+require_once __DIR__ . '/../../models/DoctorModel.php';
 
 $role_label   = '🛡️ Administrador';
 $role_class   = 'role-adm';
 $avatar_class = 'avatar-adm';
 
 try {
-    $db   = (new Database())->getConnection();
-    $stmt = $db->prepare("SELECT nombre FROM establecimientos WHERE id = :id");
-    $stmt->execute([':id' => $est_id]);
-    $est        = $stmt->fetch(PDO::FETCH_ASSOC);
-    $est_nombre = $est['nombre'] ?? 'Mi Establecimiento';
+    $estModel = new EstablecimientoModel();
+    $maestroModel = new MaestroModel();
+    $docModel = new DoctorModel();
+
+    $user_id = (int)($user['id'] ?? 0);
+
+    // Todos los establecimientos del admin logueado
+    $mis_establecimientos = $estModel->getByOwnerId($user_id);
+
+    // Si no tiene ninguno vinculado por id_usuario, fallback al establecimiento_id de sesión
+    if (empty($mis_establecimientos) && $est_id > 0) {
+        $est = $estModel->getById($est_id);
+        if ($est) $mis_establecimientos = [$est];
+    }
+
+    $est_nombre = $mis_establecimientos[0]['nombre'] ?? 'Mi Establecimiento';
     $header_sub = $est_nombre;
-    
+
     // Cargar especialidades desde maestro
-    $qEsp = $db->query(
-        "SELECT codigo, descripcion FROM maestro WHERE tipo='TIPO_ESPECIALIDAD' AND descripcion != 'Otro' ORDER BY orden ASC"
-    );
-    $especialidades = $qEsp->fetchAll(PDO::FETCH_ASSOC);
+    $especialidades = $maestroModel->getEspecialidades();
+
+    // Badge pendientes (todos los establecimientos del admin)
+    $cnt_pendientes = 0;
+    if (!empty($mis_establecimientos)) {
+        $ids_est = array_map('intval', array_column($mis_establecimientos, 'id'));
+        $cnt_pendientes = $docModel->countPendingByEstablishments($ids_est);
+    }
 } catch (Exception $ex) {
-    $est_nombre = ''; $header_sub = ''; $especialidades = [];
+    $mis_establecimientos = []; $est_nombre = ''; $header_sub = ''; $especialidades = []; $cnt_pendientes = 0;
 }
 
 // Leer flash messages desde sesión
@@ -170,6 +189,23 @@ unset($_SESSION['flash_errors'], $_SESSION['flash_success'], $_SESSION['flash_te
                 </div>
 
                 <form method="POST" action="<?= $base ?>controllers/DoctorController.php?action=create" id="form-doctor" novalidate>
+                    <!-- Selector de establecimiento -->
+                    <?php if (count($mis_establecimientos) > 1): ?>
+                    <div class="field" style="margin-bottom:22px;">
+                        <label for="establecimiento_id">Establecimiento destino <span style="color:#DC2626">*</span></label>
+                        <select id="establecimiento_id" name="establecimiento_id" required>
+                            <option value="">— Seleccione el establecimiento —</option>
+                            <?php foreach ($mis_establecimientos as $e): ?>
+                            <option value="<?= (int)$e['id'] ?>" <?= ((int)($old_post['establecimiento_id'] ?? 0) === (int)$e['id']) ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($e['nombre']) ?>
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <p class="hint">El médico quedará vinculado al establecimiento elegido.</p>
+                    </div>
+                    <?php else: ?>
+                    <input type="hidden" name="establecimiento_id" value="<?= (int)($mis_establecimientos[0]['id'] ?? $est_id) ?>">
+                    <?php endif; ?>
                     <!-- Nombre -->
                     <div class="field">
                         <label for="nombre">Nombre completo</label>

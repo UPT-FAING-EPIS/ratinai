@@ -28,30 +28,54 @@ class DoctorController {
 
     public function createDoctor() {
         require_role('ADM');
-        $user = current_user();
-        $est_id = (int)($user['establecimiento_id'] ?? 0);
+        $user   = current_user();
+        $user_id = (int)($user['id'] ?? 0);
+        $est_id  = (int)($user['establecimiento_id'] ?? 0); // fallback
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $nombre       = trim($_POST['nombre']       ?? '');
-            $correo       = trim($_POST['correo']       ?? '');
-            $cmp          = trim($_POST['cmp']          ?? '');
-            $esp_sel      = trim($_POST['especialidad'] ?? '');
-            $esp_nueva    = trim($_POST['esp_nueva']    ?? '');
-            $password_override = trim($_POST['password_override'] ?? '');
-            $password_temp   = ($password_override !== '') ? $password_override : PasswordHelper::generateTemp(12);
+            $nombre             = trim($_POST['nombre']          ?? '');
+            $correo             = trim($_POST['correo']          ?? '');
+            $cmp                = trim($_POST['cmp']             ?? '');
+            $esp_sel            = trim($_POST['especialidad']    ?? '');
+            $esp_nueva          = trim($_POST['esp_nueva']       ?? '');
+            $est_id_form        = (int)($_POST['establecimiento_id'] ?? 0);
+            $password_override  = trim($_POST['password_override'] ?? '');
+            $password_temp      = ($password_override !== '') ? $password_override : PasswordHelper::generateTemp(12);
 
             $especialidad_final = ($esp_sel === '__nueva__') ? $esp_nueva : $esp_sel;
 
             $errors = [];
-            if (empty($nombre)) $errors[] = "El nombre es obligatorio.";
+            if (empty($nombre))  $errors[] = "El nombre es obligatorio.";
             if (empty($correo) || !filter_var($correo, FILTER_VALIDATE_EMAIL)) $errors[] = "Ingrese un correo electrónico válido.";
-            if (empty($cmp)) $errors[] = "El número CMP es obligatorio.";
+            if (empty($cmp))     $errors[] = "El número CMP es obligatorio.";
             if (empty($especialidad_final)) $errors[] = "Seleccione o ingrese una especialidad.";
+            if ($est_id_form <= 0) $errors[] = "Debe seleccionar un establecimiento destino.";
 
             if (!empty($errors)) {
                 $_SESSION['flash_errors'] = $errors;
                 $_SESSION['old_post'] = $_POST;
                 $this->redirect('views/admin/create_doctor.php');
+            }
+
+            // Verificar que el establecimiento pertenezca al admin logueado
+            try {
+                require_once __DIR__ . '/../config/config.php';
+                $db = (new Database())->getConnection();
+                $stmtChk = $db->prepare(
+                    "SELECT COUNT(*) FROM establecimientos WHERE id = ? AND id_usuario = ?"
+                );
+                $stmtChk->execute([$est_id_form, $user_id]);
+                if ((int)$stmtChk->fetchColumn() === 0) {
+                    // Fallback: permitir si es el establecimiento_id de sesión
+                    if ($est_id_form !== $est_id) {
+                        $_SESSION['flash_errors'] = ["El establecimiento seleccionado no le pertenece."];
+                        $_SESSION['old_post'] = $_POST;
+                        $this->redirect('views/admin/create_doctor.php');
+                    }
+                }
+            } catch (Exception $e) {
+                // si falla la verificación, usar fallback
+                $est_id_form = $est_id;
             }
 
             if ($this->model->existsByEmail($correo)) {
@@ -73,12 +97,12 @@ class DoctorController {
             $hash = password_hash($password_temp, PASSWORD_BCRYPT);
 
             $data = [
-                'nombre' => $nombre,
-                'email' => $correo,
-                'cmp' => $cmp,
-                'especialidad' => $especialidad_final,
-                'password' => $hash,
-                'establecimiento_id' => $est_id
+                'nombre'            => $nombre,
+                'email'             => $correo,
+                'cmp'               => $cmp,
+                'especialidad'      => $especialidad_final,
+                'password'          => $hash,
+                'establecimiento_id'=> $est_id_form,
             ];
 
             $this->model->create($data);

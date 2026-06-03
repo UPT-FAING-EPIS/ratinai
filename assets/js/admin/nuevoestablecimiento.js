@@ -56,7 +56,11 @@ form.addEventListener('submit', function(e) {
     document.getElementById('form-solicitud').submit();
 });
 
-uploadArea.addEventListener('click', () => fileInput.click());
+uploadArea.addEventListener('click', (e) => {
+    if (e.target !== fileInput) {
+        fileInput.click();
+    }
+});
 
 function handleDragOver(e) { e.preventDefault(); uploadArea.classList.add('dragover'); }
 function handleDragLeave(e) { e.preventDefault(); uploadArea.classList.remove('dragover'); }

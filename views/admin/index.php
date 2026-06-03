@@ -8,34 +8,46 @@ $base     = get_base_path();
 $est_id   = (int)($user['establecimiento_id'] ?? 0);
 $logout_url = $base . 'controllers/AuthController.php?action=logout';
 
+require_once __DIR__ . '/../../models/EstablecimientoModel.php';
+require_once __DIR__ . '/../../models/DoctorModel.php';
+
 $role_label   = '🛡️ Administrador';
 $role_class   = 'role-adm';
 $avatar_class = 'avatar-adm';
 
 try {
-    $db   = (new Database())->getConnection();
-    $stmt = $db->prepare("SELECT nombre FROM establecimientos WHERE id = :id");
-    $stmt->execute([':id' => $est_id]);
-    $est        = $stmt->fetch(PDO::FETCH_ASSOC);
-    $est_nombre = $est['nombre'] ?? 'Mi Establecimiento';
+    $estModel = new EstablecimientoModel();
+    $docModel = new DoctorModel();
+
+    $user_id = (int)($user['id'] ?? 0);
+
+    // Todos los establecimientos del admin
+    $mis_establecimientos = $estModel->getByOwnerId($user_id);
+
+    // Fallback
+    if (empty($mis_establecimientos) && $est_id > 0) {
+        $est = $estModel->getById($est_id);
+        if ($est) $mis_establecimientos = [$est];
+    }
+
+    $est_nombre = $mis_establecimientos[0]['nombre'] ?? 'Mi Establecimiento';
     $header_sub = $est_nombre;
 
-    // Solicitudes pendientes (activo=0)
-    $q = $db->prepare(
-        "SELECT id, nombre, correo, cmp, especialidad, ultimo_acceso
-         FROM usuarios WHERE rol_codigo='MED' AND activo=0 AND establecimiento_id=:eid
-         ORDER BY nombre"
-    );
-    $q->execute([':eid' => $est_id]);
-    $pendientes = $q->fetchAll(PDO::FETCH_ASSOC);
+    if (!empty($mis_establecimientos)) {
+        $ids_est = array_map('intval', array_column($mis_establecimientos, 'id'));
 
-    // Contadores para KPIs y sidebar badge
-    $cnt_pendientes = count($pendientes);
-    $cnt_activos    = (int)$db->prepare(
-        "SELECT COUNT(*) FROM usuarios WHERE rol_codigo='MED' AND activo=1 AND establecimiento_id=:eid"
-    )->execute([':eid' => $est_id]) ? $db->query(
-        "SELECT COUNT(*) FROM usuarios WHERE rol_codigo='MED' AND activo=1 AND establecimiento_id=$est_id"
-    )->fetchColumn() : 0;
+        // Solicitudes pendientes (activo=0)
+        $pendientes = $docModel->getPendingDoctorsByEstablishments($ids_est);
+
+        // Contadores para KPIs y sidebar badge
+        $cnt_pendientes = count($pendientes);
+        $cnt_activos    = $docModel->countActiveByEstablishments($ids_est);
+    } else {
+        $pendientes = [];
+        $cnt_pendientes = 0;
+        $cnt_activos = 0;
+    }
+
 } catch (Exception $ex) {
     $est_nombre = ''; $pendientes = [];
     $cnt_pendientes = 0; $cnt_activos = 0; $header_sub = '';
@@ -46,14 +58,32 @@ $msg_ok = $msg_err = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_type'])) {
     try {
         $target_id = (int)($_POST['target_id'] ?? 0);
-        if ($_POST['action_type'] === 'aprobar') {
-            $s = $db->prepare("UPDATE usuarios SET activo=1 WHERE id=:id AND establecimiento_id=:eid AND rol_codigo='MED'");
-            $s->execute([':id' => $target_id, ':eid' => $est_id]);
-            $msg_ok = "Médico aprobado exitosamente.";
-        } elseif ($_POST['action_type'] === 'rechazar') {
-            $s = $db->prepare("UPDATE usuarios SET activo=0 WHERE id=:id AND establecimiento_id=:eid AND rol_codigo='MED'");
-            $s->execute([':id' => $target_id, ':eid' => $est_id]);
-            $msg_ok = "Solicitud rechazada.";
+        $user_id = (int)($user['id'] ?? 0);
+        
+        $estModel = new EstablecimientoModel();
+        $mis_establecimientos = $estModel->getByOwnerId($user_id);
+        
+        // Fallback
+        if (empty($mis_establecimientos) && $est_id > 0) {
+            $est = $estModel->getById($est_id);
+            if ($est) $mis_establecimientos = [$est];
+        }
+
+        $ids_est = !empty($mis_establecimientos) ? array_map('intval', array_column($mis_establecimientos, 'id')) : [];
+
+        if (!empty($ids_est)) {
+            $db = (new Database())->getConnection();
+            $in = str_repeat('?,', count($ids_est) - 1) . '?';
+            
+            if ($_POST['action_type'] === 'aprobar') {
+                $s = $db->prepare("UPDATE usuarios SET activo=1 WHERE id=? AND establecimiento_id IN ($in) AND rol_codigo='MED'");
+                $s->execute(array_merge([$target_id], $ids_est));
+                $msg_ok = "Médico aprobado exitosamente.";
+            } elseif ($_POST['action_type'] === 'rechazar') {
+                $s = $db->prepare("UPDATE usuarios SET activo=0 WHERE id=? AND establecimiento_id IN ($in) AND rol_codigo='MED'");
+                $s->execute(array_merge([$target_id], $ids_est));
+                $msg_ok = "Solicitud rechazada.";
+            }
         }
         header("Location: " . $_SERVER['PHP_SELF'] . "?ok=" . urlencode($msg_ok));
         exit();

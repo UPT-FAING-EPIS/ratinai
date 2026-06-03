@@ -2,9 +2,12 @@
 require_once __DIR__ . '/../../config/session_guard.php';
 require_once __DIR__ . '/../../config/config.php';
 require_role('SAD');
-$user = current_user();
+
+require_once __DIR__ . '/../../models/SolicitudModel.php';
+
+$user     = current_user();
 $initials = get_initials($user['nombre']);
-$base = get_base_path();
+$base     = get_base_path();
 $logout_url = $base . 'controllers/AuthController.php?action=logout';
 
 $role_label   = '⚡ Super Administrador';
@@ -26,17 +29,9 @@ try {
     $solicitudes = [];
     $cnt_solicitudes_pendientes = 0;
     try {
-        $solicitudes = $db->query(
-            "SELECT id, nombre_centro, direccion, tipo, ruc,
-                    dni_titular, nombres_titular, apellidos_titular, telefono, correo_contacto,
-                    evidencia_1, evidencia_1_nombre, evidencia_2, evidencia_2_nombre,
-                    estado, fecha_solicitud
-             FROM solicitudes_establecimiento
-             ORDER BY FIELD(estado,'pendiente','aprobado','rechazado'), fecha_solicitud DESC"
-        )->fetchAll(PDO::FETCH_ASSOC);
-        $cnt_solicitudes_pendientes = $db->query(
-            "SELECT COUNT(*) FROM solicitudes_establecimiento WHERE estado='pendiente'"
-        )->fetchColumn();
+        $solicitudModel = new SolicitudModel();
+        $solicitudes = $solicitudModel->getAllSolicitudesConOrigen();
+        $cnt_solicitudes_pendientes = $solicitudModel->countPendientes();
     } catch(Exception $e) {
         $solicitudes = [];
         $cnt_solicitudes_pendientes = 0;
@@ -138,6 +133,7 @@ try {
                         <th>Centro Oftalmológico</th>
                         <th>Titular</th>
                         <th>Contacto</th>
+                        <th>Origen</th>
                         <th>Evidencias</th>
                         <th>Fecha</th>
                         <th>Estado</th>
@@ -165,6 +161,19 @@ try {
                             <span>📞 <?= htmlspecialchars($s['telefono']) ?></span>
                             <span>✉️ <?= htmlspecialchars($s['correo_contacto']) ?></span>
                         </div>
+                    </td>
+                    <!-- Columna Origen: distingue solicitud pública vs. ADM existente -->
+                    <td>
+                        <?php if (!empty($s['id_usuario_solicitante'])): ?>
+                        <span style="display:inline-flex;align-items:center;gap:4px;background:#ECFDF5;color:#065F46;font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;">
+                            🛡️ ADM registrado
+                        </span>
+                        <div style="font-size:11px;color:var(--text3);margin-top:3px;"><?= htmlspecialchars($s['nombre_usuario_solicitante'] ?? '') ?></div>
+                        <?php else: ?>
+                        <span style="display:inline-flex;align-items:center;gap:4px;background:#EFF6FF;color:#1E40AF;font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;">
+                            🌐 Solicitud pública
+                        </span>
+                        <?php endif; ?>
                     </td>
                     <td>
                         <?php if ($s['evidencia_1']): ?>
@@ -195,11 +204,21 @@ try {
                     </td>
                     <td>
                         <?php if ($s['estado'] === 'pendiente'): ?>
+                        <?php
+                            // Mensaje de confirmación diferente según origen
+                            $esAdmExistente = !empty($s['id_usuario_solicitante']);
+                            $confirmMsg = $esAdmExistente
+                                ? '¿Aprobar esta solicitud? El establecimiento se vinculará al ADM existente (NO se creará nueva cuenta ni se enviará contraseña).'
+                                : '¿Aprobar esta solicitud? Se creará el establecimiento, la cuenta ADM y se enviarán las credenciales al titular.';
+                        ?>
                         <div class="action-btns">
                             <form method="POST" action="<?= $base ?>controllers/SolicitudController.php" style="margin:0">
                                 <input type="hidden" name="action" value="aprobar">
                                 <input type="hidden" name="id" value="<?= (int)$s['id'] ?>">
-                                <button type="submit" class="btn-approve" onclick="return confirm('¿Aprobar esta solicitud, crear el establecimiento y enviar correo al titular?')">✓ Aprobar</button>
+                                <button type="submit" class="btn-approve"
+                                    onclick="return confirm('<?= htmlspecialchars($confirmMsg, ENT_QUOTES) ?>')">
+                                    ✓ Aprobar
+                                </button>
                             </form>
                             <form method="POST" action="<?= $base ?>controllers/SolicitudController.php" style="margin:0">
                                 <input type="hidden" name="action" value="rechazar">

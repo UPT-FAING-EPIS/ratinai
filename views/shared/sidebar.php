@@ -13,6 +13,11 @@ $_rol = $_SESSION['rol_codigo'] ?? '';
                class="nav-item <?= $_page === 'index.php' ? 'active' : '' ?>">
                 <svg class="nav-icon" viewBox="0 0 20 20" fill="none"><rect x="2" y="4" width="16" height="12" rx="2" stroke="currentColor" stroke-width="1.3"/><path d="M6 8h8M6 12h5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
                 Dashboard
+            </a>
+            <a href="<?= $base ?>views/admin/solicitud_registro.php"
+               class="nav-item <?= $_page === 'solicitud_registro.php' ? 'active' : '' ?>">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none"><path d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h6a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h0a2 2 0 002-2M9 5a2 2 0 012-2h0a2 2 0 012 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+                Solicitudes de Registro
                 <?php if (!empty($cnt_pendientes) && $cnt_pendientes > 0): ?>
                     <span class="nav-badge"><?= $cnt_pendientes ?></span>
                 <?php endif; ?>
@@ -61,7 +66,7 @@ $_rol = $_SESSION['rol_codigo'] ?? '';
                 Dashboard
             </a>
             <a href="<?= $base ?>views/superadmin/Establecimientos.php"
-               class="nav-item <?= $_page === 'Establecimientos.php' ? 'active' : '' ?>">
+               class="nav-item <?= ($_page === 'Establecimientos.php' || $_page === 'detalles_establecimientos.php') ? 'active' : '' ?>">
                 <svg class="nav-icon" viewBox="0 0 20 20" fill="none"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke="currentColor" stroke-width="1.3"/></svg>
                 Establecimientos
             </a>

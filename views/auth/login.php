@@ -24,12 +24,8 @@ $expired = isset($_GET['expired']);
 
         <!-- Logo -->
         <div class="auth-logo">
-            <div class="auth-logo-mark">
-                <svg viewBox="0 0 24 24" fill="none">
-                    <circle cx="12" cy="12" r="9" stroke="white" stroke-width="1.5"/>
-                    <circle cx="12" cy="12" r="3.5" fill="white" opacity=".6"/>
-                    <circle cx="12" cy="12" r="1.2" fill="white"/>
-                </svg>
+            <div class="auth-logo-mark" style="background:transparent; box-shadow:none; padding:0; width:auto; height:auto; margin-bottom:12px;">
+                <img src="../../assets/images/logo_retinai_fondo_color.png" alt="RetinAI" style="height: 48px; border-radius: 8px; display: block;">
             </div>
             <h1>Retin<span>AI</span></h1>
             <p>Sistema de Diagnóstico Oftalmológico</p>

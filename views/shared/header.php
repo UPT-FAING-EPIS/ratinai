@@ -16,8 +16,8 @@
 ?>
 <header class="top-header">
     <div class="header-brand">
-        <div class="logo-mark">
-            <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="white" stroke-width="1.5"/><circle cx="12" cy="12" r="3.5" fill="white" opacity=".6"/><circle cx="12" cy="12" r="1.2" fill="white"/></svg>
+        <div class="logo-mark" style="background:transparent; border:none; padding:0;">
+            <img src="<?= $base ?>assets/images/logo_retinai_fondo_color.png" alt="Logo RetinAI" style="height: 28px; width: auto; display: block; border-radius: 4px;">
         </div>
         <span class="logo-text">Retin<em>AI</em></span>
     </div>

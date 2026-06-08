@@ -53,44 +53,7 @@ try {
     $cnt_pendientes = 0; $cnt_activos = 0; $header_sub = '';
 }
 
-// Acciones POST: aprobar / rechazar
 $msg_ok = $msg_err = '';
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_type'])) {
-    try {
-        $target_id = (int)($_POST['target_id'] ?? 0);
-        $user_id = (int)($user['id'] ?? 0);
-        
-        $estModel = new EstablecimientoModel();
-        $mis_establecimientos = $estModel->getByOwnerId($user_id);
-        
-        // Fallback
-        if (empty($mis_establecimientos) && $est_id > 0) {
-            $est = $estModel->getById($est_id);
-            if ($est) $mis_establecimientos = [$est];
-        }
-
-        $ids_est = !empty($mis_establecimientos) ? array_map('intval', array_column($mis_establecimientos, 'id')) : [];
-
-        if (!empty($ids_est)) {
-            $db = (new Database())->getConnection();
-            $in = str_repeat('?,', count($ids_est) - 1) . '?';
-            
-            if ($_POST['action_type'] === 'aprobar') {
-                $s = $db->prepare("UPDATE usuarios SET activo=1 WHERE id=? AND establecimiento_id IN ($in) AND rol_codigo='MED'");
-                $s->execute(array_merge([$target_id], $ids_est));
-                $msg_ok = "Médico aprobado exitosamente.";
-            } elseif ($_POST['action_type'] === 'rechazar') {
-                $s = $db->prepare("UPDATE usuarios SET activo=0 WHERE id=? AND establecimiento_id IN ($in) AND rol_codigo='MED'");
-                $s->execute(array_merge([$target_id], $ids_est));
-                $msg_ok = "Solicitud rechazada.";
-            }
-        }
-        header("Location: " . $_SERVER['PHP_SELF'] . "?ok=" . urlencode($msg_ok));
-        exit();
-    } catch (Exception $ex) {
-        $msg_err = "Error al procesar la acción.";
-    }
-}
 if (isset($_GET['ok'])) $msg_ok = htmlspecialchars($_GET['ok']);
 ?>
 <!DOCTYPE html>
@@ -132,51 +95,6 @@ if (isset($_GET['ok'])) $msg_ok = htmlspecialchars($_GET['ok']);
             </div>
         </div>
 
-        <!-- Solicitudes pendientes -->
-        <section class="content-section">
-            <div class="section-header">
-                <h1 class="page-title">Solicitudes de registro</h1>
-                <p class="page-sub">Revise y apruebe o rechace solicitudes de médicos oftalmólogos.</p>
-            </div>
-            <div class="card">
-                <?php if (empty($pendientes)): ?>
-                <p class="empty-msg">✅ No hay solicitudes pendientes.</p>
-                <?php else: ?>
-                <table class="data-table" id="tabla-pendientes">
-                    <thead>
-                        <tr><th>Médico</th><th>CMP</th><th>Especialidad</th><th>Estado</th><th>Acción</th></tr>
-                    </thead>
-                    <tbody>
-                    <?php foreach ($pendientes as $m): ?>
-                    <tr id="row-<?= $m['id'] ?>">
-                        <td>
-                            <strong><?= htmlspecialchars($m['nombre']) ?></strong><br>
-                            <span class="text-muted small"><?= htmlspecialchars($m['correo']) ?></span>
-                        </td>
-                        <td class="mono"><?= htmlspecialchars($m['cmp'] ?? '—') ?></td>
-                        <td><?= htmlspecialchars($m['especialidad'] ?? '—') ?></td>
-                        <td><span class="badge badge-pending">Pendiente</span></td>
-                        <td>
-                            <div class="action-group">
-                                <form method="POST" style="display:inline">
-                                    <input type="hidden" name="action_type" value="aprobar">
-                                    <input type="hidden" name="target_id" value="<?= $m['id'] ?>">
-                                    <button type="submit" class="btn btn-sm btn-success">Aprobar</button>
-                                </form>
-                                <form method="POST" style="display:inline">
-                                    <input type="hidden" name="action_type" value="rechazar">
-                                    <input type="hidden" name="target_id" value="<?= $m['id'] ?>">
-                                    <button type="submit" class="btn btn-sm btn-danger-outline">Rechazar</button>
-                                </form>
-                            </div>
-                        </td>
-                    </tr>
-                    <?php endforeach; ?>
-                    </tbody>
-                </table>
-                <?php endif; ?>
-            </div>
-        </section>
 
     </main>
 </div>

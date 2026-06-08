@@ -91,12 +91,11 @@ if (isset($_SESSION['solicitud_success'])) {
     <main class="main-content">
         <?php if ($msg_ok): ?><div class="alert-flash alert-ok" id="flash-msg"><?= $msg_ok ?></div><?php endif; ?>
 
-        <section class="content-section">
-            <div class="section-top">
-                <div>
-                    <h1 class="page-title">Mis Establecimientos</h1>
-                    <p class="page-sub">Gestione sus centros oftalmológicos y solicite el registro de nuevos.</p>
-                </div>
+        <div class="section-header" style="display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 20px; flex-wrap: wrap;">
+            <div>
+                <h1 class="page-title">Mis Establecimientos</h1>
+                <p class="page-sub">Gestione sus centros oftalmológicos y solicite el registro de nuevos.</p>
+            </div>
                 <a href="<?= $base ?>views/admin/nuevoestablecimiento.php" class="btn-add">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                         <path d="M12 5v14M5 12h14" stroke="white" stroke-width="2" stroke-linecap="round"/>
@@ -168,7 +167,6 @@ if (isset($_SESSION['solicitud_success'])) {
                 </table>
                 <?php endif; ?>
             </div>
-        </section>
     </main>
 </div>
 

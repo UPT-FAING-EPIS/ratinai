@@ -125,7 +125,7 @@ try {
             <p class="empty-msg">No hay establecimientos registrados.</p>
             <?php else: ?>
             <table class="data-table">
-                <thead><tr><th>#</th><th>Nombre</th><th>Dirección</th><th>Médicos</th><th>Estado</th></tr></thead>
+                <thead><tr><th>#</th><th>Nombre</th><th>Dirección</th><th>Médicos</th><th>Estado</th><th>Acción</th></tr></thead>
                 <tbody>
                 <?php foreach ($establecimientos as $e): ?>
                 <tr>
@@ -134,6 +134,9 @@ try {
                     <td><?= htmlspecialchars($e['direccion'] ?? '—') ?></td>
                     <td><span class="badge badge-info"><?= (int)$e['medicos'] ?></span></td>
                     <td><span class="badge badge-active">Activo</span></td>
+                    <td>
+                        <a href="detalles_establecimientos.php?id=<?= $e['id'] ?>" class="btn-approve" style="text-decoration:none; padding:4px 8px; display:inline-block;">Ver/Editar</a>
+                    </td>
                 </tr>
                 <?php endforeach; ?>
                 </tbody>

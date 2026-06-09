@@ -354,5 +354,58 @@ end
 
 Control --> VistaSAD : Redirige con mensaje de éxito
 VistaSAD --> SADM : Muestra alerta verde "Solicitud aprobada\ny credenciales enviadas al titular"
+@enduml
+
+' ============================================================
+' RF-04: Gestión de centro oftalmológico (Edición)
+' ============================================================
+@startuml RF04_SRS_GestionCentroOftalmologico
+title RF-04: Gestión de Centro Oftalmológico (Edición) [SRS]
+
+skinparam backgroundColor #FFFFFF
+skinparam sequenceArrowThickness 1.5
+skinparam roundcorner 5
+skinparam ParticipantBackgroundColor #FFFFFF
+skinparam ParticipantBorderColor #000000
+skinparam ArrowColor #000000
+skinparam SequenceLifeLineBorderColor #888888
+
+actor "Super Administrador" as SADM
+participant "Interfaz: Detalles del\nEstablecimiento\n(detalles_establecimientos.php)" as Vista
+participant "Control: Gestión de\nEstablecimiento\n(EstablecimientoController.php)" as Control
+participant "Entidad: Establecimiento\n(EstablecimientoModel.php)" as Entidad
+participant "Servicio de Correo\n(MailService.php)" as Correo
+database "Base de Datos" as BD
+
+SADM -> Vista : Clic en "Ver/Editar" sobre un establecimiento
+Vista -> Entidad : Solicita datos del establecimiento, titular y médicos
+Entidad -> BD : Consulta información del centro y sus usuarios
+BD --> Entidad : Datos recuperados
+Entidad --> Vista : Retorna datos
+Vista --> SADM : Muestra formulario de edición con los datos actuales
+
+SADM -> Vista : Modifica datos (Nombre, RUC, Dirección, etc.)\ny hace clic en "Guardar Cambios"
+Vista -> Control : Envía los nuevos datos (POST al controlador)
+
+Control -> Control : Valida que el nombre no esté vacío
+
+alt [Datos inválidos]
+    Control --> Vista : Redirige con mensaje de error en sesión
+    Vista --> SADM : Muestra alerta de error
+else [Datos válidos]
+    Control -> Entidad : Solicita actualizar los datos del establecimiento
+    Entidad -> BD : Actualiza los datos del centro en el sistema
+    BD --> Entidad : Confirmación de actualización exitosa
+    Entidad --> Control : OK
+
+    Control -> Entidad : Solicita datos del titular para notificación
+    Entidad --> Control : Datos del titular (Nombre, Correo)
+
+    Control -> Correo : Solicita enviar notificación al titular
+    Correo --> Control : Correo de "Datos Actualizados" enviado
+
+    Control --> Vista : Redirige con mensaje de éxito en sesión
+    Vista --> SADM : Muestra alerta: "Establecimiento actualizado correctamente"
+end
 
 @enduml

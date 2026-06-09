@@ -435,7 +435,102 @@ class MailService {
             </body>
             </html>";
 
-            $mail->AltBody = "Estimado/a $nombre,\n\nSu solicitud para el centro «$nombreCentro» ha sido APROBADA.\nEn breve recibirá sus credenciales de acceso.\n\nRetinAI";
+            $mail->AltBody = "Estimado/a {$nombre},\n\nSu solicitud para el centro «{$nombreCentro}» ha sido APROBADA.\nEn breve recibirá sus credenciales de acceso.\n\nRetinAI";
+
+            $mail->send();
+            return true;
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Notifica al titular que los datos de su establecimiento fueron actualizados.
+     *
+     * @param string $correo         Correo del titular
+     * @param string $nombre         Nombre del titular
+     * @param string $nombreCentro   Nombre del centro actualizado
+     * @return bool
+     */
+    public static function sendEstablecimientoActualizado(string $correo, string $nombre, string $nombreCentro): bool {
+        if (!filter_var($correo, FILTER_VALIDATE_EMAIL)) {
+            return false;
+        }
+        if (SMTP_USER === 'tu_correo@gmail.com' || empty(SMTP_USER)) {
+            return false;
+        }
+
+        $mail = new PHPMailer(true);
+        try {
+            $mail->isSMTP();
+            $mail->Host       = SMTP_HOST;
+            $mail->SMTPAuth   = true;
+            $mail->Username   = SMTP_USER;
+            $mail->Password   = SMTP_PASS;
+            $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+            $mail->Port       = SMTP_PORT;
+
+            $mail->setFrom(SMTP_FROM, SMTP_FROM_NAME);
+            $mail->addAddress($correo, $nombre);
+
+            $mail->isHTML(true);
+            $mail->CharSet = 'UTF-8';
+            $mail->Subject = 'RetinAI — Datos de su establecimiento actualizados';
+
+            $loginUrl = 'https://retinai-ehcadnergkbkd9dr.eastus2-01.azurewebsites.net/views/auth/login.php';
+
+            $mail->Body = "
+            <!DOCTYPE html>
+            <html lang='es'>
+            <head><meta charset='UTF-8'></head>
+            <body style='margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",Roboto,sans-serif;'>
+                <table width='100%' cellpadding='0' cellspacing='0' style='padding:40px 20px;background:#f8fafc;'>
+                    <tr><td align='center'>
+                        <table width='100%' cellpadding='0' cellspacing='0' style='max-width:560px;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.05);'>
+                            <tr>
+                                <td align='center' style='padding:36px 0;background:linear-gradient(135deg,#1A56DB 0%,#1e40af 100%);'>
+                                    <h1 style='color:#fff;font-size:26px;margin:0;font-weight:700;'><span style='color:#93c5fd;'>Retin</span>AI</h1>
+                                    <p style='color:#bfdbfe;font-size:13px;margin:6px 0 0;'>Sistema de Análisis Oftalmológico</p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style='padding:44px 40px;'>
+                                    <div style='text-align:center;margin-bottom:28px;'>
+                                        <div style='width:60px;height:60px;border-radius:50%;background:#e0f2fe;border:2px solid #7dd3fc;display:inline-flex;align-items:center;justify-content:center;font-size:28px;'>✏️</div>
+                                    </div>
+                                    <h2 style='color:#0f172a;font-size:20px;font-weight:700;margin:0 0 14px;text-align:center;'>Datos Actualizados</h2>
+                                    <p style='color:#475569;font-size:15px;line-height:1.6;margin:0 0 18px;'>
+                                        Estimado/a <strong>$nombre</strong>, le informamos que la información de su centro oftalmológico <strong>«$nombreCentro»</strong> ha sido actualizada por el equipo de administración de RetinAI.
+                                    </p>
+                                    <p style='color:#475569;font-size:15px;line-height:1.6;margin:0 0 28px;'>
+                                        Puede ingresar a la plataforma para revisar los cambios y continuar gestionando su establecimiento.
+                                    </p>
+                                    <table width='100%' cellpadding='0' cellspacing='0'>
+                                        <tr>
+                                            <td align='center'>
+                                                <a href='$loginUrl' style='display:inline-block;background:#1A56DB;color:#fff;text-decoration:none;font-size:15px;font-weight:600;padding:14px 32px;border-radius:8px;'>
+                                                    Ir a RetinAI
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style='background:#f8fafc;padding:20px 40px;border-top:1px solid #e2e8f0;text-align:center;'>
+                                    <p style='color:#94a3b8;font-size:12px;margin:0;'>
+                                        &copy; " . date('Y') . " RetinAI. Todos los derechos reservados.<br>
+                                        Mensaje automático, no responda este correo.
+                                    </p>
+                                </td>
+                            </tr>
+                        </table>
+                    </td></tr>
+                </table>
+            </body>
+            </html>";
+
+            $mail->AltBody = "Estimado/a {$nombre},\n\nLos datos de su centro «{$nombreCentro}» han sido actualizados por administración.\nPor favor ingrese a la plataforma para revisar los cambios.\n\nRetinAI";
 
             $mail->send();
             return true;

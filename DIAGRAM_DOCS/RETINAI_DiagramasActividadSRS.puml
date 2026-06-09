@@ -487,4 +487,59 @@ else (Aprobar)
 endif
 
 @enduml
-
+
+@startuml RF04_Actividad_Gestion_Centro
+title RF-04: Gestión de Centro Oftalmológico (Edición) [Actividad]
+
+|Super Administrador|
+start
+:Inicia sesión y accede a "Establecimientos";
+:Visualiza la lista de centros registrados;
+:Hace clic en el botón "Ver/Editar" de un establecimiento;
+
+|Vista: Detalles del Establecimiento|
+:Solicita al Modelo los datos del establecimiento,\nsu titular y sus médicos;
+
+|Modelo: EstablecimientoModel|
+:Consulta la base de datos;
+
+|Base de Datos|
+:Retorna los datos del centro, titular y médicos;
+
+|Vista: Detalles del Establecimiento|
+:Muestra formulario con datos actuales del centro;
+
+|Super Administrador|
+:Modifica los datos y hace clic en "Guardar Cambios";
+
+|Controlador: EstablecimientoController|
+:Recibe los datos del formulario vía POST;
+:Valida que el nombre no esté vacío;
+if (¿Datos válidos?) then (Sí)
+    |Modelo: EstablecimientoModel|
+    :Ejecuta UPDATE en establecimientos;
+    :Consulta y retorna datos del titular;
+
+    |Controlador: EstablecimientoController|
+    :Llama a MailService::sendEstablecimientoActualizado();
+
+    |Servicio: MailService|
+    :Envía correo de notificación al titular;
+
+    |Controlador: EstablecimientoController|
+    :Guarda mensaje de éxito en sesión;
+    :Redirige a la vista de detalles;
+
+    |Vista: Detalles del Establecimiento|
+    :Muestra alerta verde de éxito;
+else (No)
+    :Guarda mensaje de error en sesión;
+    :Redirige a la vista de detalles;
+
+    |Vista: Detalles del Establecimiento|
+    :Muestra alerta roja de error;
+endif
+
+|Super Administrador|
+stop
+@enduml

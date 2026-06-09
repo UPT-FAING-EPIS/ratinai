@@ -1,83 +1,52 @@
 <?php
 require_once __DIR__ . '/../../config/session_guard.php';
 require_once __DIR__ . '/../../config/config.php';
+require_once __DIR__ . '/../../models/EstablecimientoModel.php';
 require_role('SAD');
-$user = current_user();
-$initials = get_initials($user['nombre']);
-$base = get_base_path();
-$logout_url = $base . 'controllers/AuthController.php?action=logout';
 
+$user         = current_user();
+$initials     = get_initials($user['nombre']);
+$base         = get_base_path();
+$logout_url   = $base . 'controllers/AuthController.php?action=logout';
 $role_label   = '⚡ Super Administrador';
 $role_class   = 'role-sad';
 $avatar_class = 'avatar-sad';
 $header_sub   = 'Detalles del Establecimiento';
 
-$msg_success = '';
-$msg_error   = '';
-
+// Validar ID
 $id_establecimiento = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 if ($id_establecimiento === 0) {
     header('Location: Establecimientos.php');
     exit;
 }
 
-$db = (new Database())->getConnection();
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_type']) && $_POST['action_type'] === 'update_est') {
-    $nombre = trim($_POST['nombre'] ?? '');
-    $direccion = trim($_POST['direccion'] ?? '');
-    $tipo = trim($_POST['tipo'] ?? '');
-    $ruc = trim($_POST['ruc'] ?? '');
-
-    if (empty($nombre)) {
-        $msg_error = 'El nombre es obligatorio.';
-    } else {
-        try {
-            $stmt = $db->prepare("UPDATE establecimientos SET nombre = ?, direccion = ?, tipo = ?, ruc = ? WHERE id = ?");
-            $stmt->execute([$nombre, $direccion, $tipo, $ruc, $id_establecimiento]);
-            $msg_success = 'Establecimiento actualizado correctamente.';
-        } catch(Exception $e) {
-            $msg_error = 'Error al actualizar: ' . $e->getMessage();
-        }
-    }
+// Flash messages desde el controlador
+$msg_success = '';
+$msg_error   = '';
+if (isset($_SESSION['est_success'])) {
+    $msg_success = $_SESSION['est_success'];
+    unset($_SESSION['est_success']);
+}
+if (isset($_SESSION['est_error'])) {
+    $msg_error = $_SESSION['est_error'];
+    unset($_SESSION['est_error']);
 }
 
-// Fetch establishment details
+// Cargar datos a través del modelo
+$model = new EstablecimientoModel();
 try {
-    $stmt = $db->prepare("SELECT * FROM establecimientos WHERE id = ?");
-    $stmt->execute([$id_establecimiento]);
-    $establecimiento = $stmt->fetch(PDO::FETCH_ASSOC);
-
+    $establecimiento = $model->getById($id_establecimiento);
     if (!$establecimiento) {
         header('Location: Establecimientos.php');
         exit;
     }
-
-    // Fetch the admin of this establishment
-    $admins = [];
-    if (!empty($establecimiento['id_usuario'])) {
-        $stmt = $db->prepare("SELECT * FROM usuarios WHERE id = ?");
-        $stmt->execute([$establecimiento['id_usuario']]);
-        $owner = $stmt->fetch(PDO::FETCH_ASSOC);
-        if ($owner) $admins[] = $owner;
-    }
-    
-    if (empty($admins)) {
-        $stmt = $db->prepare("SELECT * FROM usuarios WHERE establecimiento_id = ? AND rol_codigo = 'ADM'");
-        $stmt->execute([$id_establecimiento]);
-        $admins = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    }
-
-    // Fetch the doctors of this establishment
-    $stmt = $db->prepare("SELECT * FROM usuarios WHERE establecimiento_id = ? AND rol_codigo = 'MED'");
-    $stmt->execute([$id_establecimiento]);
-    $medicos = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-} catch(Exception $ex) {
-    $msg_error = "Error cargando detalles del establecimiento.";
+    $admins  = $model->getAdminByEstablecimiento($id_establecimiento);
+    $medicos = $model->getMedicosByEstablecimiento($id_establecimiento);
+} catch (Exception $ex) {
+    $msg_error       = 'Error cargando detalles del establecimiento.';
     $establecimiento = [];
-    $admins = [];
-    $medicos = [];
+    $admins          = [];
+    $medicos         = [];
 }
 ?>
 <!DOCTYPE html>
@@ -119,11 +88,13 @@ try {
         </div>
 
         <div class="detalles-grid">
-            <!-- Formulario de Edición -->
+            <!-- Formulario de Edición — POST al controlador -->
             <div class="card form-card">
                 <h3 class="card-title">Información del Establecimiento</h3>
-                <form method="POST" id="form-est">
-                    <input type="hidden" name="action_type" value="update_est">
+                <form method="POST"
+                      action="<?= $base ?>controllers/EstablecimientoController.php?action=update"
+                      id="form-est">
+                    <input type="hidden" name="id_establecimiento" value="<?= $id_establecimiento ?>">
                     <div class="form-group">
                         <label>Nombre del Centro</label>
                         <input type="text" name="nombre" value="<?= htmlspecialchars($establecimiento['nombre'] ?? '') ?>" required>
@@ -136,8 +107,8 @@ try {
                         <label>Tipo</label>
                         <select name="tipo">
                             <option value="">Seleccione...</option>
-                            <option value="publico" <?= (($establecimiento['tipo'] ?? '') === 'publico') ? 'selected' : '' ?>>Público</option>
-                            <option value="privado" <?= (($establecimiento['tipo'] ?? '') === 'privado') ? 'selected' : '' ?>>Privado</option>
+                            <option value="publico"  <?= (($establecimiento['tipo'] ?? '') === 'publico')  ? 'selected' : '' ?>>Público</option>
+                            <option value="privado"  <?= (($establecimiento['tipo'] ?? '') === 'privado')  ? 'selected' : '' ?>>Privado</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -216,6 +187,8 @@ try {
             if (remaining > 0) remaining--;
         }, 1000);
     }
+    const flash = document.getElementById('flash-msg');
+    if (flash) setTimeout(() => { flash.style.opacity = '0'; setTimeout(() => flash.remove(), 400); }, 3500);
 </script>
 <script src="<?= $base ?>assets/js/dashboard/detalles_establecimientos.js"></script>
 </body>

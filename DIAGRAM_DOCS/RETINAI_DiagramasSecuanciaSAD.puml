@@ -754,3 +754,86 @@ C --> V_SAD : HTTP 302 Location:\n  views/superadmin/SolicitudesRegistro.php
 V_SAD --> SADM : if($solicitud_msg): renderiza .alert-flash\n(background:#D1FAE5, border:#6EE7B7):\n  "Solicitud aprobada. El centro «...»..."
 
 @enduml
+
+' ============================================================
+' RF-04: Gestión de Centro Oftalmológico (Edición)
+' ============================================================
+@startuml RF04_Diseno_GestionCentroOftalmologico
+title RF-04: Gestión de Centro Oftalmológico (Edición) [Diseño]
+
+skinparam backgroundColor #FFFFFF
+skinparam sequenceArrowThickness 1.5
+skinparam roundcorner 5
+skinparam ParticipantBackgroundColor #FFFFFF
+skinparam ParticipantBorderColor #000000
+skinparam ArrowColor #000000
+skinparam SequenceLifeLineBorderColor #888888
+
+actor "Super Administrador" as SADM
+
+boundary "views/superadmin/\ndetalles_establecimientos.php" as V
+control "controllers/\nEstablecimientoController.php\n::updateEstablecimiento()" as C
+entity "models/\nEstablecimientoModel.php" as E
+control "services/\nMailService.php\n::sendEstablecimientoActualizado()" as MS
+database "Railway DB\n(establecimientos, usuarios)" as BD
+
+== GET views/superadmin/detalles_establecimientos.php?id={id} ==
+
+SADM -> V : HTTP GET ?id=1
+V -> V : require_role('SAD')
+V -> E : EstablecimientoModel::getById($id)
+E -> BD : SELECT * FROM establecimientos WHERE id = ?
+BD --> E : $establecimiento (fetch)
+E --> V : array $establecimiento
+
+V -> E : EstablecimientoModel::getAdminByEstablecimiento($id)
+E -> BD : SELECT id_usuario FROM establecimientos WHERE id = ?
+BD --> E : $row
+alt id_usuario presente
+    E -> BD : SELECT * FROM usuarios WHERE id = ?
+    BD --> E : $owner
+else Fallback
+    E -> BD : SELECT * FROM usuarios\nWHERE establecimiento_id = ? AND rol_codigo = 'ADM'
+    BD --> E : $admins[]
+end
+E --> V : array $admins[]
+
+V -> E : EstablecimientoModel::getMedicosByEstablecimiento($id)
+E -> BD : SELECT * FROM usuarios\nWHERE establecimiento_id = ? AND rol_codigo = 'MED'
+BD --> E : $medicos[]
+E --> V : array $medicos[]
+
+V --> SADM : HTTP 200 — Renderiza formulario\n<form action="controllers/EstablecimientoController.php?action=update">
+
+== POST controllers/EstablecimientoController.php?action=update ==
+
+SADM -> V : Submit <form method="POST">\n(id_establecimiento, nombre, direccion, tipo, ruc)
+V -> C : HTTP POST EstablecimientoController.php?action=update
+
+C -> C : require_role('SAD')\n$id = (int)$_POST['id_establecimiento']\n$nombre = trim($_POST['nombre'])
+
+alt nombre vacío
+    C -> C : $_SESSION['est_error'] = 'El nombre es obligatorio.'
+    C --> V : HTTP 302 Redirect ?id={id}
+    V --> SADM : Renderiza alerta roja (.alert-flash.alert-err)
+else Datos válidos
+    C -> E : EstablecimientoModel::update(\n  $id, $nombre, $direccion, $tipo, $ruc)
+    E -> BD : UPDATE establecimientos SET\nnombre=?, direccion=?, tipo=?, ruc=?\nWHERE id=?
+    BD --> E : execute() OK
+    E --> C : true
+
+    C -> E : EstablecimientoModel::getAdminByEstablecimiento($id)
+    E --> C : array $admins[]
+
+    loop foreach $admins as $adm
+        C -> MS : MailService::sendEstablecimientoActualizado(\n  $adm['correo'], $adm['nombre'], $nombre)
+        MS -> MS : PHPMailer SMTP:\nSubject: "RetinAI — Datos actualizados"
+        MS --> C : return bool
+    end
+
+    C -> C : $_SESSION['est_success'] = 'Establecimiento actualizado correctamente.'
+    C --> V : HTTP 302 Redirect ?id={id}
+    V --> SADM : Renderiza alerta verde (.alert-flash.alert-ok)
+end
+
+@enduml

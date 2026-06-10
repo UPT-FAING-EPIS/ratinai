@@ -11,7 +11,7 @@
  */
 describe('RF-04: Gestión de Centro Oftalmológico (Edición)', () => {
     const SAD_CREDENTIALS = {
-        email   : 'superadmin@retinai.com',
+        email   : 'superadmin@ratinai.com',
         password: 'admin123'
     };
 
@@ -74,6 +74,9 @@ describe('RF-04: Gestión de Centro Oftalmológico (Edición)', () => {
         // Seleccionar tipo
         cy.get('select[name="tipo"]').select('privado');
 
+        // Modificar RUC a 11 dígitos para pasar la validación HTML5
+        cy.get('input[name="ruc"]').clear().type('20123456789');
+
         // Guardar
         cy.get('form#form-est button[type="submit"]').click();
 
@@ -135,7 +138,8 @@ describe('RF-04: Gestión de Centro Oftalmológico (Edición)', () => {
     it('El botón Volver debe redirigir a la lista de establecimientos', () => {
         cy.visit(`${BASE_URL}/detalles_establecimientos.php?id=1`);
 
-        cy.get('a[href*="Establecimientos.php"]').click();
+        // Ser más específicos apuntando al botón "Volver" con clase btn-outline
+        cy.get('a.btn-outline[href*="Establecimientos.php"]').click();
 
         cy.url().should('include', 'Establecimientos.php');
     });

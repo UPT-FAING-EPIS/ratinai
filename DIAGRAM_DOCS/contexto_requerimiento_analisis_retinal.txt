@@ -1,0 +1,46 @@
+CASO DE USO — Cargar, Procesar y Presentar el Análisis de Imagen Retinal|  CU-05
+Actor
+Médico Oftalmólogo · Sistema
+Descripción
+Permite al médico subir una retinografía en formato JPG o PNG, obtener el resultado del análisis CNN en un máximo de 5 segundos con probabilidades por clase y alertas visuales ante anomalías detectadas, y descargar un reporte PDF formal. Todo dentro de un flujo continuo sin interrupciones clínicas.
+Precondiciones
+El médico debe tener sesión activa con cuenta aprobada por el administrador. El médico debe contar con una retinografía en formato JPG o PNG con resolución mínima de 224×224 px y tamaño máximo de 10 MB. El servidor backend debe estar operativo y el modelo CNN en formato TF Lite debe estar cargado en memoria.
+
+
+
+FLUJO NORMAL
+Acción del actor
+Curso del sistema
+1. El médico ingresa al módulo de análisis retinal desde el menú principal del sistema.
+2. El sistema muestra la pantalla de análisis con el encabezado "Análisis Retinal" y el nombre del médico con sesión activa. Presenta un área central de carga con el texto "Arrastra tu retinografía aquí o haz clic para seleccionar", los formatos aceptados (JPG, PNG, máx. 10 MB) y, a la derecha, el panel informativo del modelo (RF-09) con métricas de rendimiento (accuracy, sensibilidad, especificidad). La advertencia clínica "Este resultado es de carácter referencial. No reemplaza el diagnóstico médico definitivo." se muestra de forma permanente en pantalla.
+3. El médico selecciona o arrastra la retinografía del paciente al área de carga.
+4. El sistema valida formato (JPG o PNG) y tamaño (máx. 10 MB). Si la validación es exitosa, muestra una vista previa en miniatura de la imagen con su nombre y tamaño, y activa el botón "Analizar imagen".
+5. El médico presiona el botón "Analizar imagen".
+6. El sistema muestra el indicador de carga "Procesando imagen…" y aplica automáticamente el preprocesamiento: redimensionamiento a 224×224 px, normalización de píxeles y compensación de brillo y contraste. A continuación envía la imagen preprocesada al modelo CNN (TF Lite) para la inferencia.
+ 
+7. El sistema recibe el resultado en menos de 5 segundos y presenta: (a) la clase con mayor probabilidad como resultado principal con su porcentaje; (b) barras de probabilidad para las cuatro categorías: normal, retinopatía diabética, glaucoma y catarata; (c) un indicador visual prominente en rojo con ícono de alerta si alguna anomalía supera el umbral configurado; (d) la advertencia clínica permanente. Se habilita el botón "Descargar reporte PDF".
+8. El médico revisa los resultados y presiona "Descargar reporte PDF".
+9. El sistema genera y descarga automáticamente un PDF con: nombre del médico, fecha y hora del análisis, miniatura de la retinografía, porcentajes por clase, resultado principal destacado y la leyenda: "Resultado generado por modelo de inteligencia artificial con fines de apoyo diagnóstico. La decisión clínica final corresponde al médico tratante."
+10. El médico descarga el reporte y continúa con su consulta clínica.
+11. El sistema registra el análisis en el historial del médico (RF-07): fecha, hora, resultado y, si fue ingresado, el identificador del paciente. Habilita el botón "Nuevo análisis" para reiniciar el flujo.
+
+
+
+
+
+
+
+FLUJO ALTERNATIVO — Imagen con baja calidad
+Acción del actor
+Curso del sistema
+4.A El médico selecciona una imagen que cumple el formato y tamaño, pero cuya resolución o contraste es inferior al nivel óptimo.
+5.A El sistema muestra la vista previa con un aviso en amarillo: "La imagen puede presentar baja calidad. Los resultados podrían ser menos precisos. Puede continuar el análisis." Mantiene el botón "Analizar imagen" habilitado para no interrumpir el flujo clínico.
+6.A El médico presiona "Analizar imagen" aceptando la advertencia.
+7.A El sistema continúa con el preprocesamiento (compensación de brillo y contraste aplicada con mayor intensidad) e inferencia normalmente desde el paso 6 del flujo normal.
+EXCEPCIONES
+Formato no válido: Si el archivo cargado no es JPG ni PNG, el sistema muestra: "Formato no permitido. Por favor sube una imagen en formato JPG o PNG." El botón "Analizar imagen" permanece deshabilitado.
+Archivo demasiado grande: Si el archivo supera los 10 MB, el sistema muestra: "El archivo supera el tamaño máximo permitido de 10 MB. Por favor comprime o recorta la imagen." No se procesa el archivo.
+Error en la inferencia del modelo: Si el modelo CNN no puede procesar la imagen, el sistema muestra: "No se pudo completar el análisis. Por favor intente nuevamente o contacte al administrador." El análisis no se registra en el historial.
+Tiempo de respuesta excedido (> 5 seg): Si la inferencia supera los 5 segundos, el sistema muestra: "El análisis está tardando más de lo esperado. Verifique su conexión o intente nuevamente." Ofrece el botón "Reintentar".
+Sesión expirada: Si la sesión del médico expiró durante el proceso, el sistema muestra: "Su sesión ha expirado. Por favor inicie sesión nuevamente." y redirige al módulo de login.
+

@@ -38,18 +38,22 @@ $_rol = $_SESSION['rol_codigo'] ?? '';
         <!-- ── MÉDICO: Análisis y historial ── -->
         <div class="nav-section">
             <span class="nav-section-label">Análisis</span>
-            <a href="#analisis" class="nav-item active" onclick="showPanel('analisis',this)">
+            <a href="<?= $base ?>views/medico/dashboard.php" class="nav-item <?= $_page === 'dashboard.php' ? 'active' : '' ?>">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none"><rect x="2" y="4" width="16" height="12" rx="2" stroke="currentColor" stroke-width="1.3"/><path d="M6 8h8M6 12h5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+                Dashboard
+            </a>
+            <a href="<?= $base ?>views/medico/nuevoanalisis.php" class="nav-item <?= $_page === 'nuevoanalisis.php' ? 'active' : '' ?>">
                 <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.2"/><circle cx="8" cy="8" r="3" stroke="currentColor" stroke-width="1.2"/><circle cx="8" cy="8" r="1" fill="currentColor"/></svg>
                 Nuevo análisis
             </a>
-            <a href="#historial" class="nav-item" onclick="showPanel('historial',this)">
+            <a href="<?= $base ?>views/medico/pacientes.php" class="nav-item <?= $_page === 'pacientes.php' ? 'active' : '' ?>">
                 <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><path d="M3 4h10M3 8h7M3 12h5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
                 Historial de pacientes
             </a>
         </div>
         <div class="nav-section">
             <span class="nav-section-label">Sistema</span>
-            <a href="#modelo" class="nav-item" onclick="showPanel('modelo',this)">
+            <a href="<?= $base ?>views/medico/modeloinfo.php" class="nav-item <?= $_page === 'modeloinfo.php' ? 'active' : '' ?>">
                 <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.2"/><path d="M8 5v4l2.5 2.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
                 Información del modelo
             </a>

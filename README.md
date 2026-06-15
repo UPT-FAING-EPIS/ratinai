@@ -32,3 +32,6 @@ Para ejecutar las pruebas en tu computadora, asegúrate de tener instalado **Nod
 Estas pruebas han sido configuradas en el archivo `.github/workflows/main_retinai.yml` para que se ejecuten automáticamente:
 - **Jest:** Se ejecuta en la fase de construcción (`build`) antes de desplegar.
 - **Cypress:** Se ejecuta automáticamente contra el servidor en la nube de Azure después de que el despliegue haya sido exitoso.
+
+### DATASET:
+https://www.kaggle.com/datasets/andrewmvd/ocular-disease-recognition-odir5k

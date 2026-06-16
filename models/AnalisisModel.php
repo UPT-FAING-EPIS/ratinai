@@ -51,4 +51,28 @@ class AnalisisModel {
         $stmt->execute();
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
+
+    /**
+     * Obtiene un análisis por su ID, verificando que pertenezca al médico indicado.
+     * Incluye nombre del médico, CMP y datos del paciente.
+     */
+    public function obtenerPorId($id_analisis, $id_medico) {
+        $stmt = $this->db->prepare("
+            SELECT a.*,
+                   u.nombre  AS nombre_medico,
+                   u.cmp     AS cmp_medico,
+                   u.especialidad AS especialidad_medico,
+                   p.codigo_paciente, p.dni AS dni_paciente
+            FROM analisis_retinales a
+            INNER JOIN usuarios u ON u.id = a.id_medico
+            LEFT JOIN  pacientes p ON p.id = a.id_paciente
+            WHERE a.id = :id_analisis
+              AND a.id_medico = :id_medico
+            LIMIT 1
+        ");
+        $stmt->bindParam(':id_analisis', $id_analisis, PDO::PARAM_INT);
+        $stmt->bindParam(':id_medico',   $id_medico,   PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    }
 }

@@ -122,11 +122,68 @@ class AnalisisController {
             'id_analisis' => $idAnalisis
         ]);
     }
+
+    /**
+     * Devuelve en JSON los datos de un análisis para generar el PDF desde el frontend.
+     * Requiere GET param: id_analisis
+     */
+    public function datosPdf() {
+        header('Content-Type: application/json');
+
+        if (!isset($_SESSION['user_id']) || $_SESSION['rol_codigo'] !== 'MED') {
+            echo json_encode(['success' => false, 'error' => 'Sesión inválida', 'expired' => true]);
+            return;
+        }
+
+        $id_analisis = (int)($_GET['id_analisis'] ?? 0);
+        if ($id_analisis <= 0) {
+            echo json_encode(['success' => false, 'error' => 'ID de análisis inválido']);
+            return;
+        }
+
+        $id_medico = (int)$_SESSION['user_id'];
+        $analisis  = $this->model->obtenerPorId($id_analisis, $id_medico);
+
+        if (!$analisis) {
+            echo json_encode(['success' => false, 'error' => 'Análisis no encontrado']);
+            return;
+        }
+
+        // Convertir imagen a base64 para incrustarla en el PDF sin problemas de ruta
+        $imagePath = __DIR__ . '/../' . $analisis['imagen_path'];
+        $imageB64  = '';
+        if (file_exists($imagePath)) {
+            $mime     = mime_content_type($imagePath);
+            $imageB64 = 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($imagePath));
+        }
+
+        echo json_encode([
+            'success'   => true,
+            'analisis'  => [
+                'id'                     => $analisis['id'],
+                'nombre_medico'          => $analisis['nombre_medico'],
+                'cmp_medico'             => $analisis['cmp_medico'],
+                'especialidad_medico'    => $analisis['especialidad_medico'],
+                'fecha_analisis'         => $analisis['fecha_analisis'],
+                'resultado_principal'    => $analisis['resultado_principal'],
+                'probabilidad_principal' => (float)$analisis['probabilidad_principal'],
+                'probabilidad_normal'    => (float)$analisis['probabilidad_normal'],
+                'probabilidad_diabetes'  => (float)$analisis['probabilidad_diabetes'],
+                'probabilidad_glaucoma'  => (float)$analisis['probabilidad_glaucoma'],
+                'probabilidad_catarata'  => (float)$analisis['probabilidad_catarata'],
+                'alerta_anomalia'        => (bool)$analisis['alerta_anomalia'],
+                'codigo_paciente'        => $analisis['codigo_paciente'] ?? null,
+                'dni_paciente'           => $analisis['dni_paciente'] ?? null,
+                'imagen_b64'             => $imageB64,
+            ]
+        ]);
+    }
 }
 
 if (isset($_GET['action'])) {
     $controller = new AnalisisController();
     switch ($_GET['action']) {
-        case 'analizar': $controller->analizar(); break;
+        case 'analizar':   $controller->analizar();   break;
+        case 'datos_pdf':  $controller->datosPdf();   break;
     }
 }

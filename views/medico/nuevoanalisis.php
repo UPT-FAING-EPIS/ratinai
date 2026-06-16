@@ -156,6 +156,7 @@ $_page = 'nuevoanalisis.php';
 
 <div id="toast" class="toast" style="display:none"></div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="<?= $base ?>assets/js/medico_analisis.js"></script>
 </body>
 </html>

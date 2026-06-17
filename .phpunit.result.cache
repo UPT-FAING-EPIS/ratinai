@@ -1,1 +1,1 @@
-{"version":2,"defects":[],"times":{"AnalisisControllerTest::testAnalizarFailsWithInvalidHttpMethod":0,"AnalisisControllerTest::testAnalizarFailsWithoutSession":0,"AnalisisControllerTest::testAnalizarFailsWithNoFile":0,"AnalisisControllerTest::testAnalizarFailsWithInvalidFileType":0.002,"AnalisisControllerTest::testAnalizarFailsWithFileSizeTooLarge":0}}
+{"version":1,"defects":[],"times":{"PasswordHelperTest::testGenerateTempLength":0,"PasswordHelperTest::testGenerateTempIsAlphanumeric":0,"PasswordHelperTest::testGenerateTempIsUnique":0}}

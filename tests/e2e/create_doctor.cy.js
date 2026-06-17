@@ -38,6 +38,13 @@ describe('RF-01 — Crear Médico: validación y envío de clave temporal', () =
         cy.get('#combo-display').click({force: true});
         cy.get('.combo-opt').not('.nueva').first().click({force: true});
 
+        // Seleccionar establecimiento destino si el select existe
+        cy.get('body').then($body => {
+            if ($body.find('#establecimiento_id').length > 0) {
+                cy.get('#establecimiento_id').select(1, {force: true});
+            }
+        });
+
         // Inyectar contraseña fija para tests reproducibles
         cy.get('#password_override').invoke('val', DOCTOR_TEST.password);
 

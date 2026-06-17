@@ -26,8 +26,8 @@ describe('RF-03: Gestionar Médicos Activos', () => {
     });
 
     it('Debe editar a un médico y mostrar mensaje de éxito (AJAX + Reload)', () => {
-        // Clic en editar del primer médico en la tabla
-        cy.get('table#tabla-medicos tbody tr').first().within(() => {
+        // Clic en editar del primer médico de prueba
+        cy.contains('table#tabla-medicos tbody tr', 'cypress_doc_').first().within(() => {
             cy.get('button[title="Editar"]').click();
         });
 
@@ -53,8 +53,8 @@ describe('RF-03: Gestionar Médicos Activos', () => {
     });
 
     it('Debe resetear la contraseña de un médico temporalmente', () => {
-        // Clic en reset password del primer médico
-        cy.get('table#tabla-medicos tbody tr').first().within(() => {
+        // Clic en reset password del primer médico de prueba
+        cy.contains('table#tabla-medicos tbody tr', 'cypress_doc_').first().within(() => {
             cy.get('button[title="Resetear contraseña"]').click();
         });
 
@@ -68,8 +68,8 @@ describe('RF-03: Gestionar Médicos Activos', () => {
     });
 
     it('Debe desactivar a un médico por POST de formulario', () => {
-        // Encontrar un médico y capturar su nombre para verificar que desaparece
-        cy.get('table#tabla-medicos tbody tr').first().then(($row) => {
+        // Encontrar un médico de prueba y capturar su nombre para verificar que desaparece
+        cy.contains('table#tabla-medicos tbody tr', 'cypress_doc_').first().then(($row) => {
             const nombreMedico = $row.find('td').first().find('strong').text().trim();
 
             cy.wrap($row).within(() => {

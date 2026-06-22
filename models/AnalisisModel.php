@@ -11,27 +11,29 @@ class AnalisisModel {
     public function registrarAnalisis($data) {
         $stmt = $this->db->prepare("
             INSERT INTO analisis_retinales 
-            (id_medico, id_paciente, imagen_path, resultado_principal, probabilidad_principal, 
+            (id_medico, id_paciente, id_carpeta, imagen_path, resultado_principal, probabilidad_principal, 
              probabilidad_normal, probabilidad_diabetes, probabilidad_glaucoma, probabilidad_catarata, 
-             alerta_anomalia, es_referencial, tiempo_analisis)
+             diagnostico_medico, alerta_anomalia, es_referencial, tiempo_analisis)
             VALUES 
-            (:id_medico, :id_paciente, :imagen_path, :resultado_principal, :probabilidad_principal, 
+            (:id_medico, :id_paciente, :id_carpeta, :imagen_path, :resultado_principal, :probabilidad_principal, 
              :probabilidad_normal, :probabilidad_diabetes, :probabilidad_glaucoma, :probabilidad_catarata, 
-             :alerta_anomalia, :es_referencial, :tiempo_analisis)
+             :diagnostico_medico, :alerta_anomalia, :es_referencial, :tiempo_analisis)
         ");
 
-        $stmt->bindParam(':id_medico', $data['id_medico']);
-        $stmt->bindParam(':id_paciente', $data['id_paciente']);
-        $stmt->bindParam(':imagen_path', $data['imagen_path']);
-        $stmt->bindParam(':resultado_principal', $data['resultado_principal']);
+        $stmt->bindParam(':id_medico',    $data['id_medico']);
+        $stmt->bindParam(':id_paciente',  $data['id_paciente']);
+        $stmt->bindParam(':id_carpeta',   $data['id_carpeta']);
+        $stmt->bindParam(':imagen_path',  $data['imagen_path']);
+        $stmt->bindParam(':resultado_principal',    $data['resultado_principal']);
         $stmt->bindParam(':probabilidad_principal', $data['probabilidad_principal']);
-        $stmt->bindParam(':probabilidad_normal', $data['probabilidad_normal']);
-        $stmt->bindParam(':probabilidad_diabetes', $data['probabilidad_diabetes']);
-        $stmt->bindParam(':probabilidad_glaucoma', $data['probabilidad_glaucoma']);
-        $stmt->bindParam(':probabilidad_catarata', $data['probabilidad_catarata']);
-        $stmt->bindParam(':alerta_anomalia', $data['alerta_anomalia']);
-        $stmt->bindParam(':es_referencial', $data['es_referencial']);
-        $stmt->bindParam(':tiempo_analisis', $data['tiempo_analisis']);
+        $stmt->bindParam(':probabilidad_normal',    $data['probabilidad_normal']);
+        $stmt->bindParam(':probabilidad_diabetes',  $data['probabilidad_diabetes']);
+        $stmt->bindParam(':probabilidad_glaucoma',  $data['probabilidad_glaucoma']);
+        $stmt->bindParam(':probabilidad_catarata',  $data['probabilidad_catarata']);
+        $stmt->bindParam(':diagnostico_medico',     $data['diagnostico_medico']);
+        $stmt->bindParam(':alerta_anomalia',  $data['alerta_anomalia']);
+        $stmt->bindParam(':es_referencial',   $data['es_referencial']);
+        $stmt->bindParam(':tiempo_analisis',  $data['tiempo_analisis']);
 
         if ($stmt->execute()) {
             return $this->db->lastInsertId();
@@ -41,9 +43,12 @@ class AnalisisModel {
 
     public function obtenerHistorialMedico($id_medico) {
         $stmt = $this->db->prepare("
-            SELECT a.*, p.codigo_paciente, p.dni 
+            SELECT a.*, 
+                   p.codigo_paciente, p.dni,
+                   c.nombre AS nombre_carpeta
             FROM analisis_retinales a
-            LEFT JOIN pacientes p ON a.id_paciente = p.id
+            LEFT JOIN pacientes         p ON a.id_paciente = p.id
+            LEFT JOIN carpetas_paciente c ON a.id_carpeta  = c.id
             WHERE a.id_medico = :id_medico
             ORDER BY a.fecha_analisis DESC
         ");
@@ -74,5 +79,76 @@ class AnalisisModel {
         $stmt->bindParam(':id_medico',   $id_medico,   PDO::PARAM_INT);
         $stmt->execute();
         return $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+
+    public function getKPIsMedico($id_medico) {
+        $stmt = $this->db->prepare("
+            SELECT 
+                COUNT(DISTINCT id_paciente) as total_pacientes,
+                COUNT(id) as total_analisis,
+                SUM(CASE WHEN alerta_anomalia = 1 THEN 1 ELSE 0 END) as total_alertas
+            FROM analisis_retinales
+            WHERE id_medico = :id_medico
+        ");
+        $stmt->bindParam(':id_medico', $id_medico, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+
+    public function getDistribucionResultados($id_medico) {
+        $stmt = $this->db->prepare("
+            SELECT resultado_principal, COUNT(id) as total 
+            FROM analisis_retinales 
+            WHERE id_medico = :id_medico 
+            GROUP BY resultado_principal
+        ");
+        $stmt->bindParam(':id_medico', $id_medico, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getActividadUltimos7Dias($id_medico) {
+        $stmt = $this->db->prepare("
+            SELECT DATE(fecha_analisis) as fecha, COUNT(id) as total 
+            FROM analisis_retinales 
+            WHERE id_medico = :id_medico 
+              AND fecha_analisis >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+            GROUP BY DATE(fecha_analisis) 
+            ORDER BY fecha ASC
+        ");
+        $stmt->bindParam(':id_medico', $id_medico, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getAnalisisRecientes($id_medico, $limit = 5) {
+        $stmt = $this->db->prepare("
+            SELECT a.id, a.fecha_analisis, a.resultado_principal, a.probabilidad_principal, a.alerta_anomalia, p.dni, p.codigo_paciente 
+            FROM analisis_retinales a 
+            LEFT JOIN pacientes p ON a.id_paciente = p.id 
+            WHERE a.id_medico = :id_medico 
+            ORDER BY a.fecha_analisis DESC 
+            LIMIT :lim
+        ");
+        $stmt->bindParam(':id_medico', $id_medico, PDO::PARAM_INT);
+        $stmt->bindValue(':lim', (int)$limit, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getCasosCriticosRecientes($id_medico, $limit = 5) {
+        $stmt = $this->db->prepare("
+            SELECT a.id, a.fecha_analisis, a.resultado_principal, a.probabilidad_principal, p.dni, p.codigo_paciente 
+            FROM analisis_retinales a 
+            LEFT JOIN pacientes p ON a.id_paciente = p.id 
+            WHERE a.id_medico = :id_medico 
+              AND a.alerta_anomalia = 1 
+            ORDER BY a.fecha_analisis DESC 
+            LIMIT :lim
+        ");
+        $stmt->bindParam(':id_medico', $id_medico, PDO::PARAM_INT);
+        $stmt->bindValue(':lim', (int)$limit, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 }

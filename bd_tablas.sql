@@ -14,6 +14,35 @@
 /*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
+-- Volcando estructura para tabla railway.analisis_retinales
+CREATE TABLE IF NOT EXISTS `analisis_retinales` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `id_medico` int NOT NULL,
+  `id_paciente` int DEFAULT NULL,
+  `id_carpeta` int DEFAULT NULL,
+  `imagen_path` varchar(255) NOT NULL,
+  `resultado_principal` varchar(50) NOT NULL,
+  `probabilidad_principal` decimal(5,2) NOT NULL,
+  `probabilidad_normal` decimal(5,2) NOT NULL,
+  `probabilidad_diabetes` decimal(5,2) NOT NULL,
+  `probabilidad_glaucoma` decimal(5,2) NOT NULL,
+  `probabilidad_catarata` decimal(5,2) NOT NULL,
+  `diagnostico_medico` varchar(1000) DEFAULT NULL,
+  `alerta_anomalia` tinyint(1) NOT NULL DEFAULT '0',
+  `es_referencial` tinyint(1) NOT NULL DEFAULT '1',
+  `tiempo_analisis` decimal(6,3) DEFAULT NULL,
+  `fecha_analisis` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_analisis_medico` (`id_medico`),
+  KEY `idx_analisis_paciente` (`id_paciente`),
+  KEY `idx_analisis_carpeta` (`id_carpeta`),
+  CONSTRAINT `fk_analisis_medico` FOREIGN KEY (`id_medico`) REFERENCES `usuarios` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_analisis_paciente` FOREIGN KEY (`id_paciente`) REFERENCES `pacientes` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT `fk_analisis_carpeta` FOREIGN KEY (`id_carpeta`) REFERENCES `carpetas_paciente` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=44 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- La exportación de datos fue deseleccionada.
+
 -- Volcando estructura para tabla railway.establecimientos
 CREATE TABLE IF NOT EXISTS `establecimientos` (
   `id` int NOT NULL AUTO_INCREMENT,
@@ -41,6 +70,38 @@ CREATE TABLE IF NOT EXISTS `maestro` (
 
 -- La exportación de datos fue deseleccionada.
 
+-- Volcando estructura para tabla railway.pacientes
+CREATE TABLE IF NOT EXISTS `pacientes` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `dni` varchar(15) NOT NULL,
+  `codigo_paciente` varchar(20) NOT NULL,
+  `nombres` varchar(100) DEFAULT NULL,
+  `apellidos` varchar(100) DEFAULT NULL,
+  `fecha_registro` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `dni` (`dni`),
+  UNIQUE KEY `codigo_paciente` (`codigo_paciente`)
+) ENGINE=InnoDB AUTO_INCREMENT=15 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- La exportación de datos fue deseleccionada.
+
+-- Volcando estructura para tabla railway.carpetas_paciente
+CREATE TABLE IF NOT EXISTS `carpetas_paciente` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `id_paciente` int NOT NULL,
+  `id_medico` int NOT NULL,
+  `nombre` varchar(100) NOT NULL,
+  `descripcion` varchar(255) DEFAULT NULL,
+  `fecha_creacion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_carpeta_paciente` (`id_paciente`),
+  KEY `idx_carpeta_medico` (`id_medico`),
+  CONSTRAINT `fk_carpeta_paciente` FOREIGN KEY (`id_paciente`) REFERENCES `pacientes` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_carpeta_medico` FOREIGN KEY (`id_medico`) REFERENCES `usuarios` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- La exportación de datos fue deseleccionada.
+
 -- Volcando estructura para tabla railway.solicitudes_establecimiento
 CREATE TABLE IF NOT EXISTS `solicitudes_establecimiento` (
   `id` int NOT NULL AUTO_INCREMENT,
@@ -63,7 +124,7 @@ CREATE TABLE IF NOT EXISTS `solicitudes_establecimiento` (
   PRIMARY KEY (`id`),
   KEY `solicitudes_ibfk_1` (`id_usuario_solicitante`),
   CONSTRAINT `solicitudes_ibfk_1` FOREIGN KEY (`id_usuario_solicitante`) REFERENCES `usuarios` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- La exportación de datos fue deseleccionada.
 
@@ -84,7 +145,7 @@ CREATE TABLE IF NOT EXISTS `usuarios` (
   UNIQUE KEY `correo` (`correo`),
   KEY `establecimiento_id` (`establecimiento_id`),
   CONSTRAINT `usuarios_ibfk_1` FOREIGN KEY (`establecimiento_id`) REFERENCES `establecimientos` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=28 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=37 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- La exportación de datos fue deseleccionada.
 

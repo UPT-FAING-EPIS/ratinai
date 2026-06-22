@@ -23,6 +23,109 @@ $_page = 'nuevoanalisis.php';
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="<?= $base ?>assets/css/dashboard/dashboard.css">
 <script>const BASE_URL = '<?= $base ?>';</script>
+<style>
+/* ── Carpeta cards ─────────────────────────────────────────────────────────── */
+.folder-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.folder-card {
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: all 0.18s;
+  background: var(--surface);
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  position: relative;
+}
+.folder-card:hover {
+  border-color: var(--accent);
+  background: var(--accent2);
+}
+.folder-card.selected {
+  border-color: var(--accent);
+  background: var(--accent2);
+  box-shadow: 0 0 0 3px rgba(26,86,219,.12);
+}
+.folder-card-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.folder-card-info {
+  min-width: 0;
+}
+.folder-card-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.folder-card-meta {
+  font-size: 11px;
+  color: var(--text3);
+  margin-top: 2px;
+}
+.folder-card.selected .folder-card-name { color: var(--accent); }
+.folder-check {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 18px;
+  height: 18px;
+  background: var(--accent);
+  border-radius: 50%;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+}
+.folder-card.selected .folder-check { display: flex; }
+
+/* ── Nueva carpeta inline form ──────────────────────────────────────────────── */
+.new-folder-form {
+  background: var(--surface2);
+  border: 1.5px dashed var(--border2);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-top: 10px;
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+}
+.new-folder-form.open { display: flex; }
+.new-folder-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+/* ── Skip carpeta link ───────────────────────────────────────────────────────── */
+.skip-link {
+  font-size: 12px;
+  color: var(--text3);
+  cursor: pointer;
+  text-decoration: underline;
+  display: inline-block;
+  margin-top: 8px;
+}
+.skip-link:hover { color: var(--text2); }
+
+/* ── Carpeta section card ───────────────────────────────────────────────────── */
+#carpeta-section {
+  display: none;
+  margin-top: 0;
+}
+</style>
 </head>
 <body>
 
@@ -46,11 +149,12 @@ $_page = 'nuevoanalisis.php';
             <div class="step-line" id="line1"></div>
             <div class="step"><div class="step-circle pending" id="step2">2</div><span class="step-label" id="lbl-step2">Procesando</span></div>
             <div class="step-line" id="line2"></div>
-            <div class="step"><div class="step-circle pending" id="step3">✓</div><span class="step-label" id="lbl-step3">Resultado</span></div>
+            <div class="step"><div class="step-circle pending" id="step3">3</div><span class="step-label" id="lbl-step3">Resultado / Diagnóstico</span></div>
         </div>
 
         <div class="grid-2" style="gap:20px">
             <div>
+                <!-- ── Cargar imagen ─────────────────────────────────── -->
                 <div class="card mb-16" id="upload-card">
                 <div class="card-title">
                     <div class="card-title-icon blue">
@@ -78,7 +182,7 @@ $_page = 'nuevoanalisis.php';
                     </div>
                     <div style="margin-top:12px;text-align:center;">
                     <p id="file-name" class="text-sm text-muted"></p>
-                    <button class="btn btn-primary mt-8" id="analyze-btn">
+                    <button class="btn btn-primary mt-8" id="analyze-btn" disabled>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M12 5l7 7-7 7" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                         Analizar imagen
                     </button>
@@ -86,7 +190,8 @@ $_page = 'nuevoanalisis.php';
                 </div>
                 </div>
 
-                <div class="card">
+                <!-- ── Identificación del paciente ─────────────────────── -->
+                <div class="card mb-16">
                 <div class="card-title">
                     <div class="card-title-icon green">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" stroke="#059669" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="7" r="4" stroke="#059669" stroke-width="1.8"/></svg>
@@ -99,6 +204,62 @@ $_page = 'nuevoanalisis.php';
                 </div>
                 <button class="btn btn-secondary btn-sm" id="btn-buscar-paciente">Buscar / registrar paciente</button>
                 <div id="paciente-result" style="margin-top:12px;display:none"></div>
+                </div>
+
+                <!-- ── Carpeta del análisis ────────────────────────────── -->
+                <div class="card" id="carpeta-section">
+                <div class="card-title">
+                    <div class="card-title-icon" style="background:#F3E8FF;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" stroke="#7C3AED" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </div>
+                    Carpeta del análisis
+                    <span style="margin-left:auto;font-size:11px;font-weight:400;color:var(--text3)">Opcional</span>
+                </div>
+
+                <p style="font-size:12px;color:var(--text3);margin-bottom:12px;">
+                    Seleccione una carpeta existente o cree una nueva para organizar este análisis.
+                </p>
+
+                <!-- Lista de carpetas existentes -->
+                <div id="folder-list-loading" style="display:none;text-align:center;padding:16px;">
+                    <span style="color:var(--text3);font-size:13px;">Cargando carpetas…</span>
+                </div>
+                <div class="folder-grid" id="folder-grid"></div>
+
+                <!-- Botón crear nueva carpeta -->
+                <button class="btn btn-ghost btn-sm" id="btn-toggle-new-folder" style="margin-bottom:4px;">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                    Nueva carpeta
+                </button>
+
+                <!-- Formulario inline nueva carpeta -->
+                <div class="new-folder-form" id="new-folder-form">
+                    <div class="new-folder-row">
+                        <div class="form-group-d" style="flex:1;margin-bottom:0;">
+                            <label class="form-label-d" for="folder-name-input">Nombre de la carpeta</label>
+                            <input class="form-input-d" type="text" id="folder-name-input" placeholder="Ej. Control 2024, Ojo derecho…" maxlength="100">
+                        </div>
+                    </div>
+                    <div class="form-group-d" style="margin-bottom:0;">
+                        <label class="form-label-d" for="folder-desc-input">Descripción <span style="font-weight:400;color:var(--text3)">(opcional)</span></label>
+                        <input class="form-input-d" type="text" id="folder-desc-input" placeholder="Breve descripción de la carpeta" maxlength="255">
+                    </div>
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <button class="btn btn-primary btn-sm" id="btn-create-folder">Crear y seleccionar</button>
+                        <button class="btn btn-ghost btn-sm" id="btn-cancel-new-folder">Cancelar</button>
+                    </div>
+                </div>
+
+                <!-- Carpeta seleccionada actualmente -->
+                <div id="carpeta-seleccionada" style="display:none;margin-top:12px;">
+                    <div class="alert-box alert-info" style="margin-bottom:0;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" stroke="#1A56DB" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        <p>Carpeta seleccionada: <strong id="carpeta-seleccionada-nombre"></strong>
+                        <button onclick="deseleccionarCarpeta()" style="border:none;background:none;color:var(--danger);cursor:pointer;font-size:11px;margin-left:8px;font-weight:600;">✕ Quitar</button></p>
+                    </div>
+                </div>
+
+                <span class="skip-link" id="skip-carpeta-link" onclick="saltarCarpeta()">Continuar sin seleccionar carpeta</span>
                 </div>
             </div>
 
@@ -141,8 +302,17 @@ $_page = 'nuevoanalisis.php';
                     <div class="result-track"><div class="result-fill fill-success" id="f_normal" style="width:0%"></div></div>
                 </div>
                 
+                <!-- Diagnostico Medico -->
+                <div style="margin-top:20px; border-top: 1px solid var(--border); padding-top: 16px;">
+                    <div class="form-group-d">
+                        <label class="form-label-d" for="diagnostico-input">Diagnóstico médico y observaciones</label>
+                        <textarea class="form-input-d" id="diagnostico-input" rows="4" maxlength="1000" placeholder="Escriba aquí su diagnóstico, interpretación del resultado o cualquier observación relevante..."></textarea>
+                    </div>
+                </div>
+                
                 <div style="margin-top:16px;">
-                    <button class="btn btn-secondary btn-sm" id="btn-pdf">
+                    <button class="btn btn-primary btn-sm" id="btn-save-final">Guardar análisis</button>
+                    <button class="btn btn-secondary btn-sm" id="btn-pdf" style="display:none;">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     Descargar reporte PDF
                     </button>

@@ -95,9 +95,11 @@ $_rol = $_SESSION['rol_codigo'] ?? '';
     </nav>
 
     <div class="sidebar-footer">
+        <?php if ($_rol !== 'MED'): ?>
         <div class="session-info">
             <svg viewBox="0 0 20 20" fill="none" width="13" height="13"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.3"/><path d="M10 6v4l2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
             Sesión: <span id="session-countdown">05:00</span>
         </div>
+        <?php endif; ?>
     </div>
 </aside>

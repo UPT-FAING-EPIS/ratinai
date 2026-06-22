@@ -43,22 +43,19 @@ class DoctorModelTest extends TestCase {
         $this->stmtMock->expects($this->once())
              ->method('execute')
              ->with([
-                 ':pwd' => $nuevoHash,
-                 ':id'  => $doctorId,
-                 ':eid' => $estId
+                 $nuevoHash,
+                 $doctorId,
+                 $estId
              ])
              ->willReturn(true);
 
         // Configuramos el mock de base de datos para esperar la query SQL correcta
-        $expectedSql = "UPDATE usuarios SET password=:pwd, es_password_temporal=1
-             WHERE id=:id AND establecimiento_id=:eid AND rol_codigo='MED'";
-             
-        // Limpiamos los saltos de línea extra para que el assert coincida si la clase tiene espacios
         $this->dbMock->expects($this->once())
              ->method('prepare')
              ->with($this->callback(function($sql) {
                  return strpos($sql, 'es_password_temporal=1') !== false 
-                        && strpos($sql, 'UPDATE usuarios SET password=:pwd') !== false;
+                        && strpos($sql, 'UPDATE usuarios SET password=?') !== false
+                        && strpos($sql, 'establecimiento_id IN (?)') !== false;
              }))
              ->willReturn($this->stmtMock);
 

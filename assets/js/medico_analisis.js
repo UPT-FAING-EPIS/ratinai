@@ -9,6 +9,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentFile    = null;
     let isProcessing   = false;
     let currentAnalisisId = null;   // ID del análisis guardado en BD
+    let currentAiData  = null;      // Datos devueltos por la IA temporalmente
+    let currentImagePath = null;    // Path de la imagen subida
 
     // ── File handling ────────────────────────────────────────────────────────
     fileInput.addEventListener('change', function() {
@@ -86,8 +88,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const formData = new FormData();
         formData.append('imagen', currentFile);
+        
         const dni = document.getElementById('dni-input').value.trim();
         if (dni) formData.append('dni_paciente', dni);
+
+        if (currentCarpetaId) {
+            formData.append('id_carpeta', currentCarpetaId);
+        }
 
         try {
             const response = await fetch(BASE_URL + 'controllers/AnalisisController.php?action=analizar', {
@@ -103,9 +110,16 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (result.success) {
-                // Guardar el ID del análisis registrado en BD
-                currentAnalisisId = result.id_analisis;
+                currentAiData = result.data;
+                currentImagePath = result.imagen_path;
                 mostrarResultados(result.data);
+                
+                // Mostrar input de diagnostico y boton guardar
+                document.getElementById('diagnostico-input').value = '';
+                document.getElementById('diagnostico-input').disabled = false;
+                document.getElementById('btn-save-final').style.display = 'inline-flex';
+                document.getElementById('btn-save-final').disabled = false;
+                document.getElementById('btn-pdf').style.display = 'none';
             } else {
                 if (result.expired) {
                     window.location.href = BASE_URL + 'views/auth/login.php';
@@ -125,6 +139,64 @@ document.addEventListener('DOMContentLoaded', () => {
             analyzeBtn.textContent = 'Analizar imagen';
         }
     });
+
+    // ── Guardar Análisis Final ────────────────────────────────────────────────
+    const btnSaveFinal = document.getElementById('btn-save-final');
+    if(btnSaveFinal) {
+        btnSaveFinal.addEventListener('click', async () => {
+            if(!currentAiData || !currentImagePath) return;
+
+            const diag = document.getElementById('diagnostico-input').value.trim();
+            btnSaveFinal.disabled = true;
+            btnSaveFinal.textContent = 'Guardando...';
+
+            const fd = new FormData();
+            const dni = document.getElementById('dni-input').value.trim();
+            if (dni) fd.append('dni_paciente', dni);
+            if (currentCarpetaId) fd.append('id_carpeta', currentCarpetaId);
+            
+            fd.append('imagen_path', currentImagePath);
+            fd.append('diagnostico_medico', diag);
+            fd.append('resultado_principal', currentAiData.resultado_principal);
+            fd.append('probabilidad_principal', currentAiData.probabilidad_principal || (currentAiData.probabilidades[currentAiData.resultado_principal] || 0));
+            fd.append('probabilidad_normal', currentAiData.probabilidades.normal || 0);
+            fd.append('probabilidad_diabetes', currentAiData.probabilidades.diabetes || 0);
+            fd.append('probabilidad_glaucoma', currentAiData.probabilidades.glaucoma || 0);
+            fd.append('probabilidad_catarata', currentAiData.probabilidades.catarata || 0);
+            fd.append('alerta_anomalia', currentAiData.alerta_anomalia ? 1 : 0);
+            fd.append('es_referencial', currentAiData.es_referencial ? 1 : 0);
+            if(currentAiData.tiempo_analisis) fd.append('tiempo_analisis', currentAiData.tiempo_analisis);
+
+            try {
+                const response = await fetch(BASE_URL + 'controllers/AnalisisController.php?action=registrar_final', {
+                    method: 'POST',
+                    body: fd
+                });
+                const result = await response.json();
+                if (result.success) {
+                    currentAnalisisId = result.id_analisis;
+                    showToast('Análisis guardado exitosamente.', 'success');
+                    
+                    // Actualizar UI
+                    btnSaveFinal.style.display = 'none';
+                    document.getElementById('diagnostico-input').disabled = true;
+                    document.getElementById('btn-pdf').style.display = 'inline-flex';
+                    
+                    document.getElementById('step3').className   = 'step-circle done';
+                    document.getElementById('step3').textContent = '✓';
+                } else {
+                    showToast(result.error || 'Error al guardar', 'danger');
+                    btnSaveFinal.disabled = false;
+                    btnSaveFinal.textContent = 'Guardar análisis';
+                }
+            } catch (error) {
+                console.error(error);
+                showToast('Error de conexión al guardar.', 'danger');
+                btnSaveFinal.disabled = false;
+                btnSaveFinal.textContent = 'Guardar análisis';
+            }
+        });
+    }
 
     // ── Mostrar resultados ────────────────────────────────────────────────────
     function mostrarResultados(data) {
@@ -174,6 +246,14 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('preview-area').style.display  = 'none';
         document.getElementById('quality-warning').style.display = 'none';
         document.getElementById('file-input').value            = '';
+        
+        // Reset carpetas y paciente
+        document.getElementById('carpeta-section').style.display = 'none';
+        document.getElementById('paciente-result').style.display = 'none';
+        document.getElementById('dni-input').value = '';
+        currentPacienteId = null;
+        deseleccionarCarpeta();
+        
         currentFile       = null;
         currentAnalisisId = null;
         resetStepper();
@@ -192,6 +272,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ── Buscar Paciente ───────────────────────────────────────────────────────
+    let currentPacienteId = null;
+
     btnBuscarPaciente.addEventListener('click', async () => {
         const dni = document.getElementById('dni-input').value.trim();
         if (dni.length !== 8 || !/^\d+$/.test(dni)) {
@@ -213,18 +295,179 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await res.json();
             if (data.success) {
                 const p   = data.paciente;
+                currentPacienteId = p.id;
+                
                 const msg = data.nuevo ? 'Paciente registrado' : 'Paciente identificado';
                 const resDiv = document.getElementById('paciente-result');
                 resDiv.style.display = 'block';
                 resDiv.innerHTML = `<div class="alert-box alert-success"><p>${msg} · Código: <strong>${p.codigo_paciente}</strong></p></div>`;
+                
+                // Mostrar sección de carpetas
+                document.getElementById('carpeta-section').style.display = 'block';
+                cargarCarpetas(currentPacienteId);
             } else {
                 showToast(data.error || 'Error', 'danger');
+                document.getElementById('carpeta-section').style.display = 'none';
+                currentPacienteId = null;
             }
         } catch (e) {
             showToast('Error de conexión', 'danger');
         } finally {
             btnBuscarPaciente.disabled    = false;
             btnBuscarPaciente.textContent = 'Buscar / registrar paciente';
+        }
+    });
+
+    // ── Gestión de Carpetas ───────────────────────────────────────────────────
+    let currentCarpetaId = null;
+    let carpetasArr = [];
+
+    const folderGrid = document.getElementById('folder-grid');
+    const folderLoading = document.getElementById('folder-list-loading');
+    const btnToggleNewFolder = document.getElementById('btn-toggle-new-folder');
+    const newFolderForm = document.getElementById('new-folder-form');
+    const btnCancelNewFolder = document.getElementById('btn-cancel-new-folder');
+    const btnCreateFolder = document.getElementById('btn-create-folder');
+
+    // Cargar carpetas
+    async function cargarCarpetas(id_paciente) {
+        folderLoading.style.display = 'block';
+        folderGrid.innerHTML = '';
+        btnToggleNewFolder.style.display = 'none';
+        newFolderForm.classList.remove('open');
+        deseleccionarCarpeta();
+
+        const fd = new FormData();
+        fd.append('id_paciente', id_paciente);
+
+        try {
+            const res = await fetch(BASE_URL + 'controllers/CarpetaController.php?action=listar', {
+                method: 'POST',
+                body: fd
+            });
+            const data = await res.json();
+            
+            if (data.success) {
+                carpetasArr = data.carpetas;
+                renderFolderGrid();
+            } else {
+                showToast(data.error || 'Error al cargar carpetas', 'danger');
+            }
+        } catch (e) {
+            showToast('Error de red al cargar carpetas', 'danger');
+        } finally {
+            folderLoading.style.display = 'none';
+            btnToggleNewFolder.style.display = 'inline-flex';
+        }
+    }
+
+    function renderFolderGrid() {
+        folderGrid.innerHTML = '';
+        if (carpetasArr.length === 0) {
+            folderGrid.innerHTML = '<p style="color:var(--text3);font-size:12px;grid-column:1/-1">No hay carpetas para este paciente.</p>';
+            return;
+        }
+
+        carpetasArr.forEach(c => {
+            const el = document.createElement('div');
+            el.className = 'folder-card' + (currentCarpetaId === c.id ? ' selected' : '');
+            el.innerHTML = `
+                <div class="folder-check">✓</div>
+                <div class="folder-card-icon">📂</div>
+                <div class="folder-card-info">
+                    <div class="folder-card-name" title="${c.nombre}">${c.nombre}</div>
+                    <div class="folder-card-meta">${c.total_analisis} análisis</div>
+                </div>
+            `;
+            el.addEventListener('click', () => seleccionarCarpeta(c));
+            folderGrid.appendChild(el);
+        });
+    }
+
+    function seleccionarCarpeta(c) {
+        currentCarpetaId = c.id;
+        
+        document.getElementById('carpeta-seleccionada').style.display = 'block';
+        document.getElementById('carpeta-seleccionada-nombre').textContent = c.nombre;
+        
+        // Cerrar form nueva carpeta si está abierto
+        newFolderForm.classList.remove('open');
+        btnToggleNewFolder.style.display = 'inline-flex';
+        
+        renderFolderGrid();
+    }
+
+    // Exponer globalmente para el onclick del HTML
+    window.deseleccionarCarpeta = function() {
+        currentCarpetaId = null;
+        document.getElementById('carpeta-seleccionada').style.display = 'none';
+        renderFolderGrid();
+    };
+
+    window.saltarCarpeta = function() {
+        deseleccionarCarpeta();
+        // Feedback visual
+        showToast('Continuando sin asignar carpeta.', 'info');
+    };
+
+    // Formulario de nueva carpeta
+    btnToggleNewFolder.addEventListener('click', () => {
+        newFolderForm.classList.add('open');
+        btnToggleNewFolder.style.display = 'none';
+        document.getElementById('folder-name-input').focus();
+    });
+
+    btnCancelNewFolder.addEventListener('click', () => {
+        newFolderForm.classList.remove('open');
+        btnToggleNewFolder.style.display = 'inline-flex';
+        document.getElementById('folder-name-input').value = '';
+        document.getElementById('folder-desc-input').value = '';
+    });
+
+    btnCreateFolder.addEventListener('click', async () => {
+        const nombre = document.getElementById('folder-name-input').value.trim();
+        const desc = document.getElementById('folder-desc-input').value.trim();
+
+        if (!nombre) {
+            showToast('El nombre de la carpeta es requerido', 'warning');
+            return;
+        }
+
+        btnCreateFolder.disabled = true;
+        btnCreateFolder.textContent = 'Creando...';
+
+        const fd = new FormData();
+        fd.append('id_paciente', currentPacienteId);
+        fd.append('nombre', nombre);
+        if (desc) fd.append('descripcion', desc);
+
+        try {
+            const res = await fetch(BASE_URL + 'controllers/CarpetaController.php?action=crear', {
+                method: 'POST',
+                body: fd
+            });
+            const data = await res.json();
+            
+            if (data.success) {
+                const nueva = data.carpeta;
+                carpetasArr.unshift(nueva); // Añadir al inicio
+                
+                // Resetear form
+                document.getElementById('folder-name-input').value = '';
+                document.getElementById('folder-desc-input').value = '';
+                newFolderForm.classList.remove('open');
+                btnToggleNewFolder.style.display = 'inline-flex';
+                
+                showToast('Carpeta creada', 'success');
+                seleccionarCarpeta(nueva);
+            } else {
+                showToast(data.error || 'Error al crear carpeta', 'danger');
+            }
+        } catch (e) {
+            showToast('Error de conexión', 'danger');
+        } finally {
+            btnCreateFolder.disabled = false;
+            btnCreateFolder.textContent = 'Crear y seleccionar';
         }
     });
 
@@ -423,6 +666,29 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         y = Math.max(imgY + imgH + 8, barY0 + clases.length * 11 + 6);
+
+        // ── DIAGNÓSTICO MÉDICO ────────────────────────────────────────────────
+        if (a.diagnostico_medico) {
+            doc.setFillColor(248, 250, 255);
+            doc.setDrawColor(210, 220, 240);
+            
+            const diagLines = doc.splitTextToSize(a.diagnostico_medico, W - 32);
+            const diagH = diagLines.length * 4.5 + 14;
+            
+            doc.roundedRect(10, y, W - 20, diagH, 2, 2, 'FD');
+            
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(8);
+            doc.setTextColor(26, 86, 219);
+            doc.text('DIAGNÓSTICO Y OBSERVACIONES CLÍNICAS', 16, y + 7);
+            
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(9);
+            doc.setTextColor(30, 30, 40);
+            doc.text(diagLines, 16, y + 14);
+            
+            y += diagH + 8;
+        }
 
         // ── AVISO REFERENCIAL ─────────────────────────────────────────────────
         y += 4;

@@ -409,3 +409,218 @@ else [Datos válidos]
 end
 
 @enduml
+
+' ============================================================
+' RF-05: Procesar Análisis de Imagen Retinal (CU-05)
+' ============================================================
+@startuml RF05_SRS_AnalisisRetinal
+
+title RF-05: Procesar Análisis de Imagen Retinal [Diagrama de Secuencia SRS]
+
+actor "Médico Oftalmólogo" as Medico
+participant "Pantalla: Nuevo Análisis\n(views/medico/nuevoanalisis.php):\nFormulario de Análisis Retinal" as Vista
+participant "Control: Análisis\n(controllers/AnalisisController.php):\nGestión del Análisis" as Control
+participant "Control: Paciente\n(controllers/PacienteController.php):\nIdentificación de Paciente" as CtrlPac
+participant "Control: Carpeta\n(controllers/CarpetaController.php):\nGestión de Carpetas" as CtrlCarpeta
+entity "Modelo CNN\n(API Flask - EC2):\nMotor de Diagnóstico IA" as CNN
+entity "Entidad: Análisis\n(models/AnalisisModel.php):\nRegistro de Análisis" as EntAnalisis
+entity "Entidad: Paciente\n(models/PacienteModel.php):\nDatos del Paciente" as EntPac
+database "Base de Datos (Railway DB)" as BD
+
+box "Proceso de Análisis Retinal" #White
+    participant Medico
+    participant Vista
+    participant Control
+    participant CtrlPac
+    participant CtrlCarpeta
+    participant CNN
+    participant EntAnalisis
+    participant EntPac
+    participant BD
+end box
+
+== Paso 1: Cargar Retinografía ==
+
+Medico -> Vista : Accede a "Nuevo análisis" desde el menú lateral
+Vista --> Medico : Muestra la pantalla con el indicador de pasos\n(① Cargar imagen → ② Procesando → ③ Resultado)\ny el área de carga de imagen
+
+Medico -> Vista : Selecciona o arrastra la retinografía\n(formato JPG o PNG, máximo 10 MB)
+Vista -> Vista : Verifica formato y tamaño del archivo
+
+alt [Formato no válido (no es JPG ni PNG)]
+    Vista --> Medico : Muestra alerta:\n"Formato no permitido. Por favor sube\nuna imagen en formato JPG o PNG."
+else [Archivo demasiado grande (más de 10 MB)]
+    Vista --> Medico : Muestra alerta:\n"El archivo supera el tamaño máximo\npermitido de 10 MB."
+else [Archivo válido]
+    Vista -> Vista : Evalúa si la imagen tiene\nsuficiente nitidez y contraste
+
+    alt [Imagen con baja calidad]
+        Vista --> Medico : Muestra aviso en amarillo:\n"La imagen puede presentar baja calidad.\nLos resultados podrían ser menos precisos.\nPuede continuar el análisis."
+    end
+
+    Vista --> Medico : Muestra vista previa de la retinografía,\nel nombre del archivo y habilita el botón\n"Analizar imagen"
+end
+
+== Paso 2: Identificar al Paciente ==
+
+Medico -> Vista : Ingresa el DNI del paciente (ej. 71987400)\ny presiona "Buscar / registrar paciente"
+Vista -> CtrlPac : Envía el DNI para identificar al paciente
+CtrlPac -> CtrlPac : Verifica que el DNI tenga exactamente 8 dígitos numéricos
+
+alt [DNI inválido]
+    CtrlPac --> Vista : Informa que el DNI no tiene el formato correcto
+    Vista --> Medico : Muestra alerta: "Ingrese un DNI válido de 8 dígitos."
+else [DNI válido]
+    CtrlPac -> EntPac : Busca si el paciente ya está registrado en el sistema
+    EntPac -> BD : Consulta al paciente por su DNI
+    BD --> EntPac : Resultado de la búsqueda
+    EntPac --> CtrlPac : Datos del paciente o indicación de que no existe
+
+    alt [Paciente nuevo]
+        CtrlPac -> EntPac : Registra al nuevo paciente y le asigna un código de historial único
+        EntPac -> BD : Guarda al nuevo paciente con su código de historial
+        BD --> EntPac : Confirmación de registro
+        CtrlPac --> Vista : Confirma que el paciente fue registrado con su código de historial
+        Vista --> Medico : Muestra: "Paciente nuevo registrado. Código de historial asignado."
+    else [Paciente ya registrado]
+        CtrlPac --> Vista : Confirma que el paciente fue identificado correctamente
+        Vista --> Medico : Muestra: "Paciente identificado correctamente."
+    end
+
+    Vista --> Medico : Muestra la sección "Carpeta del análisis"\ncon las carpetas existentes del paciente
+end
+
+== Paso 3: Seleccionar Carpeta (Opcional) ==
+
+Medico -> Vista : Selecciona una carpeta existente,\ncrea una nueva o elige "Continuar sin seleccionar carpeta"
+
+alt [Crear nueva carpeta]
+    Vista -> CtrlCarpeta : Envía nombre y descripción de la nueva carpeta
+    CtrlCarpeta -> BD : Guarda la nueva carpeta asociada al médico y al paciente
+    BD --> CtrlCarpeta : Confirmación de creación
+    CtrlCarpeta --> Vista : Devuelve la carpeta recién creada
+    Vista --> Medico : Muestra la nueva carpeta como seleccionada
+end
+
+== Paso 4: Ejecutar el Análisis ==
+
+Medico -> Vista : Presiona "Analizar imagen"
+Vista --> Medico : Avanza al paso ② "Procesando" en el indicador de pasos\ncon un indicador visual de espera
+
+Vista -> Control : Envía la imagen y los datos del paciente y carpeta seleccionada
+
+Control -> CNN : Envía la imagen al modelo de inteligencia artificial\npara su análisis (tiempo límite: 30 segundos)
+
+alt [El modelo responde exitosamente]
+    CNN --> Control : Devuelve el diagnóstico: clase principal\ny porcentajes de probabilidad por categoría\n(Retinopatía Diabética, Glaucoma, Catarata, Normal)
+    Control --> Vista : Entrega los resultados al navegador
+    Vista --> Medico : Avanza al paso ③ "Resultado" y muestra:\n- Alerta en rojo si se detectó anomalía (ej. "Retinopatía Diabética —\n  Alta probabilidad de anomalía detectada")\n- Aviso en amarillo: "Este resultado es referencial.\n  No reemplaza el diagnóstico médico definitivo."\n- Barras de probabilidad por categoría\n- Campo para escribir el diagnóstico del médico\n- Botón "Guardar análisis"
+
+else [Tiempo de espera excedido]
+    CNN --> Control : Sin respuesta (tiempo agotado)
+    Control --> Vista : Informa el problema de tiempo
+    Vista --> Medico : Muestra aviso:\n"El análisis está tardando más de lo esperado.\nVerifique su conexión o intente nuevamente."
+
+else [Error interno en el modelo de IA]
+    CNN --> Control : Error en el procesamiento
+    Control --> Vista : Informa el error del modelo
+    Vista --> Medico : Muestra aviso:\n"No se pudo completar el análisis.\nPor favor intente nuevamente\no contacte al administrador."
+end
+
+== Paso 5: Guardar y Descargar Reporte ==
+
+Medico -> Vista : Escribe su diagnóstico clínico (opcional)\ny presiona "Guardar análisis"
+Vista -> Control : Envía todos los datos del análisis:\nresultados, diagnóstico médico, paciente y carpeta
+Control -> EntAnalisis : Registra el análisis completo en el sistema
+EntAnalisis -> BD : Guarda todos los datos del análisis incluyendo\nresultados de IA, datos del paciente, carpeta y diagnóstico médico
+BD --> EntAnalisis : Confirmación de guardado exitoso
+EntAnalisis --> Control : Confirma el registro con el identificador del análisis
+Control --> Vista : Análisis guardado correctamente
+Vista --> Medico : Muestra el botón "Descargar reporte PDF" habilitado\ny el botón "Nuevo análisis"
+
+Medico -> Vista : Presiona "Descargar reporte PDF"
+Vista --> Medico : Genera y descarga automáticamente el reporte PDF\ncon el diagnóstico, los resultados de IA y los datos del médico
+
+@enduml
+
+' ============================================================
+' RF-06: Gestionar Historial por Paciente (CU-06)
+' ============================================================
+@startuml RF06_SRS_GestionarHistorialPaciente
+
+title RF-06: Gestionar Historial por Paciente [Diagrama de Secuencia SRS]
+
+actor "Médico Oftalmólogo" as Medico
+participant "Pantalla: Historial de Pacientes\n(views/medico/pacientes.php):\nVista de Historial" as Vista
+participant "Control: Paciente\n(controllers/PacienteController.php):\nGestión de Historial" as Control
+participant "Control: Análisis\n(controllers/AnalisisController.php):\nDatos de Análisis para PDF" as CtrlAnalisis
+entity "Entidad: Paciente\n(models/PacienteModel.php):\nDatos del Paciente" as EntPac
+entity "Entidad: Carpeta\n(models/CarpetaModel.php):\nCarpetas de Análisis" as EntCarpeta
+database "Base de Datos (Railway DB)" as BD
+
+box "Proceso de Gestión del Historial" #White
+    participant Medico
+    participant Vista
+    participant Control
+    participant CtrlAnalisis
+    participant EntPac
+    participant EntCarpeta
+    participant BD
+end box
+
+== Cargar Lista de Pacientes ==
+
+Medico -> Vista : Accede al módulo "Historial de pacientes"\ndesde el menú lateral
+Vista -> Control : Solicita la lista de pacientes con análisis registrados\npara el médico en sesión
+Control -> EntPac : Obtiene todos los pacientes con análisis del médico
+EntPac -> BD : Consulta la lista de pacientes con sus estadísticas:\nDNI, código, número de carpetas, total de análisis,\nalertas activas y fecha del último análisis
+BD --> EntPac : Listado de pacientes con sus datos resumidos
+EntPac --> Control : Devuelve el listado completo
+Control --> Vista : Presenta la lista de pacientes
+
+alt [No hay pacientes con análisis registrados]
+    Vista --> Medico : Muestra mensaje:\n"No hay pacientes con análisis registrados."
+else [Hay pacientes registrados]
+    Vista --> Medico : Muestra las tarjetas de cada paciente con:\nCódigo de paciente, DNI, fecha del último análisis,\ncantidad de carpetas, total de análisis\ny badge de alertas si existen anomalías detectadas
+end
+
+== Buscar un Paciente ==
+
+Medico -> Vista : Escribe en la barra de búsqueda\nun DNI o código de paciente para filtrar
+Vista -> Vista : Filtra instantáneamente las tarjetas\nde pacientes que coincidan con el texto ingresado
+Vista --> Medico : Muestra solo las tarjetas de pacientes\nque coinciden con la búsqueda
+
+== Ver Detalle del Historial ==
+
+Medico -> Vista : Presiona "Ver detalle" en la tarjeta\nde un paciente específico
+Vista -> Control : Solicita el detalle completo del historial del paciente\nmediante una petición asíncrona (sin recargar la página)
+Control -> EntPac : Obtiene el detalle del paciente:\ncarpetas con sus análisis y análisis sin carpeta
+EntPac -> BD : Consulta todas las carpetas del paciente\nasociadas al médico y sus análisis contenidos
+BD --> EntPac : Datos de carpetas y análisis
+EntPac -> EntCarpeta : Solicita los análisis de cada carpeta\nordenados del más reciente al más antiguo
+EntCarpeta -> BD : Consulta análisis por carpeta ordenados cronológicamente
+BD --> EntCarpeta : Análisis con fecha, resultado y probabilidad
+
+alt [Error de conexión al cargar el detalle]
+    Control --> Vista : Informa que no se pudo obtener el historial
+    Vista --> Medico : Muestra: "Error al cargar el detalle."
+else [Historial cargado correctamente]
+    Control --> Vista : Devuelve el historial completo del paciente
+    Vista --> Medico : Despliega debajo de la tarjeta:\n- Carpetas del paciente (con cantidad de análisis por carpeta)\n- Sección "Análisis sin carpeta" (si existen análisis sin asignar)\n- Un campo de búsqueda para filtrar por nombre de carpeta
+end
+
+== Explorar una Carpeta ==
+
+Medico -> Vista : Hace clic en una carpeta específica
+Vista --> Medico : Expande la carpeta y muestra los análisis\nordedos del más reciente al más antiguo.\nCada análisis muestra:\n- Fecha y hora del análisis\n- Resultado principal (ej. Retinopatía Diabética)\n- Porcentaje de probabilidad\n- Indicador de alerta (Normal o Alerta en rojo)\n- Botón para descargar el reporte PDF
+
+== Descargar Reporte PDF de un Análisis ==
+
+Medico -> Vista : Presiona el botón "PDF" en uno de los análisis del historial
+Vista -> CtrlAnalisis : Solicita los datos completos del análisis seleccionado
+CtrlAnalisis -> BD : Obtiene todos los datos del análisis:\nresultados de IA, diagnóstico médico, imagen y datos del paciente
+BD --> CtrlAnalisis : Datos completos del análisis
+CtrlAnalisis --> Vista : Devuelve los datos listos para generar el PDF
+Vista --> Medico : Genera y descarga automáticamente el reporte PDF\ncon los datos del análisis, imagen de la retinografía,\nresultados de IA y diagnóstico del médico
+
+@enduml

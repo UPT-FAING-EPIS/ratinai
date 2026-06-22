@@ -542,4 +542,265 @@ endif
 
 |Super Administrador|
 stop
+@enduml
+
+' ============================================================
+' RF-05: Procesar Análisis de Imagen Retinal [Actividad SRS]
+' ============================================================
+@startuml RF05_Actividad_AnalisisRetinal
+
+title RF-05: Procesar Análisis de Imagen Retinal [Diagrama de Actividad SRS]
+
+|Médico Oftalmólogo|
+start
+:Accede a "Nuevo análisis" desde el menú lateral;
+
+|Vista: Nuevo Análisis\n(nuevoanalisis.php)|
+:Muestra pantalla con el indicador de pasos\n(① Cargar imagen → ② Procesando → ③ Resultado)\ny el área de carga de imagen;
+
+|Médico Oftalmólogo|
+:Selecciona o arrastra la retinografía\n(JPG o PNG, máximo 10 MB);
+
+|Vista: Nuevo Análisis\n(nuevoanalisis.php)|
+:Verifica el formato y tamaño del archivo;
+
+if (¿El archivo es JPG o PNG y pesa menos de 10 MB?) then (no)
+  :Muestra alerta de error\n(formato no válido o archivo muy grande);
+
+  |Médico Oftalmólogo|
+  :Selecciona otro archivo;
+  end
+
+else (sí)
+  |Vista: Nuevo Análisis\n(nuevoanalisis.php)|
+  :Evalúa la calidad de la imagen\n(nitidez y contraste);
+
+  if (¿La imagen tiene baja calidad?) then (sí)
+    :Muestra aviso amarillo:\n"La imagen puede presentar baja calidad.\nLos resultados podrían ser menos precisos.\nPuede continuar el análisis.";
+  else (no)
+  endif
+
+  :Muestra vista previa de la retinografía\ny habilita el botón "Analizar imagen";
+
+  |Médico Oftalmólogo|
+  :Ingresa el DNI del paciente\ny presiona "Buscar / registrar paciente";
+
+  |Control: Identificación de Paciente|
+  :Verifica que el DNI tenga\nexactamente 8 dígitos numéricos;
+
+  if (¿DNI inválido?) then (sí)
+    :Informa que el DNI no tiene\nel formato correcto;
+
+    |Vista: Nuevo Análisis\n(nuevoanalisis.php)|
+    :Muestra alerta de DNI inválido;
+
+    |Médico Oftalmólogo|
+    :Corrige el DNI ingresado;
+    end
+
+  else (no)
+    |Control: Identificación de Paciente|
+    :Busca al paciente en la base de datos\npor su número de DNI;
+
+    if (¿Es un paciente nuevo?) then (sí)
+      |Entidad: Paciente|
+      :Registra al nuevo paciente\ny le asigna un código de historial único;
+
+      |Base de Datos|
+      :Guarda el nuevo paciente\ncon su código de historial;
+
+      |Vista: Nuevo Análisis\n(nuevoanalisis.php)|
+      :Muestra: "Paciente nuevo registrado.\nCódigo de historial asignado."\ny despliega la sección de carpetas;
+
+    else (no — paciente ya registrado)
+      |Vista: Nuevo Análisis\n(nuevoanalisis.php)|
+      :Muestra: "Paciente identificado correctamente."\ny despliega la sección de carpetas\ncon las carpetas existentes del paciente;
+    endif
+
+    |Médico Oftalmólogo|
+    if (¿Qué acción elige con la carpeta?) then (Seleccionar existente)
+      :Selecciona una carpeta existente\nde la lista;
+    elseif (Crear nueva)
+      :Escribe el nombre\nde la nueva carpeta\ny presiona "Crear y seleccionar";
+
+      |Control: Gestión de Carpetas|
+      :Guarda la nueva carpeta\nasociada al médico y al paciente;
+
+      |Base de Datos|
+      :Registra la nueva carpeta;
+
+      |Vista: Nuevo Análisis\n(nuevoanalisis.php)|
+      :Muestra la nueva carpeta como seleccionada;
+    else (Continuar sin carpeta)
+    endif
+
+    |Médico Oftalmólogo|
+    :Presiona "Analizar imagen";
+
+    |Vista: Nuevo Análisis\n(nuevoanalisis.php)|
+    :Avanza al paso ② "Procesando"\ncon indicador visual de espera;
+
+    |Control: Análisis Retinal|
+    :Guarda la imagen en el servidor\ny la envía al modelo de inteligencia artificial\n(API Flask en servidor EC2);
+
+    |Modelo CNN (API Flask - EC2)|
+    :Procesa la retinografía\ny calcula las probabilidades\npor categoría;
+
+    note right
+      **Categorías evaluadas:**
+      - Retinopatía Diabética
+      - Glaucoma
+      - Catarata
+      - Normal
+    end note
+
+    if (¿El modelo respondió exitosamente?) then (no — error o tiempo agotado)
+      |Vista: Nuevo Análisis\n(nuevoanalisis.php)|
+      :Muestra aviso de error:\n"No se pudo completar el análisis.\nVerifique su conexión\no intente nuevamente.";
+
+      |Médico Oftalmólogo|
+      :Reintenta el análisis;
+      end
+
+    else (sí)
+      |Control: Análisis Retinal|
+      :Recibe los resultados: clase principal\ny probabilidades por categoría;
+
+      |Vista: Nuevo Análisis\n(nuevoanalisis.php)|
+      :Avanza al paso ③ "Resultado" y muestra:\n- Alerta en rojo si hay anomalía detectada\n- Barras de probabilidad por categoría\n- Aviso de carácter referencial del resultado\n- Campo para el diagnóstico médico\n- Botón "Guardar análisis";
+
+      |Médico Oftalmólogo|
+      :Revisa los resultados\ny escribe su diagnóstico (opcional);
+      :Presiona "Guardar análisis";
+
+      |Control: Análisis Retinal|
+      :Registra el análisis completo en el sistema\n(resultados, diagnóstico, paciente, carpeta);
+
+      |Entidad: Análisis|
+      :Guarda todos los datos del análisis;
+
+      |Base de Datos|
+      :Persiste el análisis;\n:Retorna confirmación;
+
+      |Vista: Nuevo Análisis\n(nuevoanalisis.php)|
+      :Muestra el botón "Descargar reporte PDF"\ny el botón "Nuevo análisis";
+
+      |Médico Oftalmólogo|
+      if (¿Desea descargar el reporte?) then (sí)
+        :Presiona "Descargar reporte PDF";
+
+        |Vista: Nuevo Análisis\n(nuevoanalisis.php)|
+        :Genera y descarga el reporte PDF\ncon los datos del análisis\ny el diagnóstico del médico;
+
+        |Médico Oftalmólogo|
+        :Recibe el reporte PDF;
+        end
+
+      else (no)
+        |Médico Oftalmólogo|
+        :Presiona "Nuevo análisis"\npara iniciar otro proceso;
+        end
+      endif
+
+    endif
+  endif
+endif
+
+@enduml
+
+' ============================================================
+' RF-06: Gestionar Historial por Paciente [Actividad SRS]
+' ============================================================
+@startuml RF06_Actividad_GestionarHistorialPaciente
+
+title RF-06: Gestionar Historial por Paciente [Diagrama de Actividad SRS]
+
+|Médico Oftalmólogo|
+start
+:Accede al módulo "Historial de pacientes"\ndesde el menú lateral;
+
+|Vista: Historial de Pacientes\n(pacientes.php)|
+:Consulta los pacientes del médico\ncon sus análisis registrados;
+
+|Control: Gestión de Historial|
+:Obtiene la lista de pacientes con sus estadísticas:\ncantidad de carpetas, total de análisis,\nalertas y fecha del último análisis;
+
+|Base de Datos|
+:Retorna la lista de pacientes\ncon sus datos resumidos;
+
+|Vista: Historial de Pacientes\n(pacientes.php)|
+
+if (¿Hay pacientes con análisis registrados?) then (no)
+  :Muestra mensaje:\n"No hay pacientes con análisis registrados.";
+
+  |Médico Oftalmólogo|
+  stop
+
+else (sí)
+  :Muestra las tarjetas de cada paciente con:\nCódigo, DNI, fecha del último análisis,\ncarpetas, total de análisis y alertas;
+
+  |Médico Oftalmólogo|
+  if (¿Desea buscar un paciente específico?) then (sí)
+    :Escribe el DNI o código del paciente\nen la barra de búsqueda;
+
+    |Vista: Historial de Pacientes\n(pacientes.php)|
+    :Filtra instantáneamente las tarjetas\nde pacientes que coincidan\ncon el texto ingresado;
+
+    |Médico Oftalmólogo|
+  else (no)
+  endif
+
+  :Presiona "Ver detalle" en la tarjeta\nde un paciente específico;
+
+  |Control: Gestión de Historial|
+  :Solicita el historial completo del paciente\nmediante una petición asíncrona\n(sin recargar la página);
+
+  |Entidad: Paciente|
+  :Obtiene todas las carpetas del paciente\nasociadas al médico\ny los análisis sin carpeta;
+
+  |Entidad: Carpeta|
+  :Obtiene los análisis de cada carpeta\nordenados del más reciente al más antiguo;
+
+  |Base de Datos|
+  :Retorna carpetas y análisis del paciente;
+
+  if (¿Error al cargar el historial?) then (sí)
+    |Vista: Historial de Pacientes\n(pacientes.php)|
+    :Muestra: "Error al cargar el detalle.";
+
+    |Médico Oftalmólogo|
+    stop
+
+  else (no)
+    |Vista: Historial de Pacientes\n(pacientes.php)|
+    :Despliega debajo de la tarjeta:\n- Carpetas del paciente con conteo de análisis\n- Sección "Análisis sin carpeta"\n- Campo de búsqueda por nombre de carpeta;
+
+    |Médico Oftalmólogo|
+    :Hace clic en una carpeta específica\npara expandirla;
+
+    |Vista: Historial de Pacientes\n(pacientes.php)|
+    :Expande la carpeta y muestra los análisis\nordenados del más reciente al más antiguo.\nCada análisis muestra: fecha, resultado,\nprobabilidad, indicador y botón PDF;
+
+    |Médico Oftalmólogo|
+    if (¿Desea descargar el reporte PDF\nde un análisis?) then (sí)
+      :Presiona el botón "PDF"\nen uno de los análisis;
+
+      |Control: Datos de Análisis para PDF|
+      :Obtiene todos los datos del análisis:\nresultados, diagnóstico, imagen\ny datos del paciente;
+
+      |Base de Datos|
+      :Retorna los datos completos del análisis;
+
+      |Vista: Historial de Pacientes\n(pacientes.php)|
+      :Genera y descarga el reporte PDF\ncon los datos del análisis,\nimagen de la retinografía\ny diagnóstico del médico;
+
+      |Médico Oftalmólogo|
+      :Recibe el reporte PDF;
+    else (no)
+    endif
+
+    stop
+  endif
+endif
+
 @enduml

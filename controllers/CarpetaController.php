@@ -9,10 +9,6 @@ class CarpetaController {
         $this->model = new CarpetaModel();
     }
 
-    /**
-     * Lista las carpetas de un paciente para el médico autenticado.
-     * POST: id_paciente
-     */
     public function listar() {
         header('Content-Type: application/json');
 

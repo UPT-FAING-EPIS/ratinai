@@ -837,3 +837,288 @@ else Datos válidos
 end
 
 @enduml
+
+
+' ============================================================
+' RF-05: Procesar Análisis de Imagen Retinal
+' ============================================================
+@startuml RF05_Diseno_AnalisisRetinal_v2
+title RF-05: Procesar Análisis de Imagen Retinal [Diseño SAD]
+
+skinparam backgroundColor #FFFFFF
+skinparam sequenceArrowThickness 1.5
+skinparam roundcorner 5
+skinparam ParticipantBackgroundColor #FFFFFF
+skinparam ParticipantBorderColor #000000
+skinparam ArrowColor #000000
+skinparam SequenceLifeLineBorderColor #888888
+
+actor "Médico Oftalmólogo" as MED
+
+boundary "views/medico/\nnuevoanalisis.php" as V
+boundary "assets/js/\nmedico_analisis.js" as JS
+control "controllers/\nAnalisisController.php\n::analizar()\n::registrar_final()" as C
+control "controllers/\nPacienteController.php\n::buscar_registrar()" as CP
+control "controllers/\nCarpetaController.php\n::listar()\n::crear()" as CC
+entity "models/\nAnalisisModel.php\n::registrarAnalisis()" as EA
+entity "models/\nPacienteModel.php\n::buscarPorDNI()\n::registrarPaciente()" as EP
+entity "models/\nCarpetaModel.php\n::listarPorPaciente()\n::crear()\n::obtenerPorId()" as ECarp
+entity "API Flask\n(EC2: 18.119.14.223:8000)\nPOST /api/analizar" as FLASK
+database "Railway DB\n(tablas: analisis,\npacientes, carpetas)" as BD
+
+== GET views/medico/nuevoanalisis.php ==
+
+MED -> V : HTTP GET nuevoanalisis.php
+V -> V : session_start()\nrequire_auth() — verifica $_SESSION['user_id']\nrequire_role('MED') — verifica $_SESSION['rol_codigo']\n$user = current_user()\n$base = get_base_path()
+V --> MED : HTTP 200 — Stepper (#step1 active)\nZona drag&drop #drop-zone\nInclye: <script src="assets/js/medico_analisis.js">
+
+== Paso 1: Carga y validación de la imagen (JavaScript cliente) ==
+
+MED -> JS : ondrop / onclick → #file-input.change\nFile seleccionado: retinografia.jpg|png
+JS -> JS : validateFile(file):\n  allowed = ['image/jpeg','image/png']\n  file.type ∈ allowed?\n  file.size <= 10 * 1024 * 1024?
+
+alt MIME no permitido
+    JS --> V : showError("Formato no permitido.\nPor favor sube una imagen JPG o PNG.")
+    V --> MED : Alerta roja visible — botón analyze-btn permanece disabled
+else Supera 10 MB
+    JS --> V : showError("El archivo supera el tamaño\nmáximo permitido de 10 MB.")
+    V --> MED : Alerta roja visible — botón analyze-btn permanece disabled
+else Archivo válido
+    JS -> JS : FileReader.readAsDataURL(file)\n→ preview-image-element.src = dataUrl\n→ file-name.textContent = file.name\n→ analyze-btn.disabled = false
+    JS --> V : Muestra #preview-area con imagen y nombre
+    V --> MED : Vista previa habilitada — botón "Analizar imagen" activo
+end
+
+== Paso 2: Identificación del paciente (AJAX fetch POST) ==
+
+MED -> JS : Ingresa DNI en #dni-input\ny hace clic en #btn-buscar-paciente
+JS -> CP : fetch(BASE_URL + 'controllers/PacienteController.php?action=buscar_registrar')\nPOST: { dni: "71987400" }\nContent-Type: application/x-www-form-urlencoded
+
+CP -> CP : $dni = trim($_POST['dni'])\nif (strlen($dni) !== 8 || !ctype_digit($dni)):
+
+alt DNI inválido
+    CP --> JS : json_encode(['success' => false, 'error' => 'DNI inválido'])
+    JS --> V : showError("Ingrese un DNI válido de 8 dígitos.")
+else DNI válido
+    CP -> EP : PacienteModel::buscarPorDNI($dni)
+    EP -> BD : SELECT id, dni, codigo_paciente\nFROM pacientes\nWHERE dni = ? LIMIT 1
+    BD --> EP : row / false
+    EP --> CP : $paciente / null
+
+    alt Paciente nuevo (null)
+        CP -> EP : PacienteModel::registrarPaciente($dni)
+        EP -> BD : INSERT INTO pacientes (dni, codigo_paciente)\nVALUES (?, CONCAT('PAC-', LPAD(id, 5, '0')))
+        BD --> EP : lastInsertId()
+        EP --> CP : $id
+        CP -> EP : PacienteModel::buscarPorDNI($dni)
+        EP --> CP : $paciente (con codigo_paciente)
+        CP --> JS : json_encode(['success' => true,\n  'paciente' => $paciente, 'nuevo' => true])
+        JS --> V : Muestra: "Paciente nuevo registrado."\nAlmacena window._pacienteId = id\nMuestra #carpeta-section con\nfetch carpetas vacío → folder-grid vacío
+    else Paciente ya registrado
+        CP --> JS : json_encode(['success' => true,\n  'paciente' => $paciente, 'nuevo' => false])
+        JS --> V : Muestra: "Paciente identificado correctamente."\nAlmacena window._pacienteId = id\nMuestra #carpeta-section\ny dispara carga de carpetas
+    end
+end
+
+== Paso 3: Carga y gestión de carpetas (AJAX) ==
+
+JS -> CC : fetch(BASE_URL + 'controllers/CarpetaController.php?action=listar')\nPOST: { id_paciente: _pacienteId }
+
+CC -> CC : checkSession()\n$id_paciente = (int)$_POST['id_paciente']\n$id_medico = (int)$_SESSION['user_id']
+CC -> ECarp : CarpetaModel::listarPorPaciente($id_paciente, $id_medico)
+ECarp -> BD : SELECT id, nombre, descripcion,\n  COUNT(a.id) AS total_analisis\nFROM carpetas c\nLEFT JOIN analisis a ON a.id_carpeta = c.id\nWHERE c.id_paciente = ? AND c.id_medico = ?\nGROUP BY c.id\nORDER BY c.nombre
+BD --> ECarp : rows[] / []
+ECarp --> CC : $carpetas[]
+CC --> JS : json_encode(['success' => true, 'carpetas' => $carpetas])
+JS --> V : Renderiza folder-grid con tarjetas\nde carpetas existentes del paciente
+
+alt Médico crea nueva carpeta
+    MED -> JS : Clic #btn-toggle-new-folder → abre #new-folder-form\nEscribe nombre en #folder-name-input\ny clic #btn-create-folder
+    JS -> CC : fetch(BASE_URL + 'controllers/CarpetaController.php?action=crear')\nPOST: { id_paciente, nombre, descripcion }
+    CC -> CC : checkSession()\nValida nombre not empty, strlen <= 100
+    CC -> ECarp : CarpetaModel::crear($id_paciente, $id_medico, $nombre, $descripcion)
+    ECarp -> BD : INSERT INTO carpetas\n(id_paciente, id_medico, nombre, descripcion)\nVALUES (?, ?, ?, ?)
+    BD --> ECarp : lastInsertId()
+    ECarp --> CC : $id_carpeta
+    CC -> ECarp : CarpetaModel::obtenerPorId($id_carpeta)
+    ECarp --> CC : $carpeta con datos
+    CC --> JS : json_encode(['success' => true, 'carpeta' => $carpeta])
+    JS --> V : Agrega tarjeta al folder-grid\ny la marca como seleccionada\n(window._carpetaId = carpeta.id)
+end
+
+alt Médico selecciona carpeta existente
+    MED -> JS : Clic en .folder-card de una carpeta
+    JS -> JS : toggleFolderCard(card)\n→ window._carpetaId = carpeta.id\n→ #carpeta-seleccionada-nombre.textContent = nombre
+    JS --> V : Marca carpeta con clase .selected\nMuestra #carpeta-seleccionada con nombre
+end
+
+== Paso 4: Ejecución del análisis (multipart/form-data) ==
+
+MED -> JS : Clic #analyze-btn "Analizar imagen"
+JS -> JS : updateStepper(2) — activa paso ②\nshowSpinner()
+JS -> C : fetch(BASE_URL + 'controllers/AnalisisController.php?action=analizar')\nPOST multipart/form-data:\n  imagen: File (binario retinografia)\n  dni_paciente: "71987400"\n  id_carpeta: 3 (o 0 si no se seleccionó)
+
+C -> C : if (!isset($_FILES['imagen']))\n  || $_FILES['imagen']['error'] !== UPLOAD_ERR_OK\nif (!in_array($ext, ['jpg','jpeg','png']))\nif ($file['size'] > 10 * 1024 * 1024)
+
+C -> C : $uploadDir = __DIR__.'/../assets/uploads/retinografias/'\n$filename = uniqid('retina_') . '.' . $ext\n$destPath = $uploadDir . $filename\nmove_uploaded_file($file['tmp_name'], $destPath)
+
+C -> FLASK : curl_init("http://18.119.14.223:8000/api/analizar")\ncurl_setopt CURLOPT_POST = true\ncurl_setopt CURLOPT_POSTFIELDS =\n  ['file' => new CURLFile($destPath)]\ncurl_setopt CURLOPT_TIMEOUT = 30
+
+alt HTTP 200 — respuesta válida del modelo
+    FLASK --> C : JSON {\n  "resultado_principal": "retinopatia_diabetica",\n  "probabilidad_principal": 55.62,\n  "probabilidades": {\n    "retinopatia_diabetica": 55.62,\n    "normal": 51.55,\n    "glaucoma": 0.26,\n    "catarata": 0.01\n  },\n  "alerta_anomalia": true\n}
+    C --> JS : json_encode(['success' => true,\n  'data' => $resJson,\n  'imagen_path' => $relPath])
+    JS -> JS : updateStepper(3) — activa paso ③\n→ renderResults(data)\n→ result-title: "Retinopatía Diabética"\n→ result-sub: "Alta probabilidad de anomalía"\n→ Barras de probabilidad actualizadas\n→ big-alert-danger visible\n→ #result-col.style.display = 'block'\n→ window._imagenPath = data.imagen_path\n→ window._resultData = data.data
+    JS --> V : Muestra panel de resultados con:\nalerta roja, barras, aviso referencial,\ncampo diagnóstico médico (#diagnostico-input)\ny botón #btn-save-final
+
+else cURL error / timeout
+    FLASK --> C : curl_error() !== '' || !$response
+    C --> JS : json_encode(['success' => false,\n  'error' => 'No se pudo completar el análisis...'])
+    JS --> V : showError("El análisis está tardando más\nde lo esperado. Verifique su\nconexión o intente nuevamente.")
+
+else HTTP 500 desde Flask
+    FLASK --> C : HTTP 500 — respuesta sin resultado_principal
+    C --> JS : json_encode(['success' => false,\n  'error' => 'Respuesta inválida del modelo CNN'])
+    JS --> V : showError("No se pudo completar el análisis.\nPor favor intente nuevamente\no contacte al administrador.")
+end
+
+== Paso 5: Guardar análisis final (POST registrar_final) ==
+
+MED -> JS : Escribe diagnóstico en #diagnostico-input\ny hace clic #btn-save-final
+JS -> C : fetch(BASE_URL + 'controllers/AnalisisController.php?action=registrar_final')\nPOST application/x-www-form-urlencoded:\n  dni_paciente, id_carpeta,\n  imagen_path, resultado_principal,\n  probabilidad_principal, probabilidad_normal,\n  probabilidad_diabetes, probabilidad_glaucoma,\n  probabilidad_catarata, alerta_anomalia,\n  es_referencial=1, diagnostico_medico
+
+C -> C : $id_medico = $_SESSION['user_id']\nVerifica id_carpeta pertenece al médico:\n  CarpetaModel::obtenerPorId($id_carpeta)\n  if ($carpeta['id_medico'] !== $id_medico): $id_carpeta = null
+C -> EA : AnalisisModel::registrarAnalisis([\n  'id_medico', 'id_paciente', 'id_carpeta',\n  'imagen_path', 'resultado_principal',\n  'probabilidad_principal', 'probabilidad_normal',\n  'probabilidad_diabetes', 'probabilidad_glaucoma',\n  'probabilidad_catarata', 'alerta_anomalia',\n  'es_referencial', 'diagnostico_medico'\n])
+EA -> BD : INSERT INTO analisis (\n  id_medico, id_paciente, id_carpeta,\n  imagen_path, resultado_principal,\n  probabilidad_principal, probabilidad_normal,\n  probabilidad_diabetes, probabilidad_glaucoma,\n  probabilidad_catarata, alerta_anomalia,\n  es_referencial, diagnostico_medico,\n  fecha_analisis\n) VALUES (?, ?, ?, ..., NOW())
+BD --> EA : INSERT OK — lastInsertId()
+EA --> C : $idAnalisis (int)
+C --> JS : json_encode(['success' => true, 'id_analisis' => $idAnalisis])
+JS --> V : Oculta #btn-save-final\nMuestra #btn-pdf (display: inline-flex)\nalmacena window._idAnalisis = idAnalisis
+
+== GET AnalisisController.php?action=datos_pdf ==
+
+MED -> JS : Clic #btn-pdf "Descargar reporte PDF"
+JS -> C : fetch(BASE_URL + 'controllers/AnalisisController.php?action=datos_pdf\n  &id_analisis=' + _idAnalisis)
+C -> EA : AnalisisModel::obtenerPorId($id_analisis, $id_medico)
+EA -> BD : SELECT a.*, u.nombre AS nombre_medico,\n  u.cmp AS cmp_medico, u.especialidad AS especialidad_medico,\n  p.dni AS dni_paciente, p.codigo_paciente\nFROM analisis a\nLEFT JOIN usuarios u ON u.id = a.id_medico\nLEFT JOIN pacientes p ON p.id = a.id_paciente\nWHERE a.id = ? AND a.id_medico = ?
+BD --> EA : row completo del análisis
+EA --> C : $analisis[]
+C -> C : $imagePath = __DIR__.'/../'.$analisis['imagen_path']\n$imageB64 = 'data:'.mime_content_type($imagePath)\n  .';base64,'.base64_encode(file_get_contents($imagePath))
+C --> JS : json_encode(['success' => true, 'analisis' => {..., 'imagen_b64' => $imageB64}])
+JS -> JS : generarPDF(analisis):\n  new jsPDF({unit:'mm', format:'a4'})\n  header azul, datos médico y paciente,\n  imagen retinografía incrustada,\n  resultado CNN, barras de probabilidad,\n  diagnóstico médico, pie referencial
+JS --> MED : doc.save('RetinAI_Reporte_' + id + '_' + fecha + '.pdf')\nDescarga automática del PDF en el navegador
+
+@enduml
+
+
+' ============================================================
+' RF-06: Gestionar Historial por Paciente
+' ============================================================
+@startuml RF06_Diseno_GestionarHistorial_v2
+title RF-06: Gestionar Historial por Paciente [Diseño SAD]
+
+skinparam backgroundColor #FFFFFF
+skinparam sequenceArrowThickness 1.5
+skinparam roundcorner 5
+skinparam ParticipantBackgroundColor #FFFFFF
+skinparam ParticipantBorderColor #000000
+skinparam ArrowColor #000000
+skinparam SequenceLifeLineBorderColor #888888
+
+actor "Médico Oftalmólogo" as MED
+
+boundary "views/medico/\npacientes.php" as V
+control "controllers/\nPacienteController.php\n::detalle_html()" as CP
+control "controllers/\nAnalisisController.php\n::datosPdf()" as CA
+entity "models/\nPacienteModel.php\n::listarPacientesConAnalisisMedico()\n::obtenerDetallePaciente()" as EP
+entity "models/\nCarpetaModel.php\n::obtenerAnalisisDeCarpeta()" as ECarp
+database "Railway DB\n(tablas: pacientes,\nanalisis, carpetas)" as BD
+
+== GET views/medico/pacientes.php ==
+
+MED -> V : HTTP GET pacientes.php
+V -> V : session_start()\nrequire_auth() — verifica $_SESSION['user_id']\nrequire_role('MED') — $_SESSION['rol_codigo'] === 'MED'\n$user = current_user()\n$base = get_base_path()
+
+V -> EP : PacienteModel::listarPacientesConAnalisisMedico($user['id'])
+EP -> BD : SELECT p.id, p.dni, p.codigo_paciente,\n  COUNT(DISTINCT c.id) AS total_carpetas,\n  COUNT(a.id) AS total_analisis,\n  SUM(a.alerta_anomalia) AS total_alertas,\n  MAX(a.fecha_analisis) AS ultimo_analisis\nFROM pacientes p\nINNER JOIN analisis a ON a.id_paciente = p.id\n  AND a.id_medico = :id_medico\nLEFT JOIN carpetas c ON c.id_paciente = p.id\n  AND c.id_medico = :id_medico\nGROUP BY p.id\nORDER BY MAX(a.fecha_analisis) DESC
+BD --> EP : $pacientes[] (PDO::FETCH_ASSOC)
+EP --> V : array $pacientes
+
+alt $pacientes vacío
+    V --> MED : HTTP 200 — Renderiza:\n<p class="text-muted">No hay pacientes con análisis registrados.</p>
+else $pacientes con datos
+    V --> MED : HTTP 200 — Renderiza .paciente-card[] con:\n  data-search="dni codigo_paciente"\n  #paciente-header onclick="toggleDetalle(id, this)"\n  .stat-badge: carpetas, análisis, alertas\n  .detalle-btn "Ver detalle ▼"\n  Incluye: <script>const BASE_URL = '...';</script>
+end
+
+== Filtro local por DNI/código ==
+
+MED -> V : Escribe en #hist-dni onkeyup="filterHistory()"
+V -> V : filterHistory():\n  term = hist-dni.value.toLowerCase()\n  .paciente-card[].forEach:\n    if item.dataset.search.includes(term):\n      item.style.display = 'block'\n    else:\n      item.style.display = 'none'
+V --> MED : Muestra solo tarjetas que coinciden\ncon el texto ingresado (filtro client-side)
+
+== Detalle asíncrono del historial (AJAX fetch GET) ==
+
+MED -> V : Clic en .paciente-header → toggleDetalle(id_paciente, this)
+V -> V : wrapper = #detalle-{id}\nif (wrapper.style.display === 'block'):\n  Oculta — return\nwrapper.style.display = 'block'\nbtn.textContent = 'Ocultar ▲'
+
+alt Ya fue cargado (cargados[id] === true)
+    V --> MED : Muestra el HTML ya cargado en memoria\n(no hace nueva petición al servidor)
+else Primera vez que se expande
+    V -> CP : fetch(BASE_URL + 'controllers/PacienteController.php?action=detalle_html\n  &id_paciente=' + id_paciente)\nHTTP GET — espera HTML en texto plano
+    CP -> CP : require_role('MED')\n$id_paciente = (int)$_GET['id_paciente']\n$id_medico = (int)$_SESSION['user_id']\nCP -> EP : PacienteModel::obtenerDetallePaciente($id_paciente, $id_medico)
+    EP -> BD : SELECT c.id, c.nombre,\n  COUNT(a.id) AS total_analisis\nFROM carpetas c\nLEFT JOIN analisis a ON a.id_carpeta = c.id\nWHERE c.id_paciente = ? AND c.id_medico = ?\nGROUP BY c.id ORDER BY c.nombre
+    BD --> EP : $carpetas[]
+
+    EP -> BD : SELECT id, resultado_principal,\n  probabilidad_principal, alerta_anomalia,\n  fecha_analisis\nFROM analisis\nWHERE id_paciente = ? AND id_medico = ?\n  AND id_carpeta IS NULL\nORDER BY fecha_analisis DESC
+    BD --> EP : $sin_carpeta[]
+    EP --> CP : ['carpetas' => $carpetas, 'sin_carpeta' => $sin_carpeta]
+
+    alt Sin carpetas y sin análisis
+        CP --> V : HTML: <p class="text-muted">No hay análisis para este paciente.</p>
+        V --> MED : Muestra mensaje dentro de la sección desplegable
+    else Con carpetas o análisis sin carpeta
+        loop foreach $carpetas as $c
+            CP -> ECarp : CarpetaModel::obtenerAnalisisDeCarpeta($c['id'], $id_medico)
+            ECarp -> BD : SELECT a.id, a.resultado_principal,\n  a.probabilidad_principal,\n  a.alerta_anomalia, a.fecha_analisis\nFROM analisis a\nWHERE a.id_carpeta = ? AND a.id_medico = ?\nORDER BY a.fecha_analisis DESC
+            BD --> ECarp : $analisis_carpeta[]
+            ECarp --> CP : $analisis_carpeta[]
+        end
+
+        CP --> V : ob_get_clean() — HTML renderizado con PHP:\n  <div class="paciente-detalle-container">\n    <input "Buscar carpeta..." onkeyup="filterFolders(this)">\n    foreach $carpetas:\n      <div class="carpeta-box">\n        📂 nombre + badge análisis\n        onclick="toggleAnalisis('folder-{id}')"\n        <div id="folder-{id}" style="display:none">\n          foreach $analisisCarpeta:\n            renderAnalisisRow($a)\n        </div>\n      </div>\n    if $sin_carpeta:\n      <div class="carpeta-box">\n        📁 "Análisis sin carpeta"\n        <div id="folder-none">\n          foreach $sin_carpeta: renderAnalisisRow($a)\n        </div>\n      </div>\n  </div>
+        V -> V : wrapper.innerHTML = html\ncargados[id_paciente] = true
+        V --> MED : Muestra la vista de historial con carpetas\ny sección "Análisis sin carpeta" si aplica
+
+    alt Error al cargar (fetch lanza excepción)
+        V -> V : catch(e): wrapper.innerHTML =\n  '<p class="text-danger">Error al cargar el detalle.</p>'
+        V --> MED : Muestra error dentro de la sección desplegable
+    end
+    end
+end
+
+== Expandir carpeta (JavaScript cliente) ==
+
+MED -> V : Clic en .carpeta-header onclick="toggleAnalisis('folder-{id}')"
+V -> V : toggleAnalisis(folderId):\n  div = document.getElementById(folderId)\n  div.style.display =\n    (div.style.display === 'none') ? 'block' : 'none'
+V --> MED : Expande o colapsa la lista de análisis de la carpeta.\nCada análisis muestra mediante renderAnalisisRow():\n  - Punto de color (rojo=alerta, verde=normal)\n  - resultado_principal · probabilidad_principal%\n  - fecha_analisis (d M Y H:i)\n  - Badge "Alerta" o "Normal"\n  - <button onclick="descargarPDF(id)">PDF</button>
+
+== Descarga de PDF desde el historial ==
+
+MED -> V : Clic en <button onclick="descargarPDF(id_analisis)">PDF</button>
+V -> CA : fetch(BASE_URL + 'controllers/AnalisisController.php?action=datos_pdf\n  &id_analisis=' + id_analisis)\nHTTP GET — espera JSON
+CA -> CA : require 'MED' session\n$id_analisis = (int)$_GET['id_analisis']\n$id_medico = (int)$_SESSION['user_id']
+CA -> BD : SELECT a.*, u.nombre AS nombre_medico,\n  u.cmp AS cmp_medico,\n  u.especialidad AS especialidad_medico,\n  p.dni AS dni_paciente,\n  p.codigo_paciente\nFROM analisis a\nLEFT JOIN usuarios u ON u.id = a.id_medico\nLEFT JOIN pacientes p ON p.id = a.id_paciente\nWHERE a.id = ? AND a.id_medico = ?
+BD --> CA : row (PDO::FETCH_ASSOC)
+CA -> CA : $imagePath = __DIR__.'/../'.$analisis['imagen_path']\nif (file_exists($imagePath)):\n  $mime = mime_content_type($imagePath)\n  $imageB64 = 'data:'.$mime.';base64,'\n    .base64_encode(file_get_contents($imagePath))
+
+alt Análisis no encontrado o no pertenece al médico
+    CA --> V : json_encode(['success' => false, 'error' => 'Análisis no encontrado'])
+    V -> V : showToast('Error', 'danger')
+    V --> MED : Toast de error visible 3 segundos
+else Análisis encontrado
+    CA --> V : json_encode(['success' => true, 'analisis' => {\n  id, nombre_medico, cmp_medico, especialidad_medico,\n  fecha_analisis, resultado_principal,\n  probabilidad_principal, probabilidad_normal,\n  probabilidad_diabetes, probabilidad_glaucoma,\n  probabilidad_catarata, alerta_anomalia,\n  diagnostico_medico, codigo_paciente,\n  dni_paciente, imagen_b64\n}])
+    V -> V : generarPDF(json.analisis):\n  new jsPDF({unit:'mm',format:'a4',orientation:'portrait'})\n  Header azul 30px: "RetinAI" + subtítulo\n  Bloque datos médico (nombre, CMP, especialidad)\n  Bloque fecha + código paciente + DNI\n  addImage(imagen_b64, 'JPEG', 14, y, 60, 55)\n  Badge resultado + barra de confianza\n  Barras de probabilidad x4 categorías\n  Bloque diagnóstico médico (si existe)\n  Disclaimer referencial en amarillo\n  Footer azul: "RetinAI" + fecha generación
+    V -> V : doc.save('RetinAI_Reporte_' + id + '_' + fechaFile + '.pdf')
+    V --> MED : Descarga automática del PDF en el navegador
+    V -> V : showToast('PDF descargado', 'success')
+end
+
+@enduml

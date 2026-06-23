@@ -373,179 +373,6 @@ end
 
 @enduml
 
-
-' ============================================================
-' RF-05: Cargar, Procesar y Presentar el Análisis de Imagen Retinal
-' ============================================================
-@startuml RF05_Diseno_AnalisisRetinal
-title RF-05: Análisis de Imagen Retinal [Diseño]
-
-skinparam backgroundColor #FFFFFF
-skinparam sequenceArrowThickness 1.5
-skinparam roundcorner 5
-skinparam ParticipantBackgroundColor #FFFFFF
-skinparam ParticipantBorderColor #000000
-skinparam ArrowColor #000000
-skinparam SequenceLifeLineBorderColor #888888
-
-actor "Médico Oftalmólogo" as MED
-
-boundary "views/analysis/\nupload.php" as V
-control "controllers/\nAnalysisController.php" as C
-control "services/\nImageValidator.php" as IV
-control "services/\nPdfReportService.php\n::generate()" as PDF
-entity "models/\nAnalysis.php" as E
-entity "Flask API\n(Railway)\nPOST /predict" as FLASK
-database "Railway DB\n(tabla: analyses)" as BD
-
-== POST /analysis/upload ==
-
-MED -> V : Sube imagen mediante\nmultipart/form-data\n(campo: retina_image)
-V -> C : AnalysisController::upload(\n  $_FILES['retina_image'],\n  $_SESSION['doctor_id']\n)
-
-C -> IV : ImageValidator::validate(\n  $file['tmp_name'],\n  $file['type'],\n  $file['size']\n)
-IV -> IV : Verifica MIME:\n  in_array($type,\n  ['image/jpeg','image/png'])\nVerifica tamaño:\n  $size <= 10 * 1024 * 1024
-
-alt MIME no permitido
-    IV --> C : return ['error' => 'formato_invalido']
-    C --> V : return error
-    V --> MED : HTTP 415 — "Formato no permitido.\nSuba una imagen JPG o PNG"
-else Supera 10 MB
-    IV --> C : return ['error' => 'tamano_excedido']
-    C --> V : return error
-    V --> MED : HTTP 413 — "El archivo supera\nel tamaño máximo de 10 MB"
-else Archivo válido
-    IV -> IV : ImageQualityChecker::\n  analyze($file['tmp_name'])\n' Evalúa contraste y nitidez
-    IV --> C : return [\n  'valid' => true,\n  'low_quality' => bool\n]
-
-    alt low_quality === true
-        C --> V : return ['warning' =>\n  'baja_calidad']
-        V --> MED : HTTP 200 — Aviso amarillo:\n"La imagen puede presentar\nbaja calidad"
-    end
-
-    V --> MED : HTTP 200 — Muestra\nvista previa con nombre,\ntamaño y botón "Analizar imagen"
-
-    == POST /analysis/process ==
-
-    MED -> V : Presiona "Analizar imagen"
-    V -> C : AnalysisController::process(\n  $tmpPath,\n  $_SESSION['doctor_id'],\n  $patientHistoryId\n)
-    V --> MED : HTTP 200 — Spinner:\n"Procesando imagen…"
-
-    C -> FLASK : HTTP POST https://flask-api.railway.app/predict\nContent-Type: multipart/form-data\nbody: { image: $imageData }\n' Timeout configurado: 10 seg
-
-    alt HTTP 200 en menos de 5 seg
-        FLASK --> C : JSON {\n  "predicted_class": "retinopatia_diabetica",\n  "probabilities": {\n    "normal": 0.05,\n    "retinopatia_diabetica": 0.82,\n    "glaucoma": 0.08,\n    "catarata": 0.05\n  }\n}
-        C -> E : Analysis::create([\n  'doctor_id'         => $doctorId,\n  'patient_history_id'=> $historyId,\n  'predicted_class'   => $class,\n  'prob_normal'       => 0.05,\n  'prob_retinopatia'  => 0.82,\n  'prob_glaucoma'     => 0.08,\n  'prob_catarata'     => 0.05,\n  'image_path'        => $storedPath,\n  'created_at'        => now()\n])
-        E -> BD : INSERT INTO analyses\n(doctor_id, patient_history_id,\npredicted_class, prob_normal,\nprob_retinopatia, prob_glaucoma,\nprob_catarata, image_path,\ncreated_at)\nVALUES (?,?,?,?,?,?,?,?,NOW())
-        BD --> E : INSERT OK — lastInsertId()
-        E --> C : $analysisId
-        C --> V : return [\n  'analysis_id'    => $analysisId,\n  'predicted_class'=> $class,\n  'probabilities'  => [...]\n]
-        V --> MED : HTTP 200 — Muestra:\n- Clase principal + porcentaje\n- Barras de probabilidad\n- Alerta roja si prob > umbral\n- Advertencia clínica\n- Botón "Descargar reporte PDF"
-
-    else Timeout (> 10 seg) o HTTP 504
-        FLASK --> C : cURL error / timeout
-        C --> V : return ['error' =>\n  'timeout_modelo']
-        V --> MED : HTTP 200 — "El análisis está\ntardando más de lo esperado.\nVerifique su conexión\no intente nuevamente"
-
-    else HTTP 500 desde Flask
-        FLASK --> C : HTTP 500
-        C --> V : return ['error' =>\n  'fallo_modelo']
-        V --> MED : HTTP 200 — "No se pudo completar\nel análisis. Intente nuevamente\no contacte al administrador"
-    end
-
-    == GET /analysis/{id}/report ==
-
-    MED -> V : Presiona "Descargar reporte PDF"
-    V -> C : AnalysisController::downloadReport(\n  $analysisId\n)
-    C -> PDF : PdfReportService::generate([\n  'doctor_nombre'  => $_SESSION['nombre'],\n  'fecha'          => date('d/m/Y H:i'),\n  'image_path'     => $storedPath,\n  'predicted_class'=> $class,\n  'probabilities'  => [...],\n  'disclaimer'     => CLINICAL_DISCLAIMER\n])
-    PDF --> C : $pdfBinary (TCPDF / FPDF)
-    C --> V : header('Content-Type:\n  application/pdf')\nheader('Content-Disposition:\n  attachment;\n  filename="reporte_retinai.pdf"')
-    V --> MED : HTTP 200 — Descarga\nautomática del PDF
-
-    C -> C : AnalysisController::\n  enableNewAnalysis()\n' Limpia estado en sesión
-    C --> V : return ['ready' => true]
-    V --> MED : Muestra botón "Nuevo análisis"
-end
-
-@enduml
-
-
-' ============================================================
-' RF-06: Gestionar Historial por Paciente
-' ============================================================
-@startuml RF06_Diseno_GestionarHistorial
-title RF-06: Gestionar Historial por Paciente [Diseño]
-
-skinparam backgroundColor #FFFFFF
-skinparam sequenceArrowThickness 1.5
-skinparam roundcorner 5
-skinparam ParticipantBackgroundColor #FFFFFF
-skinparam ParticipantBorderColor #000000
-skinparam ArrowColor #000000
-skinparam SequenceLifeLineBorderColor #888888
-
-actor "Médico" as MED
-
-boundary "views/analysis/\nupload.php" as V
-control "controllers/\nPatientController.php" as C
-entity "models/\nPatient.php" as EP
-entity "models/\nAnalysis.php" as EA
-database "Railway DB\n(tablas: patients,\nanalyses)" as BD
-
-== POST /patients/identify ==
-
-MED -> V : Ingresa DNI antes\nde confirmar análisis\nPOST: dni
-V -> C : PatientController::identifyByDni(\n  $dni\n)
-
-C -> C : Validator::regex(\n  $dni, '/^\d{8}$/'\n)
-
-alt DNI no tiene 8 dígitos numéricos
-    C --> V : return ['error' =>\n  'dni_invalido']
-    V --> MED : HTTP 422 — "Ingrese un DNI\nválido de 8 dígitos"
-else DNI válido
-    C -> EP : Patient::findByDni($dni)
-    EP -> BD : SELECT id, history_code\nFROM patients\nWHERE dni = ? LIMIT 1
-    BD --> EP : row / null
-    EP --> C : $patient / null
-
-    alt Paciente nuevo (null)
-        C -> C : $historyCode =\n  strtoupper(substr(\n    str_replace('-','',\n    Uuid::uuid4()), 0, 10\n  ))\n' Ej: "A3F9B1C2D7"
-        C -> EP : Patient::create([\n  'dni'          => $dni,\n  'history_code' => $historyCode,\n  'created_at'   => now()\n])
-        EP -> BD : INSERT INTO patients\n(dni, history_code, created_at)\nVALUES (?, ?, NOW())
-        BD --> EP : INSERT OK
-        EP --> C : $historyCode
-        C --> V : return [\n  'new_patient' => true,\n  'history_code'=> $historyCode\n]
-        V --> MED : HTTP 201 — "Código de historial\nasignado al paciente:\n[CÓDIGO]"
-    else Paciente ya registrado
-        C --> V : return [\n  'new_patient'  => false,\n  'history_code' => $patient['history_code']\n]
-        V --> MED : HTTP 200 — "Paciente\nidentificado correctamente"
-    end
-
-    == GET /patients/history?code={history_code} ==
-
-    MED -> V : Ingresa código de historial
-    V -> C : PatientController::getHistory(\n  $historyCode\n)
-    C -> EP : Patient::findByHistoryCode(\n  $historyCode\n)
-    EP -> BD : SELECT id FROM patients\nWHERE history_code = ? LIMIT 1
-    BD --> EP : row / null
-    EP --> C : $patientId / null
-
-    alt Código no encontrado
-        C --> V : return ['error' =>\n  'historial_no_encontrado']
-        V --> MED : HTTP 404 — "No se encontró historial\ncon el código ingresado.\nVerifique el código o\nrecupérelo por DNI"
-    else Código encontrado
-        C -> EA : Analysis::findByPatient(\n  $patientId\n)
-        EA -> BD : SELECT id, predicted_class,\ncreated_at\nFROM analyses\nWHERE patient_history_id=?\nORDER BY created_at DESC
-        BD --> EA : rows[]
-        EA --> C : $analyses[]
-        C --> V : return ['analyses' => $analyses]
-        V --> MED : HTTP 200 — Lista de análisis\ncon fecha, hora, resultado\ny enlace "Ver detalle"
-    end
-end
-
-@enduml
-
-
 ' ============================================================
 ' RF-07: Recuperar Código de Historial por DNI
 ' ============================================================
@@ -855,22 +682,31 @@ skinparam SequenceLifeLineBorderColor #888888
 
 actor "Médico Oftalmólogo" as MED
 
-boundary "views/medico/\nnuevoanalisis.php" as V
-boundary "assets/js/\nmedico_analisis.js" as JS
-control "controllers/\nAnalisisController.php\n::analizar()\n::registrar_final()" as C
-control "controllers/\nPacienteController.php\n::buscar_registrar()" as CP
-control "controllers/\nCarpetaController.php\n::listar()\n::crear()" as CC
-entity "models/\nAnalisisModel.php\n::registrarAnalisis()" as EA
-entity "models/\nPacienteModel.php\n::buscarPorDNI()\n::registrarPaciente()" as EP
-entity "models/\nCarpetaModel.php\n::listarPorPaciente()\n::crear()\n::obtenerPorId()" as ECarp
-entity "API Flask\n(EC2: 18.119.14.223:8000)\nPOST /api/analizar" as FLASK
-database "Railway DB\n(tablas: analisis,\npacientes, carpetas)" as BD
+boundary "views/medico/nuevoanalisis.php" as V
+boundary "assets/js/medico_analisis.js" as JS
+control "controllers/AnalisisController.php" as C
+control "controllers/PacienteController.php" as CP
+control "controllers/CarpetaController.php" as CC
+entity "models/AnalisisModel.php" as EA
+entity "models/PacienteModel.php" as EP
+entity "models/CarpetaModel.php" as ECarp
+entity "API Flask (EC2)" as FLASK
+database "Railway DB" as BD
 
 == GET views/medico/nuevoanalisis.php ==
 
 MED -> V : HTTP GET nuevoanalisis.php
-V -> V : session_start()\nrequire_auth() — verifica $_SESSION['user_id']\nrequire_role('MED') — verifica $_SESSION['rol_codigo']\n$user = current_user()\n$base = get_base_path()
-V --> MED : HTTP 200 — Stepper (#step1 active)\nZona drag&drop #drop-zone\nInclye: <script src="assets/js/medico_analisis.js">
+V -> V : session_start(), require_auth(), require_role('MED')
+note right of V
+  **UI (Inputs y Botones):**
+  - #file-input, #drop-zone
+  - #dni-input, #btn-buscar-paciente
+  - #folder-name-input, #btn-create-folder
+  - #analyze-btn
+  - #diagnostico-input, #btn-save-final
+  - #btn-pdf
+end note
+V --> MED : Renderiza vista y carga JS
 
 == Paso 1: Carga y validación de la imagen (JavaScript cliente) ==
 
@@ -892,7 +728,11 @@ end
 == Paso 2: Identificación del paciente (AJAX fetch POST) ==
 
 MED -> JS : Ingresa DNI en #dni-input\ny hace clic en #btn-buscar-paciente
-JS -> CP : fetch(BASE_URL + 'controllers/PacienteController.php?action=buscar_registrar')\nPOST: { dni: "71987400" }\nContent-Type: application/x-www-form-urlencoded
+JS -> CP : fetch('PacienteController.php?action=buscar_registrar')
+note right of CP
+  **Método:** PacienteController::buscar_registrar()
+  Valida DNI (8 dígitos)
+end note
 
 CP -> CP : $dni = trim($_POST['dni'])\nif (strlen($dni) !== 8 || !ctype_digit($dni)):
 
@@ -954,9 +794,14 @@ end
 
 == Paso 4: Ejecución del análisis (multipart/form-data) ==
 
-MED -> JS : Clic #analyze-btn "Analizar imagen"
-JS -> JS : updateStepper(2) — activa paso ②\nshowSpinner()
-JS -> C : fetch(BASE_URL + 'controllers/AnalisisController.php?action=analizar')\nPOST multipart/form-data:\n  imagen: File (binario retinografia)\n  dni_paciente: "71987400"\n  id_carpeta: 3 (o 0 si no se seleccionó)
+MED -> JS : Clic #analyze-btn
+JS -> JS : updateStepper(2), showSpinner()
+JS -> C : fetch('AnalisisController.php?action=analizar')
+note right of C
+  **Método:** AnalisisController::analizar()
+  Recibe: $_FILES['imagen'], $_POST['dni_paciente']
+  Mueve archivo a /assets/uploads/retinografias/
+end note
 
 C -> C : if (!isset($_FILES['imagen']))\n  || $_FILES['imagen']['error'] !== UPLOAD_ERR_OK\nif (!in_array($ext, ['jpg','jpeg','png']))\nif ($file['size'] > 10 * 1024 * 1024)
 
@@ -984,7 +829,12 @@ end
 == Paso 5: Guardar análisis final (POST registrar_final) ==
 
 MED -> JS : Escribe diagnóstico en #diagnostico-input\ny hace clic #btn-save-final
-JS -> C : fetch(BASE_URL + 'controllers/AnalisisController.php?action=registrar_final')\nPOST application/x-www-form-urlencoded:\n  dni_paciente, id_carpeta,\n  imagen_path, resultado_principal,\n  probabilidad_principal, probabilidad_normal,\n  probabilidad_diabetes, probabilidad_glaucoma,\n  probabilidad_catarata, alerta_anomalia,\n  es_referencial=1, diagnostico_medico
+JS -> C : fetch('AnalisisController.php?action=registrar_final')
+note right of C
+  **Método:** AnalisisController::registrar_final()
+  Recibe: imagen_path, resultado_principal,
+  probabilidades, alerta_anomalia, diagnostico_medico
+end note
 
 C -> C : $id_medico = $_SESSION['user_id']\nVerifica id_carpeta pertenece al médico:\n  CarpetaModel::obtenerPorId($id_carpeta)\n  if ($carpeta['id_medico'] !== $id_medico): $id_carpeta = null
 C -> EA : AnalisisModel::registrarAnalisis([\n  'id_medico', 'id_paciente', 'id_carpeta',\n  'imagen_path', 'resultado_principal',\n  'probabilidad_principal', 'probabilidad_normal',\n  'probabilidad_diabetes', 'probabilidad_glaucoma',\n  'probabilidad_catarata', 'alerta_anomalia',\n  'es_referencial', 'diagnostico_medico'\n])
@@ -1026,17 +876,24 @@ skinparam SequenceLifeLineBorderColor #888888
 
 actor "Médico Oftalmólogo" as MED
 
-boundary "views/medico/\npacientes.php" as V
-control "controllers/\nPacienteController.php\n::detalle_html()" as CP
-control "controllers/\nAnalisisController.php\n::datosPdf()" as CA
-entity "models/\nPacienteModel.php\n::listarPacientesConAnalisisMedico()\n::obtenerDetallePaciente()" as EP
-entity "models/\nCarpetaModel.php\n::obtenerAnalisisDeCarpeta()" as ECarp
-database "Railway DB\n(tablas: pacientes,\nanalisis, carpetas)" as BD
+boundary "views/medico/pacientes.php" as V
+control "controllers/PacienteController.php" as CP
+control "controllers/AnalisisController.php" as CA
+entity "models/PacienteModel.php" as EP
+entity "models/CarpetaModel.php" as ECarp
+database "Railway DB" as BD
 
 == GET views/medico/pacientes.php ==
 
 MED -> V : HTTP GET pacientes.php
-V -> V : session_start()\nrequire_auth() — verifica $_SESSION['user_id']\nrequire_role('MED') — $_SESSION['rol_codigo'] === 'MED'\n$user = current_user()\n$base = get_base_path()
+V -> V : session_start(), require_auth()
+note right of V
+  **UI (Inputs y Botones):**
+  - #hist-dni (input de filtro)
+  - .paciente-card (tarjeta por paciente)
+  - .detalle-btn (botón ver historial)
+  - <button onclick="descargarPDF(id)">PDF</button>
+end note
 
 V -> EP : PacienteModel::listarPacientesConAnalisisMedico($user['id'])
 EP -> BD : SELECT p.id, p.dni, p.codigo_paciente,\n  COUNT(DISTINCT c.id) AS total_carpetas,\n  COUNT(a.id) AS total_analisis,\n  SUM(a.alerta_anomalia) AS total_alertas,\n  MAX(a.fecha_analisis) AS ultimo_analisis\nFROM pacientes p\nINNER JOIN analisis a ON a.id_paciente = p.id\n  AND a.id_medico = :id_medico\nLEFT JOIN carpetas c ON c.id_paciente = p.id\n  AND c.id_medico = :id_medico\nGROUP BY p.id\nORDER BY MAX(a.fecha_analisis) DESC
@@ -1063,8 +920,13 @@ V -> V : wrapper = #detalle-{id}\nif (wrapper.style.display === 'block'):\n  Ocu
 alt Ya fue cargado (cargados[id] === true)
     V --> MED : Muestra el HTML ya cargado en memoria\n(no hace nueva petición al servidor)
 else Primera vez que se expande
-    V -> CP : fetch(BASE_URL + 'controllers/PacienteController.php?action=detalle_html\n  &id_paciente=' + id_paciente)\nHTTP GET — espera HTML en texto plano
-    CP -> CP : require_role('MED')\n$id_paciente = (int)$_GET['id_paciente']\n$id_medico = (int)$_SESSION['user_id']\nCP -> EP : PacienteModel::obtenerDetallePaciente($id_paciente, $id_medico)
+    V -> CP : fetch('PacienteController.php?action=detalle_html&id_paciente=X')
+    note right of CP
+      **Método:** PacienteController::detalle_html()
+      Genera y retorna HTML puro (ob_start / ob_get_clean)
+      usando renderAnalisisRow($analisis)
+    end note
+    CP -> EP : PacienteModel::obtenerDetallePaciente($id_paciente, $id_medico)
     EP -> BD : SELECT c.id, c.nombre,\n  COUNT(a.id) AS total_analisis\nFROM carpetas c\nLEFT JOIN analisis a ON a.id_carpeta = c.id\nWHERE c.id_paciente = ? AND c.id_medico = ?\nGROUP BY c.id ORDER BY c.nombre
     BD --> EP : $carpetas[]
 
@@ -1103,8 +965,12 @@ V --> MED : Expande o colapsa la lista de análisis de la carpeta.\nCada anális
 == Descarga de PDF desde el historial ==
 
 MED -> V : Clic en <button onclick="descargarPDF(id_analisis)">PDF</button>
-V -> CA : fetch(BASE_URL + 'controllers/AnalisisController.php?action=datos_pdf\n  &id_analisis=' + id_analisis)\nHTTP GET — espera JSON
-CA -> CA : require 'MED' session\n$id_analisis = (int)$_GET['id_analisis']\n$id_medico = (int)$_SESSION['user_id']
+V -> CA : fetch('AnalisisController.php?action=datos_pdf&id_analisis=X')
+note right of CA
+  **Método:** AnalisisController::datosPdf()
+  Codifica la imagen a Base64
+end note
+CA -> CA : Valida sesión y obtiene $id_analisis
 CA -> BD : SELECT a.*, u.nombre AS nombre_medico,\n  u.cmp AS cmp_medico,\n  u.especialidad AS especialidad_medico,\n  p.dni AS dni_paciente,\n  p.codigo_paciente\nFROM analisis a\nLEFT JOIN usuarios u ON u.id = a.id_medico\nLEFT JOIN pacientes p ON p.id = a.id_paciente\nWHERE a.id = ? AND a.id_medico = ?
 BD --> CA : row (PDO::FETCH_ASSOC)
 CA -> CA : $imagePath = __DIR__.'/../'.$analisis['imagen_path']\nif (file_exists($imagePath)):\n  $mime = mime_content_type($imagePath)\n  $imageB64 = 'data:'.$mime.';base64,'\n    .base64_encode(file_get_contents($imagePath))

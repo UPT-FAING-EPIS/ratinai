@@ -16,7 +16,7 @@ describe('RF-06: Gestión de Historial de Pacientes', () => {
     it('Verifica el historial completo del paciente (flujo principal)', () => {
         // 1. Login con el médico
         cy.visit(LOGIN_URL);
-        cy.get('#email').type('victoraprendiendocon');
+        cy.get('#email').type('victoraprendiendocon@gmail.com');
         cy.get('#password').type('admin123');
         cy.get('#login-form').submit();
 
@@ -25,7 +25,7 @@ describe('RF-06: Gestión de Historial de Pacientes', () => {
 
         // 3. Buscar al paciente por DNI
         cy.get('#hist-dni').type('76352371');
-        
+
         // 4. Debe aparecer la tarjeta y darle clic al header para expandir
         cy.get('.paciente-card').contains('76352371').parents('.paciente-card').within(() => {
             cy.get('.paciente-header').click();
@@ -34,14 +34,21 @@ describe('RF-06: Gestión de Historial de Pacientes', () => {
         // 5. Expandir la carpeta específica "Testeos - Glaucoma"
         // Aseguramos que el contenedor asíncrono se hace visible
         cy.get('.paciente-detalle-wrapper', { timeout: 10000 }).should('be.visible');
+        
+        cy.get('input[placeholder="Buscar carpeta..."]').type('Testeos - Glaucoma');
+
         cy.contains('.carpeta-box', 'Testeos - Glaucoma').within(() => {
             cy.get('.carpeta-header').click();
-            
+
             // 6. Verificar el análisis y el porcentaje ("Catarata · 93.1%")
             cy.contains('Catarata · 93.1%').should('be.visible');
-            
-            // 7. El botón PDF debe estar presente
-            cy.contains('button', 'PDF').should('be.visible');
+
+            // 7. El botón PDF debe estar presente y se hace clic en él
+            cy.contains('Catarata · 93.1%')
+              .closest('.flex')
+              .find('button')
+              .should('be.visible')
+              .click();
         });
     });
 });

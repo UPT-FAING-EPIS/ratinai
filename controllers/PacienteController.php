@@ -108,6 +108,59 @@ class PacienteController {
         echo ob_get_clean();
     }
 
+    public function recuperar_codigo_historial() {
+        header('Content-Type: application/json');
+
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            echo json_encode(['success' => false, 'error' => 'Método no permitido']);
+            return;
+        }
+
+        if (!isset($_SESSION['user_id']) || $_SESSION['rol_codigo'] !== 'MED') {
+            echo json_encode([
+                'success' => false,
+                'error'   => 'Su sesión expiró por inactividad. Por favor ingrese nuevamente.',
+                'expired' => true
+            ]);
+            return;
+        }
+
+        $dni = trim($_POST['dni'] ?? '');
+        if (strlen($dni) !== 8 || !ctype_digit($dni)) {
+            echo json_encode([
+                'success' => false,
+                'error'   => 'El DNI debe contener exactamente 8 dígitos numéricos.'
+            ]);
+            return;
+        }
+
+        try {
+            $paciente = $this->model->recuperarCodigoHistorialPorDNI($dni, (int)$_SESSION['user_id']);
+            if (!$paciente) {
+                echo json_encode([
+                    'success' => false,
+                    'error'   => 'No se encontró un paciente registrado con ese DNI en su historial.'
+                ]);
+                return;
+            }
+
+            echo json_encode([
+                'success' => true,
+                'paciente' => [
+                    'id'              => (int)$paciente['id'],
+                    'dni'             => $paciente['dni'],
+                    'codigo_paciente' => $paciente['codigo_paciente']
+                ],
+                'message' => 'El código de historial de este paciente es: ' . $paciente['codigo_paciente']
+            ]);
+        } catch (Exception $e) {
+            echo json_encode([
+                'success' => false,
+                'error'   => 'No se pudo realizar la búsqueda en este momento. Intente nuevamente.'
+            ]);
+        }
+    }
+
     private function renderAnalisisRow($a) {
         $color = 'var(--success)';
         $badge = 'badge-active';
@@ -139,5 +192,6 @@ if (isset($_GET['action'])) {
     switch ($_GET['action']) {
         case 'buscar_registrar': $controller->buscar_registrar(); break;
         case 'detalle_html':     $controller->detalle_html(); break;
+        case 'recuperar_codigo': $controller->recuperar_codigo_historial(); break;
     }
 }

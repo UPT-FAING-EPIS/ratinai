@@ -22,6 +22,28 @@ class PacienteModel {
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
+    /**
+     * Recupera el codigo unico de historial de un paciente por DNI, validando
+     * que exista al menos un analisis asociado al medico en sesion.
+     */
+    public function recuperarCodigoHistorialPorDNI($dni, $id_medico) {
+        $stmt = $this->db->prepare("
+            SELECT DISTINCT
+                p.id,
+                p.dni,
+                p.codigo_paciente
+            FROM pacientes p
+            INNER JOIN analisis_retinales a ON a.id_paciente = p.id
+            WHERE p.dni = :dni
+              AND a.id_medico = :id_medico
+            LIMIT 1
+        ");
+        $stmt->bindParam(':dni', $dni);
+        $stmt->bindParam(':id_medico', $id_medico, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+
     public function registrarPaciente($dni) {
         $codigo = 'PAC-' . str_pad(mt_rand(1, 99999), 5, '0', STR_PAD_LEFT);
         

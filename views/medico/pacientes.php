@@ -84,6 +84,15 @@ $pacientes = $pacienteModel->listarPacientesConAnalisisMedico($user['id']);
     border-top: 1px dashed var(--border);
     padding-top: 12px;
 }
+.recovery-result {
+    display: none;
+    margin-top: 12px;
+}
+.history-code {
+    font-family: "DM Mono", monospace;
+    font-weight: 700;
+    letter-spacing: .02em;
+}
 </style>
 <script>const BASE_URL = '<?= $base ?>';</script>
 </head>
@@ -105,6 +114,15 @@ $pacientes = $pacienteModel->listarPacientesConAnalisisMedico($user['id']);
             <div class="flex gap-8">
                 <input class="form-input-d" style="flex:1" type="text" id="hist-dni" placeholder="Buscar por DNI o código de paciente..." onkeyup="filterHistory()">
             </div>
+        </div>
+
+        <div class="card mb-16">
+            <div class="card-title">Recuperar código de historial por DNI</div>
+            <div class="flex gap-8">
+                <input class="form-input-d" style="flex:1" type="text" id="recover-dni" placeholder="Ingrese DNI de 8 dígitos" maxlength="8" inputmode="numeric">
+                <button class="btn btn-secondary btn-sm" id="btn-recover-code" type="button">Recuperar código</button>
+            </div>
+            <div id="recover-result" class="recovery-result"></div>
         </div>
 
         <div class="card" id="history-container">
@@ -154,6 +172,81 @@ function filterHistory() {
             item.style.display = 'none';
         }
     });
+}
+
+document.getElementById('btn-recover-code').addEventListener('click', recuperarCodigoHistorial);
+document.getElementById('recover-dni').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        recuperarCodigoHistorial();
+    }
+});
+
+async function recuperarCodigoHistorial() {
+    const input = document.getElementById('recover-dni');
+    const resultBox = document.getElementById('recover-result');
+    const btn = document.getElementById('btn-recover-code');
+    const dni = input.value.trim();
+
+    resultBox.style.display = 'none';
+    resultBox.innerHTML = '';
+
+    if (!/^\d{8}$/.test(dni)) {
+        mostrarResultadoRecuperacion('danger', 'El DNI debe contener exactamente 8 dígitos numéricos.');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Buscando...';
+
+    const fd = new FormData();
+    fd.append('dni', dni);
+
+    try {
+        const res = await fetch(BASE_URL + 'controllers/PacienteController.php?action=recuperar_codigo', {
+            method: 'POST',
+            body: fd
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            const codigo = escapeHtml(data.paciente.codigo_paciente);
+            mostrarResultadoRecuperacion(
+                'success',
+                'El código de historial de este paciente es: <span class="history-code">' + codigo + '</span>'
+            );
+            document.getElementById('hist-dni').value = codigo;
+            filterHistory();
+        } else {
+            if (data.expired) {
+                window.location.href = BASE_URL + 'views/auth/login.php?expired=1';
+                return;
+            }
+            mostrarResultadoRecuperacion('danger', escapeHtml(data.error || 'No se pudo realizar la búsqueda en este momento. Intente nuevamente.'));
+        }
+    } catch (e) {
+        mostrarResultadoRecuperacion('danger', 'No se pudo realizar la búsqueda en este momento. Intente nuevamente.');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Recuperar código';
+    }
+}
+
+function mostrarResultadoRecuperacion(type, message) {
+    const resultBox = document.getElementById('recover-result');
+    const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
+    resultBox.className = 'recovery-result alert-box ' + alertClass;
+    resultBox.innerHTML = '<p>' + message + '</p>';
+    resultBox.style.display = 'flex';
+}
+
+function escapeHtml(value) {
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
 }
 
 const cargados = {};

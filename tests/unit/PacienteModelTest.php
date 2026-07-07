@@ -64,6 +64,38 @@ class PacienteModelTest extends TestCase {
         $this->assertEquals('76352371', $resultado[0]['dni']);
     }
 
+    public function testRecuperarCodigoHistorialPorDNI() {
+        $pacienteMock = [
+            'id' => 7,
+            'dni' => '76352371',
+            'codigo_paciente' => 'PAC-54321'
+        ];
+
+        $this->stmtMock->expects($this->once())
+             ->method('execute')
+             ->willReturn(true);
+
+        $this->stmtMock->expects($this->once())
+             ->method('fetch')
+             ->with(\PDO::FETCH_ASSOC)
+             ->willReturn($pacienteMock);
+
+        $this->dbMock->expects($this->once())
+             ->method('prepare')
+             ->with($this->callback(function($sql) {
+                 return strpos($sql, 'FROM pacientes p') !== false
+                        && strpos($sql, 'INNER JOIN analisis_retinales a') !== false
+                        && strpos($sql, 'p.dni = :dni') !== false
+                        && strpos($sql, 'a.id_medico = :id_medico') !== false;
+             }))
+             ->willReturn($this->stmtMock);
+
+        $resultado = $this->pacienteModel->recuperarCodigoHistorialPorDNI('76352371', 5);
+
+        $this->assertIsArray($resultado);
+        $this->assertEquals('PAC-54321', $resultado['codigo_paciente']);
+    }
+
     public function testObtenerDetallePaciente() {
         $idPaciente = 1;
         $idMedico = 5;

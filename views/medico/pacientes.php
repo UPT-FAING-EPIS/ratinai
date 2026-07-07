@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../config/session_guard.php';
 require_once __DIR__ . '/../../models/PacienteModel.php';
+require_once __DIR__ . '/../../models/AnalisisModel.php';
 require_auth();
 require_role('MED');
 
@@ -18,6 +19,8 @@ $_page = 'pacientes.php';
 
 $pacienteModel = new PacienteModel();
 $pacientes = $pacienteModel->listarPacientesConAnalisisMedico($user['id']);
+$analisisModel = new AnalisisModel();
+$casosCriticos = $analisisModel->getSeguimientoCasosCriticos($user['id'], 20);
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -93,6 +96,50 @@ $pacientes = $pacienteModel->listarPacientesConAnalisisMedico($user['id']);
     font-weight: 700;
     letter-spacing: .02em;
 }
+.critical-list {
+    display: grid;
+    gap: 10px;
+}
+.critical-case {
+    border: 1px solid #fecaca;
+    border-left: 4px solid var(--danger);
+    border-radius: var(--radius);
+    padding: 14px;
+    background: #fff7f7;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+.critical-main {
+    min-width: 0;
+}
+.critical-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 4px;
+}
+.critical-meta {
+    font-size: 12px;
+    color: var(--text2);
+}
+.critical-score {
+    font-family: "DM Mono", monospace;
+    font-weight: 700;
+    color: var(--danger);
+}
+.critical-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+}
+.search-result-note {
+    display: none;
+    margin-top: 10px;
+    font-size: 12px;
+    color: var(--text3);
+}
 </style>
 <script>const BASE_URL = '<?= $base ?>';</script>
 </head>
@@ -108,12 +155,58 @@ $pacientes = $pacienteModel->listarPacientesConAnalisisMedico($user['id']);
             <h1 class="page-title">Historial de pacientes</h1>
             <p class="page-sub">Consulte los pacientes atendidos y sus resultados de retinografías.</p>
         </div>
+
+        <div class="card mb-16">
+            <div class="card-title">
+                Seguimiento de casos críticos o alertas
+                <?php if (!empty($casosCriticos)): ?>
+                    <span class="badge badge-pending" style="margin-left:auto"><?= count($casosCriticos) ?> alertas</span>
+                <?php endif; ?>
+            </div>
+            <?php if (empty($casosCriticos)): ?>
+                <p class="text-muted">No hay casos críticos pendientes de seguimiento.</p>
+            <?php else: ?>
+                <div class="critical-list">
+                    <?php foreach ($casosCriticos as $caso):
+                        $codigo = $caso['codigo_paciente'] ?: 'Sin código';
+                        $dni = $caso['dni'] ?: 'Sin DNI';
+                        $resultado = ucfirst((string)$caso['resultado_principal']);
+                        $probabilidad = number_format((float)$caso['probabilidad_principal'], 1);
+                        $fecha = $caso['fecha_analisis'] ? date('d M Y H:i', strtotime($caso['fecha_analisis'])) : 'Sin fecha';
+                    ?>
+                    <div class="critical-case">
+                        <div class="critical-main">
+                            <div class="critical-title">
+                                Paciente #<?= htmlspecialchars($codigo) ?> · <?= htmlspecialchars($resultado) ?>
+                                <span class="critical-score"><?= $probabilidad ?>%</span>
+                            </div>
+                            <div class="critical-meta">
+                                DNI: <?= htmlspecialchars($dni) ?> · Fecha: <?= htmlspecialchars($fecha) ?>
+                                <?php if (!empty($caso['diagnostico_medico'])): ?>
+                                    · Con diagnóstico médico
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                        <div class="critical-actions">
+                            <?php if (!empty($caso['codigo_paciente'])): ?>
+                                <button class="btn btn-secondary btn-sm" type="button" onclick="buscarPacienteCritico('<?= htmlspecialchars($caso['codigo_paciente'], ENT_QUOTES) ?>')">Ver historial</button>
+                            <?php endif; ?>
+                            <button class="btn btn-ghost btn-sm" type="button" onclick="descargarPDF(<?= (int)$caso['id'] ?>)">PDF</button>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+        </div>
         
         <div class="card mb-16">
             <div class="card-title">Buscar paciente (Filtro local)</div>
             <div class="flex gap-8">
                 <input class="form-input-d" style="flex:1" type="text" id="hist-dni" placeholder="Buscar por DNI o código de paciente..." onkeyup="filterHistory()">
+                <button class="btn btn-secondary btn-sm" type="button" onclick="filterHistory()">Buscar</button>
+                <button class="btn btn-ghost btn-sm" type="button" onclick="clearHistorySearch()">Limpiar</button>
             </div>
+            <p id="history-search-note" class="search-result-note"></p>
         </div>
 
         <div class="card mb-16">
@@ -165,13 +258,52 @@ $pacientes = $pacienteModel->listarPacientesConAnalisisMedico($user['id']);
 function filterHistory() {
     const term = document.getElementById('hist-dni').value.toLowerCase();
     const items = document.querySelectorAll('.paciente-card');
+    const note = document.getElementById('history-search-note');
+    let matches = 0;
     items.forEach(item => {
-        if (item.getAttribute('data-search').includes(term)) {
+        if (!term || item.getAttribute('data-search').includes(term)) {
             item.style.display = 'block';
+            matches++;
         } else {
             item.style.display = 'none';
         }
     });
+
+    if (note) {
+        if (!term) {
+            note.style.display = 'none';
+            note.textContent = '';
+        } else if (matches === 0) {
+            note.style.display = 'block';
+            note.textContent = 'No se encontraron pacientes que coincidan con la búsqueda.';
+        } else {
+            note.style.display = 'block';
+            note.textContent = matches + ' paciente(s) encontrado(s).';
+        }
+    }
+}
+
+function clearHistorySearch() {
+    document.getElementById('hist-dni').value = '';
+    filterHistory();
+}
+
+function buscarPacienteCritico(codigo) {
+    const input = document.getElementById('hist-dni');
+    input.value = codigo;
+    filterHistory();
+
+    const firstMatch = Array.from(document.querySelectorAll('.paciente-card'))
+        .find(item => item.style.display !== 'none');
+
+    if (!firstMatch) return;
+
+    firstMatch.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const header = firstMatch.querySelector('.paciente-header');
+    const detail = firstMatch.querySelector('.paciente-detalle-wrapper');
+    if (header && detail && detail.style.display !== 'block') {
+        toggleDetalle(detail.id.replace('detalle-', ''), header);
+    }
 }
 
 document.getElementById('btn-recover-code').addEventListener('click', recuperarCodigoHistorial);

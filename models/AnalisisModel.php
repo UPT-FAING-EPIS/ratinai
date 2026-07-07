@@ -151,4 +151,28 @@ class AnalisisModel {
         $stmt->execute();
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
+
+    public function getSeguimientoCasosCriticos($id_medico, $limit = 20) {
+        $stmt = $this->db->prepare("
+            SELECT
+                a.id,
+                a.id_paciente,
+                a.fecha_analisis,
+                a.resultado_principal,
+                a.probabilidad_principal,
+                a.diagnostico_medico,
+                p.dni,
+                p.codigo_paciente
+            FROM analisis_retinales a
+            LEFT JOIN pacientes p ON a.id_paciente = p.id
+            WHERE a.id_medico = :id_medico
+              AND a.alerta_anomalia = 1
+            ORDER BY a.probabilidad_principal DESC, a.fecha_analisis DESC
+            LIMIT :lim
+        ");
+        $stmt->bindParam(':id_medico', $id_medico, PDO::PARAM_INT);
+        $stmt->bindValue(':lim', (int)$limit, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 }

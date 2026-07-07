@@ -87,10 +87,6 @@ $casosCriticos = $analisisModel->getSeguimientoCasosCriticos($user['id'], 20);
     border-top: 1px dashed var(--border);
     padding-top: 12px;
 }
-.recovery-result {
-    display: none;
-    margin-top: 12px;
-}
 .history-code {
     font-family: "DM Mono", monospace;
     font-weight: 700;
@@ -139,6 +135,9 @@ $casosCriticos = $analisisModel->getSeguimientoCasosCriticos($user['id'], 20);
     margin-top: 10px;
     font-size: 12px;
     color: var(--text3);
+}
+.search-result-note strong {
+    color: var(--text);
 }
 </style>
 <script>const BASE_URL = '<?= $base ?>';</script>
@@ -200,22 +199,13 @@ $casosCriticos = $analisisModel->getSeguimientoCasosCriticos($user['id'], 20);
         </div>
         
         <div class="card mb-16">
-            <div class="card-title">Buscar paciente (Filtro local)</div>
+            <div class="card-title">Buscar paciente</div>
             <div class="flex gap-8">
-                <input class="form-input-d" style="flex:1" type="text" id="hist-dni" placeholder="Buscar por DNI o código de paciente..." onkeyup="filterHistory()">
-                <button class="btn btn-secondary btn-sm" type="button" onclick="filterHistory()">Buscar</button>
+                <input class="form-input-d" style="flex:1" type="text" id="hist-dni" placeholder="DNI o código de paciente..." onkeyup="filterHistory(false)">
+                <button class="btn btn-secondary btn-sm" type="button" onclick="filterHistory(true)">Buscar</button>
                 <button class="btn btn-ghost btn-sm" type="button" onclick="clearHistorySearch()">Limpiar</button>
             </div>
             <p id="history-search-note" class="search-result-note"></p>
-        </div>
-
-        <div class="card mb-16">
-            <div class="card-title">Recuperar código de historial por DNI</div>
-            <div class="flex gap-8">
-                <input class="form-input-d" style="flex:1" type="text" id="recover-dni" placeholder="Ingrese DNI de 8 dígitos" maxlength="8" inputmode="numeric">
-                <button class="btn btn-secondary btn-sm" id="btn-recover-code" type="button">Recuperar código</button>
-            </div>
-            <div id="recover-result" class="recovery-result"></div>
         </div>
 
         <div class="card" id="history-container">
@@ -227,7 +217,10 @@ $casosCriticos = $analisisModel->getSeguimientoCasosCriticos($user['id'], 20);
                     $search_text = strtolower($p['dni'] . ' ' . $p['codigo_paciente']);
                     $ultimo = date('d M Y', strtotime($p['ultimo_analisis']));
                 ?>
-                <div class="paciente-card" data-search="<?= htmlspecialchars($search_text) ?>">
+                <div class="paciente-card"
+                     data-search="<?= htmlspecialchars($search_text) ?>"
+                     data-dni="<?= htmlspecialchars($p['dni']) ?>"
+                     data-code="<?= htmlspecialchars($p['codigo_paciente']) ?>">
                     <div class="paciente-header" onclick="toggleDetalle(<?= $p['id'] ?>, this)">
                         <div class="paciente-info-main">
                             <h3 style="font-size: 15px; color: var(--text); margin-bottom: 4px;">Paciente #<?= htmlspecialchars($p['codigo_paciente']) ?></h3>
@@ -255,15 +248,23 @@ $casosCriticos = $analisisModel->getSeguimientoCasosCriticos($user['id'], 20);
 <div id="toast" class="toast" style="display:none"></div>
 
 <script>
-function filterHistory() {
-    const term = document.getElementById('hist-dni').value.toLowerCase();
+function filterHistory(showFeedback = false) {
+    const term = document.getElementById('hist-dni').value.trim().toLowerCase();
     const items = document.querySelectorAll('.paciente-card');
     const note = document.getElementById('history-search-note');
     let matches = 0;
+    let exactDniMatch = null;
+
     items.forEach(item => {
-        if (!term || item.getAttribute('data-search').includes(term)) {
+        const searchText = item.getAttribute('data-search');
+        const dni = (item.getAttribute('data-dni') || '').toLowerCase();
+
+        if (!term || searchText.includes(term)) {
             item.style.display = 'block';
             matches++;
+            if (term && dni === term) {
+                exactDniMatch = item;
+            }
         } else {
             item.style.display = 'none';
         }
@@ -273,25 +274,32 @@ function filterHistory() {
         if (!term) {
             note.style.display = 'none';
             note.textContent = '';
+        } else if (exactDniMatch) {
+            const code = escapeHtml(exactDniMatch.getAttribute('data-code') || '');
+            note.style.display = 'block';
+            note.innerHTML = 'Paciente encontrado. Código de historial: <span class="history-code">' + code + '</span>';
         } else if (matches === 0) {
             note.style.display = 'block';
             note.textContent = 'No se encontraron pacientes que coincidan con la búsqueda.';
-        } else {
+        } else if (showFeedback) {
             note.style.display = 'block';
             note.textContent = matches + ' paciente(s) encontrado(s).';
+        } else {
+            note.style.display = 'none';
+            note.textContent = '';
         }
     }
 }
 
 function clearHistorySearch() {
     document.getElementById('hist-dni').value = '';
-    filterHistory();
+    filterHistory(true);
 }
 
 function buscarPacienteCritico(codigo) {
     const input = document.getElementById('hist-dni');
     input.value = codigo;
-    filterHistory();
+    filterHistory(true);
 
     const firstMatch = Array.from(document.querySelectorAll('.paciente-card'))
         .find(item => item.style.display !== 'none');
@@ -304,72 +312,6 @@ function buscarPacienteCritico(codigo) {
     if (header && detail && detail.style.display !== 'block') {
         toggleDetalle(detail.id.replace('detalle-', ''), header);
     }
-}
-
-document.getElementById('btn-recover-code').addEventListener('click', recuperarCodigoHistorial);
-document.getElementById('recover-dni').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') {
-        e.preventDefault();
-        recuperarCodigoHistorial();
-    }
-});
-
-async function recuperarCodigoHistorial() {
-    const input = document.getElementById('recover-dni');
-    const resultBox = document.getElementById('recover-result');
-    const btn = document.getElementById('btn-recover-code');
-    const dni = input.value.trim();
-
-    resultBox.style.display = 'none';
-    resultBox.innerHTML = '';
-
-    if (!/^\d{8}$/.test(dni)) {
-        mostrarResultadoRecuperacion('danger', 'El DNI debe contener exactamente 8 dígitos numéricos.');
-        return;
-    }
-
-    btn.disabled = true;
-    btn.textContent = 'Buscando...';
-
-    const fd = new FormData();
-    fd.append('dni', dni);
-
-    try {
-        const res = await fetch(BASE_URL + 'controllers/PacienteController.php?action=recuperar_codigo', {
-            method: 'POST',
-            body: fd
-        });
-        const data = await res.json();
-
-        if (data.success) {
-            const codigo = escapeHtml(data.paciente.codigo_paciente);
-            mostrarResultadoRecuperacion(
-                'success',
-                'El código de historial de este paciente es: <span class="history-code">' + codigo + '</span>'
-            );
-            document.getElementById('hist-dni').value = codigo;
-            filterHistory();
-        } else {
-            if (data.expired) {
-                window.location.href = BASE_URL + 'views/auth/login.php?expired=1';
-                return;
-            }
-            mostrarResultadoRecuperacion('danger', escapeHtml(data.error || 'No se pudo realizar la búsqueda en este momento. Intente nuevamente.'));
-        }
-    } catch (e) {
-        mostrarResultadoRecuperacion('danger', 'No se pudo realizar la búsqueda en este momento. Intente nuevamente.');
-    } finally {
-        btn.disabled = false;
-        btn.textContent = 'Recuperar código';
-    }
-}
-
-function mostrarResultadoRecuperacion(type, message) {
-    const resultBox = document.getElementById('recover-result');
-    const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
-    resultBox.className = 'recovery-result alert-box ' + alertClass;
-    resultBox.innerHTML = '<p>' + message + '</p>';
-    resultBox.style.display = 'flex';
 }
 
 function escapeHtml(value) {

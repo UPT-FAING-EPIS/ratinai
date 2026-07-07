@@ -50,6 +50,10 @@ $_rol = $_SESSION['rol_codigo'] ?? '';
                 <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><path d="M3 4h10M3 8h7M3 12h5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
                 Historial de pacientes
             </a>
+            <a href="<?= $base ?>views/medico/seguimiento.php" class="nav-item <?= $_page === 'seguimiento.php' ? 'active' : '' ?>">
+                <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><path d="M8 2l6 11H2L8 2z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M8 6v3M8 11.5h.01" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+                Seguimiento de alertas
+            </a>
         </div>
         <div class="nav-section">
             <span class="nav-section-label">Sistema</span>

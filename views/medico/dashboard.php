@@ -151,6 +151,9 @@ $js_actividad = json_encode($actividad);
                         </tbody>
                     </table>
                 </div>
+                <div style="padding: 0 16px 16px; text-align: right;">
+                    <a href="<?= $base ?>views/medico/seguimiento.php" class="btn btn-ghost btn-sm">Ver seguimiento de alertas →</a>
+                </div>
             </div>
         </div>
     </main>

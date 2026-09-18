@@ -93,7 +93,8 @@ class AnalisisController {
         // --- LLAMADA A LA API PRIVADA DEL MODELO ---
         $modelApiUrl = rtrim((string) env_value('ANALYSIS_API_URL', ''), '/');
         $modelApiKey = (string) env_value('ANALYSIS_API_KEY', '');
-        if ($modelApiUrl === '' || $modelApiKey === '') {
+        $modelApiCaFile = __DIR__ . '/../certs/retinai-ai-ca.crt';
+        if ($modelApiUrl === '' || $modelApiKey === '' || !is_readable($modelApiCaFile)) {
             echo json_encode(['success' => false, 'error' => 'El servicio de análisis no está configurado. Contacte al administrador.']);
             return;
         }
@@ -107,6 +108,9 @@ class AnalisisController {
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT => 30, // Permitimos que tarde lo necesario, el frontend mostrará advertencia a los 5s
             CURLOPT_HTTPHEADER => ["X-API-Key: {$modelApiKey}"],
+            CURLOPT_CAINFO => $modelApiCaFile,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYHOST => 2,
         ]);
 
         $response = curl_exec($ch);

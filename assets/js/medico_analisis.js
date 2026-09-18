@@ -5,6 +5,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnBuscarPaciente = document.getElementById('btn-buscar-paciente');
     const btnReset          = document.getElementById('btn-reset');
     const btnPdf            = document.getElementById('btn-pdf');
+    const changeImageBtn    = document.getElementById('change-image-btn');
+    const patientWorkflow   = document.getElementById('patient-workflow');
+    const patientWorkflowHost = document.getElementById('patient-workflow-host');
+
+    // Mantiene los datos administrativos a la vista, en la columna que luego
+    // comparte espacio con el resultado, sin alterar sus IDs ni su lógica.
+    if (patientWorkflow && patientWorkflowHost) {
+        patientWorkflowHost.appendChild(patientWorkflow);
+    }
 
     let currentFile    = null;
     let isProcessing   = false;
@@ -15,6 +24,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // ── File handling ────────────────────────────────────────────────────────
     fileInput.addEventListener('change', function() {
         handleFile(this.files[0]);
+    });
+
+    changeImageBtn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        fileInput.click();
     });
 
     dropZone.addEventListener('dragover', (e) => {
@@ -51,6 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         currentFile = file;
         document.getElementById('file-name').textContent = file.name;
+        dropZone.classList.add('has-file');
 
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -68,7 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         reader.readAsDataURL(file);
 
-        document.getElementById('preview-area').style.display = 'block';
+        document.getElementById('analyze-actions').style.display = 'block';
         analyzeBtn.disabled = false;
     }
 
@@ -243,9 +258,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // ── Botón Reset ───────────────────────────────────────────────────────────
     btnReset.addEventListener('click', () => {
         document.getElementById('result-col').style.display    = 'none';
-        document.getElementById('preview-area').style.display  = 'none';
+        document.getElementById('analyze-actions').style.display = 'none';
         document.getElementById('quality-warning').style.display = 'none';
         document.getElementById('file-input').value            = '';
+        document.getElementById('preview-image-element').src   = '';
+        document.getElementById('file-name').textContent       = '';
+        dropZone.classList.remove('has-file');
         
         // Reset carpetas y paciente
         document.getElementById('carpeta-section').style.display = 'none';

@@ -125,6 +125,67 @@ $_page = 'nuevoanalisis.php';
   display: none;
   margin-top: 0;
 }
+
+/* ── Flujo de carga y datos del paciente ─────────────────────────────────── */
+.upload-zone.has-file {
+  padding: 0;
+  border-style: solid;
+  border-color: var(--accent);
+  background: #0f172a;
+}
+.upload-placeholder { padding: 48px 32px; }
+.upload-zone.has-file .upload-placeholder { display: none; }
+.upload-preview {
+  position: relative;
+  height: 360px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #111827;
+}
+.upload-zone.has-file .upload-preview { display: flex; }
+.upload-preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.upload-preview-meta {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  left: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  color: #fff;
+  background: rgba(15, 23, 42, .82);
+  border-radius: 8px;
+  backdrop-filter: blur(4px);
+}
+.upload-preview-name {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.btn-change-image {
+  flex-shrink: 0;
+  color: #1d4ed8;
+  background: #fff;
+  border: 1px solid #bfdbfe;
+}
+.btn-change-image:hover { background: #dbeafe; }
+.analyze-actions { margin-top: 12px; text-align: center; }
+#patient-workflow-host:empty { display: none; }
+
+@media (max-width: 900px) {
+  .upload-preview { height: 300px; }
+}
 </style>
 </head>
 <body>
@@ -163,11 +224,20 @@ $_page = 'nuevoanalisis.php';
                     Cargar retinografía
                 </div>
                 <div class="upload-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
-                    <div class="upload-icon">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="3" stroke="#1A56DB" stroke-width="1.5"/><circle cx="12" cy="12" r="5" stroke="#1A56DB" stroke-width="1.5"/><circle cx="12" cy="12" r="2" fill="#1A56DB" opacity=".4"/></svg>
+                    <div class="upload-placeholder">
+                        <div class="upload-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="3" stroke="#1A56DB" stroke-width="1.5"/><circle cx="12" cy="12" r="5" stroke="#1A56DB" stroke-width="1.5"/><circle cx="12" cy="12" r="2" fill="#1A56DB" opacity=".4"/></svg>
+                        </div>
+                        <h3>Arrastra tu retinografía aquí o haz clic para seleccionar</h3>
+                        <p>JPG o PNG · Máximo 10 MB</p>
                     </div>
-                    <h3>Arrastra tu retinografía aquí o haz clic para seleccionar</h3>
-                    <p>JPG o PNG · Máximo 10 MB</p>
+                    <div class="upload-preview" id="preview-area" aria-live="polite">
+                        <img id="preview-image-element" src="" alt="Vista previa de la retinografía seleccionada">
+                        <div class="upload-preview-meta">
+                            <span id="file-name" class="upload-preview-name"></span>
+                            <button type="button" class="btn btn-sm btn-change-image" id="change-image-btn">Cambiar imagen</button>
+                        </div>
+                    </div>
                     <input type="file" id="file-input" accept=".jpg,.jpeg,.png" style="display:none">
                 </div>
                 
@@ -176,21 +246,16 @@ $_page = 'nuevoanalisis.php';
                     <p>La imagen puede presentar baja calidad. Los resultados podrían ser menos precisos. Puede continuar el análisis.</p>
                 </div>
 
-                <div id="preview-area" style="display:none;margin-top:16px;">
-                    <div class="retina-img" id="preview-img" style="max-width:100%; display:flex; justify-content:center; align-items:center; background:#f3f4f6; border-radius:8px; overflow:hidden;">
-                        <img id="preview-image-element" src="" style="max-width:100%; max-height:300px; object-fit:contain;">
-                    </div>
-                    <div style="margin-top:12px;text-align:center;">
-                    <p id="file-name" class="text-sm text-muted"></p>
+                <div class="analyze-actions" id="analyze-actions" style="display:none;">
                     <button class="btn btn-primary mt-8" id="analyze-btn" disabled>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M12 5l7 7-7 7" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                         Analizar imagen
                     </button>
-                    </div>
                 </div>
                 </div>
 
                 <!-- ── Identificación del paciente ─────────────────────── -->
+                <div id="patient-workflow">
                 <div class="card mb-16">
                 <div class="card-title">
                     <div class="card-title-icon green">
@@ -261,9 +326,12 @@ $_page = 'nuevoanalisis.php';
 
                 <span class="skip-link" id="skip-carpeta-link" onclick="saltarCarpeta()">Continuar sin seleccionar carpeta</span>
                 </div>
+                </div>
             </div>
 
-            <div id="result-col" style="display:none;">
+            <div class="analysis-side-panel">
+                <div id="patient-workflow-host"></div>
+                <div id="result-col" style="display:none;">
                 <div class="card">
                 <div class="card-title">
                     <div class="card-title-icon red">
@@ -319,6 +387,7 @@ $_page = 'nuevoanalisis.php';
                     <button class="btn btn-ghost btn-sm" style="margin-left:8px" id="btn-reset">Nuevo análisis</button>
                 </div>
                 </div>
+            </div>
             </div>
         </div>
     </main>

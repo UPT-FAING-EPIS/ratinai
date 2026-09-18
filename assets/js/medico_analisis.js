@@ -221,6 +221,9 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('line2').className   = 'step-line done';
         document.getElementById('lbl-step3').classList.add('active');
 
+        // El resultado reemplaza visualmente el panel de identificación y
+        // carpeta. Los valores continúan en el DOM para el guardado final.
+        patientWorkflowHost.style.display = 'none';
         document.getElementById('result-col').style.display = 'block';
 
         const mainAlert = document.getElementById('result-main');
@@ -258,6 +261,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ── Botón Reset ───────────────────────────────────────────────────────────
     btnReset.addEventListener('click', () => {
         document.getElementById('result-col').style.display    = 'none';
+        patientWorkflowHost.style.display = '';
         document.getElementById('analyze-actions').style.display = 'none';
         document.getElementById('quality-warning').style.display = 'none';
         document.getElementById('file-input').value            = '';

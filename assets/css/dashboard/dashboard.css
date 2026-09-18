@@ -1228,6 +1228,14 @@ body {
   gap: 14px;
 }
 
+/* Las tarjetas dentro de una cuadrícula ya se separan con `gap`.
+   Evita que la regla general `.card + .card` desplace hacia abajo
+   la segunda y tercera tarjeta de la misma fila. */
+.grid-2 > .card + .card,
+.grid-3 > .card + .card {
+  margin-top: 0;
+}
+
 /* ── Toast notification ── */
 .toast {
   position: fixed;

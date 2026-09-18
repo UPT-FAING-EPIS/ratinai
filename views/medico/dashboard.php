@@ -195,33 +195,32 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Preparar Actividad
-    if (rawAct && rawAct.length > 0) {
-        // Asegurar 7 días
-        const today = new Date();
-        const datesMap = {};
-        for(let i = 6; i >= 0; i--) {
-            let d = new Date(today);
-            d.setDate(d.getDate() - i);
-            const key = d.toISOString().split('T')[0];
-            datesMap[key] = 0;
-        }
+    // Preparar Actividad: el eje se muestra aun cuando no hay registros.
+    const activityRows = Array.isArray(rawAct) ? rawAct : [];
+    const today = new Date();
+    const datesMap = {};
+    for (let i = 6; i >= 0; i--) {
+        const d = new Date(today);
+        d.setDate(d.getDate() - i);
+        const key = d.toISOString().split('T')[0];
+        datesMap[key] = 0;
+    }
 
-        rawAct.forEach(a => { datesMap[a.fecha] = a.total; });
+    activityRows.forEach(a => { datesMap[a.fecha] = a.total; });
 
-        const labels = Object.keys(datesMap).map(d => {
-            const arr = d.split('-');
-            return arr[2] + '/' + arr[1]; // DD/MM
-        });
-        const data = Object.values(datesMap);
+    const activityLabels = Object.keys(datesMap).map(d => {
+        const arr = d.split('-');
+        return arr[2] + '/' + arr[1]; // DD/MM
+    });
+    const activityData = Object.values(datesMap);
 
-        new Chart(document.getElementById('chartActividad'), {
+    new Chart(document.getElementById('chartActividad'), {
             type: 'bar',
             data: {
-                labels: labels,
+                labels: activityLabels,
                 datasets: [{
                     label: 'Análisis realizados',
-                    data: data,
+                    data: activityData,
                     backgroundColor: '#3B82F6',
                     borderRadius: 4
                 }]
@@ -235,7 +234,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 plugins: { legend: { display: false } }
             }
         });
-    }
 });
 </script>
 </body>

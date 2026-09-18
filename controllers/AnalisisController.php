@@ -90,9 +90,15 @@ class AnalisisController {
             return;
         }
 
-        // --- LLAMADA AL MODELO EXTERNO ---
-        $ip_ec2 = '18.119.14.223';
-        $ch = curl_init("http://{$ip_ec2}:8000/api/analizar");
+        // --- LLAMADA A LA API PRIVADA DEL MODELO ---
+        $modelApiUrl = rtrim((string) env_value('ANALYSIS_API_URL', ''), '/');
+        $modelApiKey = (string) env_value('ANALYSIS_API_KEY', '');
+        if ($modelApiUrl === '' || $modelApiKey === '') {
+            echo json_encode(['success' => false, 'error' => 'El servicio de análisis no está configurado. Contacte al administrador.']);
+            return;
+        }
+
+        $ch = curl_init("{$modelApiUrl}/api/analizar");
         $curlFile = new CURLFile($destPath, mime_content_type($destPath), $file['name']);
 
         curl_setopt_array($ch, [
@@ -100,13 +106,15 @@ class AnalisisController {
             CURLOPT_POSTFIELDS => ['file' => $curlFile],
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT => 30, // Permitimos que tarde lo necesario, el frontend mostrará advertencia a los 5s
+            CURLOPT_HTTPHEADER => ["X-API-Key: {$modelApiKey}"],
         ]);
 
         $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
         $error = curl_error($ch);
         curl_close($ch);
 
-        if ($error || !$response) {
+        if ($error || !$response || $httpCode !== 200) {
             echo json_encode(['success' => false, 'error' => 'No se pudo completar el análisis. Por favor intente nuevamente o contacte al administrador.']);
             return;
         }

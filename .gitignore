@@ -1,3 +1,4 @@
 node_modules
 phpunit.phar
 tests/coverage/
+.env

@@ -2,6 +2,7 @@
 if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../models/AnalisisModel.php';
 require_once __DIR__ . '/../models/PacienteModel.php';
+require_once __DIR__ . '/../config/config.php';
 
 class AnalisisController {
     private $model;
@@ -20,6 +21,15 @@ class AnalisisController {
 
         if (!isset($_SESSION['user_id']) || $_SESSION['rol_codigo'] !== 'MED') {
             echo json_encode(['success' => false, 'error' => 'Su sesión ha expirado. Por favor inicie sesión nuevamente.', 'expired' => true]);
+            return;
+        }
+
+        if (!ANALYSIS_AI_ENABLED) {
+            echo json_encode([
+                'success' => false,
+                'ai_disabled' => true,
+                'error' => 'El análisis automatizado está temporalmente desactivado. Puede continuar usando las demás funciones del sistema.'
+            ]);
             return;
         }
 

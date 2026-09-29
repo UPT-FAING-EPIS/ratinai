@@ -6,6 +6,7 @@
   --muted: #566579;
   --line: #dce3ed;
   --paper: #f7f9fc;
+  --header-height: 88px;
   --mono: 'DM Mono', monospace;
 }
 * { box-sizing: border-box; }
@@ -31,7 +32,7 @@ button, summary, a { outline-offset: 5px; }
 h2 { font-size: clamp(30px, 3.5vw, 46px); line-height: 1.17; letter-spacing: -1.9px; font-weight: 500; }
 .skip-link { position: fixed; left: 16px; top: -80px; background: white; border: 2px solid var(--blue); border-radius: 8px; padding: 10px 18px; z-index: 100; }
 .skip-link:focus { top: 12px; }
-.site-header { height: 88px; position: sticky; top: 0; z-index: 20; background: rgb(247 249 252 / 92%); backdrop-filter: blur(18px); border-bottom: 1px solid rgb(220 227 237 / 70%); }
+.site-header { height: var(--header-height); position: sticky; top: 0; z-index: 20; background: rgb(247 249 252 / 92%); backdrop-filter: blur(18px); border-bottom: 1px solid rgb(220 227 237 / 70%); }
 .header-inner { height: 100%; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 .brand { display: inline-flex; align-items: center; gap: 9px; font-size: 27px; font-weight: 700; letter-spacing: -1.1px; }
 .brand-symbol { width: 40px; height: 30px; color: var(--blue); }
@@ -46,17 +47,20 @@ h2 { font-size: clamp(30px, 3.5vw, 46px); line-height: 1.17; letter-spacing: -1.
 .button .icon { width: 19px; height: 19px; transition: transform .2s; }
 .button-primary { background: var(--blue); color: white; box-shadow: 0 6px 16px rgb(37 99 235 / 14%); }
 .button-primary:hover { background: var(--blue-dark); transform: translateY(-2px); box-shadow: 0 9px 22px rgb(37 99 235 / 20%); }
+.button-secondary { background: white; color: var(--blue-dark); border-color: #b9cdf0; }
+.button-secondary:hover { background: #edf3ff; border-color: #7fa5e7; transform: translateY(-2px); box-shadow: 0 6px 16px rgb(37 99 235 / 8%); }
 .button:hover .icon { transform: translateX(3px); }
 .text-link { display: inline-flex; align-items: center; gap: 12px; font-size: 13px; font-weight: 500; transition: color .2s; }
 .text-link:hover { color: var(--blue); }
 .text-link > span { font-size: 19px; }
-.hero { overflow: clip; position: relative; }
-.hero-grid { display: grid; grid-template-columns: 1.02fr 1fr; align-items: center; min-height: 650px; padding-block: 64px 70px; }
+.hero { overflow: clip; position: relative; display: flex; flex-direction: column; min-height: calc(100vh - var(--header-height)); min-height: calc(100dvh - var(--header-height)); }
+.hero-grid { display: grid; flex: 1; grid-template-columns: 1.02fr 1fr; align-items: center; min-height: 650px; padding-block: 64px 70px; }
 .hero-copy { position: relative; z-index: 2; }
 .hero h1 { margin-top: 25px; font-size: clamp(55px, 5.7vw, 80px); font-weight: 500; line-height: 1.055; letter-spacing: -4px; }
 .hero h1 span { color: var(--blue); }
 .hero-description { margin-top: 26px; max-width: 420px; color: var(--muted); font-size: 16px; line-height: 1.8; }
-.hero-actions { display: flex; align-items: center; gap: 23px; margin-top: 31px; }
+.hero-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 31px; }
+.hero-discover { margin-top: 18px; }
 .hero-note { display: flex; align-items: center; gap: 8px; color: #657289; font-size: 11px; margin-top: 24px; }
 .hero-note .icon { width: 15px; height: 15px; }
 .eye-scene { position: relative; min-width: 0; align-self: stretch; display: flex; align-items: center; margin: -30px -44px -25px -15px; }
@@ -112,7 +116,7 @@ h2 { font-size: clamp(30px, 3.5vw, 46px); line-height: 1.17; letter-spacing: -1.
 .example-badge { font-size: 8px; color: #647491; border: 1px solid #d9e1ef; padding: 4px 7px; border-radius: 3px; white-space: nowrap; }
 .analysis-preview { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
 .retina-preview { background: #050a12; border-radius: 7px; padding: 14px; display: flex; flex-direction: column; justify-content: center; }
-.retina-preview img { width: 100%; max-width: 228px; aspect-ratio: 1; object-fit: cover; align-self: center; border-radius: 50%; }
+.retina-preview img { width: 100%; max-width: 228px; height: auto; aspect-ratio: 1; object-fit: contain; align-self: center; border-radius: 50%; }
 .retina-preview figcaption { display: flex; justify-content: space-between; align-items: center; gap: 8px; color: #9baac2; font: 8px var(--mono); padding-top: 16px; }
 .retina-preview figcaption span { color: #d5dff0; font-size: 7px; border: 1px solid #39455b; padding: 3px 5px; border-radius: 3px; }
 .probability-preview { padding-block: 8px; }
@@ -146,7 +150,7 @@ h2 { font-size: clamp(30px, 3.5vw, 46px); line-height: 1.17; letter-spacing: -1.
 .report-preview h4 { font-size: 13px; font-weight: 500; margin-top: 14px; }
 .paper-meta { display: flex; gap: 10px; justify-content: space-between; color: #748198; font-size: 8px; margin-top: 4px; }
 .paper-results { display: grid; grid-template-columns: 85px 1fr; gap: 18px; align-items: center; margin-block: 19px; }
-.paper-results img { border-radius: 5px; }
+.paper-results img { width: 100%; height: auto; aspect-ratio: 1; object-fit: contain; border-radius: 5px; }
 .paper-results p { font-size: 9px; color: #67768d; margin: 3px 0 8px; }
 .paper-footer { border-top: 1px solid #e4e9f1; padding-top: 10px; color: #6a7b94; font-size: 7px; }
 .capability-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 65px; padding-top: 54px; }
@@ -295,9 +299,9 @@ details[open] .faq-plus::after { transform: rotate(90deg); }
   .join-actions .button { font-size: 11px; padding-inline: 14px; gap: 13px; }
 }
 @media (max-width: 680px) {
+  :root { --header-height: 73px; }
   html { scroll-padding-top: 85px; }
   .container { width: calc(100% - 40px); }
-  .site-header { height: 73px; }
   .brand { font-size: 25px; }
   .brand-symbol { width: 35px; }
   .header-inner { position: relative; }
@@ -427,6 +431,7 @@ details[open] .faq-plus::after { transform: rotate(90deg); }
   .entry-transition { display: none; }
 }
 @media print {
+  .hero { min-height: auto; }
   .site-header, .eye-scene, .hero-actions, .hero-bottom, .join-section, .entry-transition, .menu-toggle { display: none !important; }
   .container { width: 100%; }
   .section { padding-block: 20px; }

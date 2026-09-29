@@ -1,0 +1,78 @@
+{
+  "info": {
+    "name": "RetinAI - RF04 - Integración Establecimiento",
+    "description": "Actualiza un establecimiento de prueba y verifica el mensaje y los datos persistidos.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://ratinai.local" },
+    { "key": "superadmin_email", "value": "" },
+    { "key": "superadmin_password", "value": "" },
+    { "key": "establishment_id", "value": "" },
+    { "key": "establishment_name", "value": "" },
+    { "key": "establishment_address", "value": "" },
+    { "key": "establishment_type", "value": "privado" },
+    { "key": "establishment_ruc", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "RF04 - Actualizar establecimiento de prueba",
+      "item": [
+        {
+          "name": "01 - Autenticar SuperAdmin",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/x-www-form-urlencoded" }],
+            "body": { "mode": "urlencoded", "urlencoded": [
+              { "key": "email", "value": "{{superadmin_email}}", "type": "text" },
+              { "key": "password", "value": "{{superadmin_password}}", "type": "text" }
+            ] },
+            "url": "{{base_url}}/controllers/AuthController.php?action=login"
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('RF04: SuperAdmin autenticado', function () {",
+            "  pm.expect(pm.response.code).to.be.oneOf([200, 302]);",
+            "});"
+          ] } }]
+        },
+        {
+          "name": "02 - Guardar establecimiento",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/x-www-form-urlencoded" }],
+            "body": { "mode": "urlencoded", "urlencoded": [
+              { "key": "id_establecimiento", "value": "{{establishment_id}}", "type": "text" },
+              { "key": "nombre", "value": "{{establishment_name}}", "type": "text" },
+              { "key": "direccion", "value": "{{establishment_address}}", "type": "text" },
+              { "key": "tipo", "value": "{{establishment_type}}", "type": "text" },
+              { "key": "ruc", "value": "{{establishment_ruc}}", "type": "text" }
+            ] },
+            "url": "{{base_url}}/controllers/EstablecimientoController.php?action=update"
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('RF04: el sistema confirma el guardado', function () {",
+            "  pm.response.to.have.status(200);",
+            "  pm.expect(pm.response.text()).to.include('Establecimiento actualizado correctamente');",
+            "});"
+          ] } }]
+        },
+        {
+          "name": "03 - Verificar datos persistidos",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/views/superadmin/detalles_establecimientos.php?id={{establishment_id}}"
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('RF04: los datos guardados siguen visibles', function () {",
+            "  pm.response.to.have.status(200);",
+            "  const html = pm.response.text();",
+            "  pm.expect(html).to.include(pm.variables.get('establishment_name'));",
+            "  pm.expect(html).to.include(pm.variables.get('establishment_address'));",
+            "  pm.expect(html).to.include(pm.variables.get('establishment_ruc'));",
+            "});"
+          ] } }]
+        }
+      ]
+    }
+  ]
+}

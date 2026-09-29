@@ -1,0 +1,105 @@
+{
+  "info": {
+    "_postman_id": "2c3b7be3-4e61-4b64-b7bb-3e1e8dce4f01",
+    "name": "RetinAI - RF01 - Integración Registro de Médico",
+    "description": "Prueba de integración: autenticación de administrador, DoctorController, DoctorModel y MariaDB. Ejecutar únicamente contra un entorno y base de datos de pruebas.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://ratinai.local" },
+    { "key": "admin_email", "value": "" },
+    { "key": "admin_password", "value": "" },
+    { "key": "establishment_id", "value": "" },
+    { "key": "doctor_name", "value": "" },
+    { "key": "doctor_email", "value": "" },
+    { "key": "doctor_cmp", "value": "" },
+    { "key": "doctor_password", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "RF01 - Registrar médico",
+      "item": [
+        {
+          "name": "01 - Autenticar administrador",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "email", "value": "{{admin_email}}", "type": "text" },
+                { "key": "password", "value": "{{admin_password}}", "type": "text" }
+              ]
+            },
+            "url": "{{base_url}}/controllers/AuthController.php?action=login"
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "type": "text/javascript", "exec": [
+              "pm.test('La autenticación responde correctamente', function () {",
+              "    pm.expect(pm.response.code).to.be.oneOf([200, 302]);",
+              "});"
+            ] }
+          }]
+        },
+        {
+          "name": "02 - Crear médico",
+          "event": [{
+            "listen": "prerequest",
+            "script": { "type": "text/javascript", "exec": [
+              "const id = Date.now();",
+              "pm.variables.set('doctor_name', 'Médico Integración ' + id);",
+              "pm.variables.set('doctor_email', 'rf01.' + id + '@example.test');",
+              "pm.variables.set('doctor_cmp', 'CMP' + id);",
+              "pm.variables.set('doctor_password', 'PruebaRF01!2026');"
+            ] }
+          }, {
+            "listen": "test",
+            "script": { "type": "text/javascript", "exec": [
+              "pm.test('El controlador procesa el registro', function () {",
+              "    pm.expect(pm.response.code).to.be.oneOf([200, 302]);",
+              "    pm.expect(pm.response.text()).not.to.include('El nombre es obligatorio');",
+              "});"
+            ] }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "nombre", "value": "{{doctor_name}}", "type": "text" },
+                { "key": "correo", "value": "{{doctor_email}}", "type": "text" },
+                { "key": "cmp", "value": "{{doctor_cmp}}", "type": "text" },
+                { "key": "especialidad", "value": "Oftalmología", "type": "text" },
+                { "key": "establecimiento_id", "value": "{{establishment_id}}", "type": "text" },
+                { "key": "password_override", "value": "{{doctor_password}}", "type": "text" }
+              ]
+            },
+            "url": "{{base_url}}/controllers/DoctorController.php?action=create"
+          }
+        },
+        {
+          "name": "03 - Verificar médico en listado",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/views/admin/doctor.php"
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "type": "text/javascript", "exec": [
+              "pm.test('El médico creado está visible en el listado', function () {",
+              "    pm.response.to.have.status(200);",
+              "    pm.expect(pm.response.text()).to.include(pm.variables.get('doctor_email'));",
+              "});"
+            ] }
+          }]
+        }
+      ]
+    }
+  ]
+}

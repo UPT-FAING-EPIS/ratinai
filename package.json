@@ -9,7 +9,7 @@
     "test:coverage": "jest --coverage",
     "cypress:open": "cypress open",
     "cypress:run": "cypress run",
-    "cypress:login": "cypress run --spec \"tests/e2e/login.cy.js\""
+    "cypress:login": "cypress run --spec \"tests/e2e/RF02_TestFuncional_IniciarSesion.cy.js\""
   },
   "jest": {
     "testEnvironment": "node",

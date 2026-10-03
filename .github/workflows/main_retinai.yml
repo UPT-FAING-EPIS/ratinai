@@ -33,12 +33,45 @@ jobs:
         if: steps.check_files.outputs.files_exists == 'true'
         run: composer validate --no-check-publish && composer install --prefer-dist --no-progress
 
+      - name: Verificar carpetas esenciales del sistema
+        run: |
+          for ruta in \
+            index.php \
+            views/auth/solicitud_registro.php \
+            views/medico/nuevoanalisis.php \
+            views/medico/modeloinfo.php \
+            views/admin/integraciones.php \
+            views/superadmin/calidad_modelo.php \
+            assets/css/auth/solicitud_registro.css \
+            assets/js/ubicacion_establecimiento.js \
+            controllers/AnalisisController.php \
+            services/ServicioPdfClinico.php \
+            certs/retinai-ai-ca.crt \
+            vendor/autoload.php; do
+            test -f "$ruta" || { echo "Falta archivo esencial: $ruta"; exit 1; }
+          done
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
         with:
           name: php-app
-          path: .
+          path: |
+            index.php
+            web.config
+            composer.json
+            composer.lock
+            assets/
+            almacenamiento/
+            certs/
+            config/
+            controllers/
+            libs/
+            models/
+            services/
+            utils/
+            views/
+            vendor/
+          include-hidden-files: true
 
   deploy:
     runs-on: ubuntu-latest
@@ -52,6 +85,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: php-app
+
+      - name: Comprobar integridad del paquete descargado
+        run: |
+          for ruta in views/medico/nuevoanalisis.php views/medico/modeloinfo.php views/auth/solicitud_registro.php assets/js/ubicacion_establecimiento.js vendor/autoload.php; do
+            test -f "$ruta" || { echo "El paquete no contiene $ruta"; exit 1; }
+          done
       
       - name: Login to Azure
         uses: azure/login@v2
@@ -67,4 +106,28 @@ jobs:
           app-name: 'retinai'
           slot-name: 'Production'
           package: .
-          
+
+      - name: Verificar rutas y recursos publicados
+        shell: bash
+        run: |
+          base="https://retinai-ehcadnergkbkd9dr.eastus2-01.azurewebsites.net"
+          for intento in {1..12}; do
+            correcto=1
+            for ruta in /index.php /views/auth/solicitud_registro.php /assets/js/ubicacion_establecimiento.js /assets/css/auth/solicitud_registro.css; do
+              codigo=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' "$base$ruta?revision=$GITHUB_SHA")
+              if [ "$codigo" != "200" ]; then echo "$ruta respondió $codigo"; correcto=0; fi
+            done
+            for ruta in /views/medico/nuevoanalisis.php /views/medico/modeloinfo.php /views/admin/integraciones.php /views/superadmin/calidad_modelo.php; do
+              codigo=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' "$base$ruta?revision=$GITHUB_SHA")
+              if [ "$codigo" != "302" ]; then echo "$ruta respondió $codigo"; correcto=0; fi
+            done
+            for recurso in assets/js/ubicacion_establecimiento.js assets/css/auth/solicitud_registro.css; do
+              hash_local=$(sha256sum "$recurso" | cut -d ' ' -f 1)
+              hash_azure=$(curl --silent --show-error "$base/$recurso?revision=$GITHUB_SHA" | sha256sum | cut -d ' ' -f 1)
+              if [ "$hash_local" != "$hash_azure" ]; then echo "$recurso todavía no coincide con el paquete"; correcto=0; fi
+            done
+            if [ "$correcto" = "1" ]; then exit 0; fi
+            sleep 5
+          done
+          echo 'El despliegue no publicó todas las rutas esenciales.'
+          exit 1

@@ -10,6 +10,7 @@ const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'application/pdf'];
 const ALLOWED_EXT   = /\.(jpg|jpeg|png|pdf)$/i;
 
 let uploadedFiles   = [];     // { file, b64, name, type }
+let archivosEnLectura = 0;
 let codeSent        = false;
 let codeVerified    = false;  // no requerimos confirmar antes de submit (el server valida)
 let resendTimer     = null;
@@ -190,12 +191,12 @@ function agregarArchivos(files) {
     errEl.style.display = 'none';
 
     for (const file of files) {
-        if (uploadedFiles.length >= MAX_FILES) {
+        if (uploadedFiles.length + archivosEnLectura >= MAX_FILES) {
             errEl.textContent = 'Máximo 2 archivos permitidos.';
             errEl.style.display = 'block';
             break;
         }
-        if (!ALLOWED_TYPES.includes(file.type) && !ALLOWED_EXT.test(file.name)) {
+        if (!ALLOWED_TYPES.includes(file.type) || !ALLOWED_EXT.test(file.name)) {
             errEl.textContent = 'Solo se permiten archivos JPG, PNG o PDF.';
             errEl.style.display = 'block';
             continue;
@@ -205,6 +206,7 @@ function agregarArchivos(files) {
             errEl.style.display = 'block';
             continue;
         }
+        archivosEnLectura++;
         leerComoBase64(file);
     }
 }
@@ -212,9 +214,16 @@ function agregarArchivos(files) {
 function leerComoBase64(file) {
     const reader = new FileReader();
     reader.onload = function(e) {
+        archivosEnLectura--;
         uploadedFiles.push({ name: file.name, type: file.type, b64: e.target.result });
         renderPreviews();
         actualizarHiddenInputs();
+    };
+    reader.onerror = function() {
+        archivosEnLectura--;
+        const mensajeError = document.getElementById('err-upload');
+        mensajeError.textContent = 'No se pudo leer el archivo. Inténtalo de nuevo.';
+        mensajeError.style.display = 'block';
     };
     reader.readAsDataURL(file);
 }
@@ -230,31 +239,44 @@ function renderPreviews() {
     const area      = document.getElementById('upload-area');
     container.innerHTML = '';
 
-    uploadedFiles.forEach((f, idx) => {
-        const isImg = f.type.startsWith('image/');
-        const sizeKB = (f.b64.length * 0.75 / 1024).toFixed(0);
-        const ext  = f.name.split('.').pop().toUpperCase();
-
+    uploadedFiles.forEach((archivo, indice) => {
+        const esImagen = archivo.type.startsWith('image/');
+        const tamanoKB = (archivo.b64.length * 0.75 / 1024).toFixed(0);
+        const extension = archivo.name.split('.').pop().toUpperCase();
         const item = document.createElement('div');
         item.className = 'file-preview-item';
 
-        if (isImg) {
-            item.innerHTML = `
-                <img src="${f.b64}" class="file-preview-img" alt="preview">
-                <div class="file-info">
-                    <span class="file-name">${f.name}</span>
-                    <span class="file-size">~${sizeKB} KB</span>
-                </div>
-                <span class="file-remove" onclick="removerArchivo(${idx})" title="Eliminar">✕</span>`;
+        if (esImagen) {
+            const imagen = document.createElement('img');
+            imagen.src = archivo.b64;
+            imagen.alt = 'Vista previa del documento';
+            imagen.className = 'file-preview-img';
+            item.appendChild(imagen);
         } else {
-            item.innerHTML = `
-                <span class="file-icon">📄</span>
-                <div class="file-info">
-                    <span class="file-name">${f.name}</span>
-                    <span class="file-size">${ext} · ~${sizeKB} KB</span>
-                </div>
-                <span class="file-remove" onclick="removerArchivo(${idx})" title="Eliminar">✕</span>`;
+            const icono = document.createElement('span');
+            icono.className = 'file-icon';
+            icono.textContent = '📄';
+            item.appendChild(icono);
         }
+
+        const informacion = document.createElement('div');
+        informacion.className = 'file-info';
+        const nombre = document.createElement('span');
+        nombre.className = 'file-name';
+        nombre.textContent = archivo.name;
+        const tamano = document.createElement('span');
+        tamano.className = 'file-size';
+        tamano.textContent = `${extension} · ~${tamanoKB} KB`;
+        informacion.append(nombre, tamano);
+        item.appendChild(informacion);
+
+        const botonQuitar = document.createElement('button');
+        botonQuitar.type = 'button';
+        botonQuitar.className = 'file-remove';
+        botonQuitar.textContent = '✕';
+        botonQuitar.setAttribute('aria-label', `Quitar ${archivo.name}`);
+        botonQuitar.addEventListener('click', () => removerArchivo(indice));
+        item.appendChild(botonQuitar);
         container.appendChild(item);
     });
 

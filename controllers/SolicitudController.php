@@ -9,6 +9,9 @@ require_once __DIR__ . '/../config/session_guard.php';
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../services/MailService.php';
 
+const TAMANO_MAXIMO_EVIDENCIA_BYTES = 204800;
+const LONGITUD_MAXIMA_NOMBRE_EVIDENCIA = 255;
+
 if (session_status() === PHP_SESSION_NONE) session_start();
 
 $action = $_POST['action'] ?? $_GET['action'] ?? '';
@@ -152,8 +155,9 @@ function handleSolicitar(): void
         exit;
     }
 
-    if (empty($evidencia_1_b64)) {
-        $_SESSION['solicitud_error'] = 'Debe adjuntar al menos una evidencia.';
+    if (!validarEvidenciaSolicitada($evidencia_1_b64, $evidencia_1_nombre, true)
+        || !validarEvidenciaSolicitada($evidencia_2_b64, $evidencia_2_nombre, false)) {
+        $_SESSION['solicitud_error'] = 'Adjunte 1 o 2 archivos JPG, PNG o PDF válidos de hasta 200 KB cada uno.';
         header('Location: ' . $redirect_form);
         exit;
     }
@@ -398,8 +402,9 @@ function handleSolicitarAdmin(): void
         header('Location: ' . $redirect_form);
         exit;
     }
-    if (empty($evidencia_1_b64)) {
-        $_SESSION['solicitud_error'] = 'Debe adjuntar al menos una evidencia.';
+    if (!validarEvidenciaSolicitada($evidencia_1_b64, $evidencia_1_nombre, true)
+        || !validarEvidenciaSolicitada($evidencia_2_b64, $evidencia_2_nombre, false)) {
+        $_SESSION['solicitud_error'] = 'Adjunte 1 o 2 archivos JPG, PNG o PDF válidos de hasta 200 KB cada uno.';
         header('Location: ' . $redirect_form);
         exit;
     }
@@ -458,9 +463,41 @@ function handleSolicitarAdmin(): void
     }
 }
 
-/**
- * Acepta coordenadas solo si el par está completo y dentro de los límites geográficos.
- */
+/** Valida tamaño, formato real y nombre antes de guardar evidencias en la base. */
+function validarEvidenciaSolicitada(?string $contenido, ?string $nombre, bool $obligatoria): bool
+{
+    if ($contenido === null || $contenido === '') {
+        return !$obligatoria && ($nombre === null || $nombre === '');
+    }
+    if ($nombre === null || $nombre === '' || strlen($nombre) > LONGITUD_MAXIMA_NOMBRE_EVIDENCIA
+        || strpbrk($nombre, '/\\') !== false) {
+        return false;
+    }
+
+    $tiposPermitidos = [
+        'image/jpeg' => ['jpg', 'jpeg'],
+        'image/png' => ['png'],
+        'application/pdf' => ['pdf'],
+    ];
+    if (!preg_match('/^data:([a-z]+\/[a-z+]+);base64,([A-Za-z0-9+\/=]+)$/D', $contenido, $coincidencias)) {
+        return false;
+    }
+
+    $tipoDeclarado = $coincidencias[1];
+    $extension = strtolower((string) pathinfo($nombre, PATHINFO_EXTENSION));
+    if (!isset($tiposPermitidos[$tipoDeclarado]) || !in_array($extension, $tiposPermitidos[$tipoDeclarado], true)) {
+        return false;
+    }
+
+    $contenidoBinario = base64_decode($coincidencias[2], true);
+    if ($contenidoBinario === false || strlen($contenidoBinario) > TAMANO_MAXIMO_EVIDENCIA_BYTES) {
+        return false;
+    }
+    $tipoDetectado = (new finfo(FILEINFO_MIME_TYPE))->buffer($contenidoBinario);
+    return $tipoDetectado === $tipoDeclarado;
+}
+
+/** Acepta coordenadas solo si el par está completo y dentro de los límites geográficos. */
 function obtenerCoordenadasOpcionales(array $entrada): array
 {
     $latitudCruda = trim((string) ($entrada['latitud'] ?? ''));

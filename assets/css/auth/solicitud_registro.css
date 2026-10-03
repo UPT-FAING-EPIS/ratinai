@@ -3,8 +3,48 @@
    Formulario RF-08: Solicitud de registro de centro oftalmológico
 ═══════════════════════════════════════════════ */
 
-/* ── Card wider for bigger form ── */
-.auth-card { max-width: 560px; }
+/* El registro usa el mismo símbolo de la portada y deja visibles el mapa y las evidencias. */
+.pagina-solicitud .auth-wrap { align-items: flex-start; padding: 36px 20px 64px; }
+.pagina-solicitud .auth-card { max-width: 1200px; padding: 36px 42px 30px; }
+.solicitud-cabecera { display: grid; grid-template-columns: 1fr 2fr; gap: 34px; align-items: center; padding-bottom: 28px; border-bottom: 1px solid var(--border); }
+.solicitud-marca { display: inline-flex; align-items: center; gap: 10px; width: fit-content; color: #2563eb; text-decoration: none; font-size: 23px; font-weight: 700; letter-spacing: -.7px; }
+.solicitud-marca svg { width: 39px; height: 30px; flex: none; }
+.solicitud-marca > span { color: var(--text); }
+.solicitud-marca > span span { color: #2563eb; }
+.solicitud-etiqueta { color: #2563eb; font-size: 11px; font-weight: 700; letter-spacing: .12em; margin-bottom: 5px; }
+.solicitud-cabecera h1 { font-size: clamp(23px, 3vw, 30px); line-height: 1.2; letter-spacing: -.03em; }
+.solicitud-cabecera h1 + p { margin-top: 7px; color: var(--text2); font-size: 13px; }
+.solicitud-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr); gap: 44px; align-items: start; }
+.solicitud-datos, .solicitud-complementos { min-width: 0; }
+.solicitud-complementos { position: sticky; top: 20px; }
+.solicitud-grid .form-section-title { margin-top: 27px; }
+.mapa-acciones { display: flex; gap: 10px; flex-wrap: wrap; margin: 14px 0; }
+.mapa-acciones .btn { min-height: 42px; font-size: 13px; }
+.mapa-acciones .btn:focus-visible, .solicitud-marca:focus-visible { outline: 3px solid #93c5fd; outline-offset: 3px; }
+#mapa-establecimiento { display: block; height: 370px; width: 100%; margin: 0; border: 1px solid var(--border2); border-radius: 12px; overflow: hidden; background: #e8eef5; }
+#mapa-establecimiento:empty::before { content: 'Cargando mapa…'; display: grid; place-items: center; height: 100%; color: var(--text2); }
+#estado-ubicacion { min-height: 2.5em; margin-top: 10px; line-height: 1.4; }
+.solicitud-complementos .upload-area { margin-top: 12px; }
+.pagina-solicitud #client-error-box { margin-top: 24px !important; }
+.pagina-solicitud #submit-btn { max-width: 350px; margin: 24px 0 0 auto !important; display: flex; }
+.pagina-solicitud .auth-footer-text { margin-top: 22px; }
+@media (max-width: 920px) {
+  .pagina-solicitud .auth-card { padding: 28px; }
+  .solicitud-cabecera { grid-template-columns: 1fr; gap: 18px; }
+  .solicitud-grid { grid-template-columns: 1fr; gap: 6px; }
+  .solicitud-complementos { position: static; }
+  #mapa-establecimiento { height: 330px; }
+}
+@media (max-width: 620px) {
+  .pagina-solicitud .auth-wrap { padding: 12px 8px 32px; }
+  .pagina-solicitud .auth-card { padding: 22px 16px; }
+  .solicitud-cabecera h1 { font-size: 23px; }
+  .form-row, .verify-row { flex-direction: column; }
+  .verify-row .form-group, .verify-row .btn-send-code { width: 100%; }
+  .mapa-acciones .btn { flex: 1 1 100%; }
+  #mapa-establecimiento { height: 300px; }
+  .pagina-solicitud #submit-btn { max-width: none; }
+}
 
 /* ── Section dividers ── */
 .form-section-title {
@@ -200,7 +240,7 @@
 .file-preview-item .file-remove {
   position: absolute; top: 4px; right: 6px;
   font-size: 14px; cursor: pointer; color: var(--text3);
-  line-height: 1;
+  line-height: 1; border: 0; background: transparent; padding: 3px;
 }
 .file-preview-item .file-remove:hover { color: var(--danger); }
 .file-preview-img {

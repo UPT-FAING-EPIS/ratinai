@@ -24,23 +24,22 @@ if (isset($_SESSION['solicitud_error'])) {
     <link rel="stylesheet" href="../../assets/css/auth/login.css">
     <link rel="stylesheet" href="../../assets/css/auth/solicitud_registro.css">
 </head>
-<body>
+<body class="pagina-solicitud">
 
 <div class="auth-wrap">
     <div class="auth-card">
 
-        <!-- Logo -->
-        <div class="auth-logo">
-            <div class="auth-logo-mark">
-                <svg viewBox="0 0 24 24" fill="none">
-                    <circle cx="12" cy="12" r="9" stroke="white" stroke-width="1.5"/>
-                    <circle cx="12" cy="12" r="3.5" fill="white" opacity=".6"/>
-                    <circle cx="12" cy="12" r="1.2" fill="white"/>
-                </svg>
+        <header class="solicitud-cabecera">
+            <a class="solicitud-marca" href="../../index.php" aria-label="RetinAI — Volver al inicio">
+                <svg viewBox="0 0 48 32" fill="none" aria-hidden="true"><path d="M2 16S10 3 24 3s22 13 22 13-8 13-22 13S2 16 2 16Z" stroke="currentColor" stroke-width="2.7"/><circle cx="24" cy="16" r="10" stroke="currentColor" stroke-width="2.7"/><circle cx="24" cy="16" r="4" fill="currentColor"/></svg>
+                <span>Retin<span>AI</span></span>
+            </a>
+            <div>
+                <p class="solicitud-etiqueta">REGISTRO DE ESTABLECIMIENTOS</p>
+                <h1>Solicita el registro de tu centro</h1>
+                <p>Completa los datos del centro y del titular. Después podrás ubicarlo en el mapa y adjuntar sus evidencias.</p>
             </div>
-            <h1>Retin<span>AI</span></h1>
-            <p>Solicitud de Registro de Centro Oftalmológico</p>
-        </div>
+        </header>
 
         <?php if ($success_msg): ?>
         <!-- ── Pantalla de éxito ── -->
@@ -81,6 +80,9 @@ if (isset($_SESSION['solicitud_error'])) {
             <input type="hidden" name="evidencia_2_b64"    id="evidencia_2_b64">
             <input type="hidden" name="evidencia_2_nombre" id="evidencia_2_nombre">
 
+            <div class="solicitud-grid">
+            <section class="solicitud-datos" aria-label="Datos del establecimiento y del titular">
+
             <!-- ──────────────────────────────────────
                  SECCIÓN 1: Datos del Centro
             ────────────────────────────────────── -->
@@ -98,15 +100,6 @@ if (isset($_SESSION['solicitud_error'])) {
                 <input class="form-input" type="text" id="direccion" name="direccion"
                     placeholder="Ej. Av. Bolognesi 245, Tacna" maxlength="200" required>
                 <span class="form-error" id="err-direccion" style="display:none">Campo obligatorio.</span>
-            </div>
-            <div class="form-group">
-                <input type="hidden" id="latitud" name="latitud">
-                <input type="hidden" id="longitud" name="longitud">
-                <button class="btn btn-outline" type="button" id="obtener-ubicacion">Confirmar ubicación opcional</button>
-                <button class="btn btn-outline" type="button" id="elegir-en-mapa">Elegir en el mapa</button>
-                <button class="btn btn-outline" type="button" id="buscar-en-mapa">Buscar dirección en el mapa</button>
-                <span class="form-hint" id="estado-ubicacion">Si no concede acceso, la dirección escrita sigue siendo suficiente.</span>
-                <div id="mapa-establecimiento" style="display:none;height:300px;margin-top:12px;border-radius:8px" aria-label="Mapa para elegir la ubicación del establecimiento"></div>
             </div>
 
             <div class="form-group">
@@ -210,6 +203,19 @@ if (isset($_SESSION['solicitud_error'])) {
                 </div>
             </div>
 
+            </section>
+            <aside class="solicitud-complementos" aria-label="Ubicación y evidencias">
+                <div class="form-section-title">Ubicación del centro</div>
+                <p class="form-hint">Busca la dirección que escribiste o marca el punto exacto sobre el mapa. La ubicación es opcional.</p>
+                <input type="hidden" id="latitud" name="latitud">
+                <input type="hidden" id="longitud" name="longitud">
+                <div class="mapa-acciones">
+                    <button class="btn btn-primary" type="button" id="buscar-en-mapa">Buscar dirección</button>
+                    <button class="btn btn-secondary" type="button" id="obtener-ubicacion">Usar mi ubicación</button>
+                </div>
+                <div id="mapa-establecimiento" role="application" aria-label="Mapa interactivo para marcar el establecimiento"></div>
+                <p class="form-hint" id="estado-ubicacion" role="status">Haz clic en el mapa para marcar el centro. También puedes continuar solo con la dirección escrita.</p>
+
             <!-- ──────────────────────────────────────
                  SECCIÓN 4: Evidencias
             ────────────────────────────────────── -->
@@ -228,6 +234,8 @@ if (isset($_SESSION['solicitud_error'])) {
             <span class="form-error-upload" id="err-upload" style="display:none"></span>
 
             <div class="upload-previews" id="upload-previews"></div>
+            </aside>
+            </div>
 
             <!-- ──────────────────────────────────────
                  ERROR GLOBAL y SUBMIT

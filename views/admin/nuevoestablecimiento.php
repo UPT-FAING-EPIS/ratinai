@@ -115,6 +115,15 @@ if (isset($_SESSION['solicitud_error'])) {
                     <input class="form-input" type="text" id="direccion" name="direccion" placeholder="Ej. Av. Bolognesi 245, Tacna" maxlength="200" required>
                     <span class="form-error" id="err-direccion" style="display:none">Campo obligatorio.</span>
                 </div>
+                <div class="form-group">
+                    <input type="hidden" id="latitud" name="latitud">
+                    <input type="hidden" id="longitud" name="longitud">
+                    <button class="btn btn-outline" type="button" id="obtener-ubicacion">Confirmar ubicación opcional</button>
+                    <button class="btn btn-outline" type="button" id="elegir-en-mapa">Elegir en el mapa</button>
+                    <button class="btn btn-outline" type="button" id="buscar-en-mapa">Buscar dirección en el mapa</button>
+                    <span class="form-hint" id="estado-ubicacion">Si no concede acceso, la dirección escrita sigue siendo suficiente.</span>
+                    <div id="mapa-establecimiento" style="display:none;height:300px;margin-top:12px;border-radius:8px" aria-label="Mapa para elegir la ubicación del establecimiento"></div>
+                </div>
 
                 <div class="form-group">
                     <label class="form-label">Tipo de establecimiento <span class="req">*</span></label>
@@ -203,6 +212,9 @@ if (isset($_SESSION['solicitud_error'])) {
 
 <script src="<?= $base ?>assets/js/session.service.js"></script>
 <script src="<?= $base ?>assets/js/admin/nuevoestablecimiento.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="<?= $base ?>assets/js/ubicacion_establecimiento.js"></script>
 <script>
 SessionService.init({ timeout: 300000, loginUrl: '<?= htmlspecialchars($base . "views/auth/login.php") ?>' });
 let remaining = 300;

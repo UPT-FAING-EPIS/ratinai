@@ -3,7 +3,7 @@ require_once __DIR__ . '/../../utils/PasswordHelper.php';
 
 use PHPUnit\Framework\TestCase;
 
-class PasswordHelperTest extends TestCase {
+class RF01_TestUnitaria_GenerarContrasenaTest extends TestCase {
     public function testGenerateTempLength() {
         $pass = PasswordHelper::generateTemp(12);
         $this->assertEquals(12, strlen($pass), "La longitud de la contraseña generada no es correcta.");

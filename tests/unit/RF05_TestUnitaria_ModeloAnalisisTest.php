@@ -3,7 +3,7 @@ use PHPUnit\Framework\TestCase;
 
 require_once __DIR__ . '/../../models/AnalisisModel.php';
 
-class AnalisisModelTest extends TestCase {
+class RF05_TestUnitaria_ModeloAnalisisTest extends TestCase {
 
     private $dbMock;
     private $stmtMock;

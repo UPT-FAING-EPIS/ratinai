@@ -10,6 +10,7 @@ $logout_url = $base . 'controllers/AuthController.php?action=logout';
 
 require_once __DIR__ . '/../../models/EstablecimientoModel.php';
 require_once __DIR__ . '/../../models/DoctorModel.php';
+require_once __DIR__ . '/../../models/IntegracionModel.php';
 
 $role_label   = '🛡️ Administrador';
 $role_class   = 'role-adm';
@@ -42,15 +43,18 @@ try {
         // Contadores para KPIs y sidebar badge
         $cnt_pendientes = count($pendientes);
         $cnt_activos    = $docModel->countActiveByEstablishments($ids_est);
+        $resumen_integracion = (new IntegracionModel())->contarEstadosPorEstablecimientos($ids_est);
     } else {
         $pendientes = [];
         $cnt_pendientes = 0;
         $cnt_activos = 0;
+        $resumen_integracion = ['completadas' => 0, 'fallidas' => 0, 'pendientes' => 0];
     }
 
 } catch (Exception $ex) {
     $est_nombre = ''; $pendientes = [];
     $cnt_pendientes = 0; $cnt_activos = 0; $header_sub = '';
+    $resumen_integracion = ['completadas' => 0, 'fallidas' => 0, 'pendientes' => 0];
 }
 
 $msg_ok = $msg_err = '';
@@ -93,6 +97,20 @@ if (isset($_GET['ok'])) $msg_ok = htmlspecialchars($_GET['ok']);
                     <span class="kpi-label">Médicos activos</span>
                 </div>
             </div>
+            <a class="kpi-card" href="integraciones.php" style="text-decoration:none;color:inherit">
+                <div class="kpi-icon kpi-warning">📁</div>
+                <div class="kpi-body">
+                    <span class="kpi-value"><?= $resumen_integracion['fallidas'] + $resumen_integracion['pendientes'] ?></span>
+                    <span class="kpi-label">Copias locales por atender</span>
+                </div>
+            </a>
+            <a class="kpi-card" href="integraciones.php" style="text-decoration:none;color:inherit">
+                <div class="kpi-icon kpi-green">📄</div>
+                <div class="kpi-body">
+                    <span class="kpi-value"><?= $resumen_integracion['completadas'] ?></span>
+                    <span class="kpi-label">Informes en copia local</span>
+                </div>
+            </a>
         </div>
 
 

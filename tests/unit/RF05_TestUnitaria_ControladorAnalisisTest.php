@@ -5,7 +5,7 @@ require_once __DIR__ . '/../../controllers/AnalisisController.php';
 require_once __DIR__ . '/../../models/AnalisisModel.php';
 require_once __DIR__ . '/../../models/PacienteModel.php';
 
-class AnalisisControllerTest extends TestCase {
+class RF05_TestUnitaria_ControladorAnalisisTest extends TestCase {
     private $analisisController;
     private $analisisModelMock;
     private $pacienteModelMock;

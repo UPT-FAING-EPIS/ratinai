@@ -15,7 +15,9 @@ $header_sub   = 'Médico Oftalmólogo';
 $_page = 'dashboard.php';
 
 require_once __DIR__ . '/../../models/AnalisisModel.php';
+require_once __DIR__ . '/../../models/InformeClinicoModel.php';
 $analisisModel = new AnalisisModel();
+$informeClinicoModel = new InformeClinicoModel();
 $id_medico = $user['id'];
 
 // Obtener datos
@@ -24,6 +26,13 @@ $dist = $analisisModel->getDistribucionResultados($id_medico);
 $actividad = $analisisModel->getActividadUltimos7Dias($id_medico);
 $recientes = $analisisModel->getAnalisisRecientes($id_medico, 5);
 $criticos = $analisisModel->getCasosCriticosRecientes($id_medico, 5);
+$pendientes = $informeClinicoModel->obtenerPendientesMedico((int)$id_medico);
+$borradoresPendientes = array_filter($pendientes, static function ($fila) {
+    return empty($fila['estado_informe']) || $fila['estado_informe'] === 'borrador';
+});
+$valoracionesPendientes = array_filter($pendientes, static function ($fila) {
+    return $fila['estado_valoracion'] === 'sin_evaluar' || $fila['estado_valoracion'] === 'evaluar_despues';
+});
 
 // Preparar para JS
 $js_dist = json_encode($dist);
@@ -64,6 +73,19 @@ $js_actividad = json_encode($actividad);
                 <h3 style="font-size: 28px; color: var(--danger); margin-bottom: 4px;"><?= $kpis['total_alertas'] ?: 0 ?></h3>
                 <p class="text-muted" style="font-size: 13px;">Casos con Alerta</p>
             </div>
+        </div>
+
+        <div class="grid-2" style="gap:16px; margin-top:16px;">
+            <a class="card" href="<?= $base ?>views/medico/pacientes.php?filtro=borradores" style="text-decoration:none;color:inherit">
+                <div class="card-title">Borradores pendientes</div>
+                <strong style="font-size:28px;color:var(--accent)"><?= count($borradoresPendientes) ?></strong>
+                <p class="text-muted" style="font-size:12px;margin-top:5px">Informes que requieren revisión o aprobación médica.</p>
+            </a>
+            <a class="card" href="<?= $base ?>views/medico/pacientes.php?filtro=valoracion" style="text-decoration:none;color:inherit">
+                <div class="card-title">Valoración opcional pendiente</div>
+                <strong style="font-size:28px;color:var(--warning)"><?= count($valoracionesPendientes) ?></strong>
+                <p class="text-muted" style="font-size:12px;margin-top:5px">Tarea de retroalimentación; no bloquea informes clínicos.</p>
+            </a>
         </div>
 
         <!-- ── GRÁFICOS ── -->

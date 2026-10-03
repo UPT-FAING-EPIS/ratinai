@@ -9,7 +9,7 @@ require_once __DIR__ . '/../../models/EstablecimientoModel.php';
  * Valida la integridad lógica del modelo sin tocar la BD real.
  * Utiliza Mocks de PDO/PDOStatement e inyección por Reflexión.
  */
-class EstablecimientoModelTest extends TestCase {
+class RF04_TestUnitaria_GestionEstablecimientoTest extends TestCase {
 
     private $dbMock;
     private $stmtMock;

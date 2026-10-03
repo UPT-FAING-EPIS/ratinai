@@ -5,7 +5,7 @@ use PHPUnit\Framework\TestCase;
 // simularemos la estructura mediante un mock.
 require_once __DIR__ . '/../../models/DoctorModel.php';
 
-class DoctorModelTest extends TestCase {
+class RF03_TestUnitaria_GestionMedicoTest extends TestCase {
 
     private $dbMock;
     private $stmtMock;

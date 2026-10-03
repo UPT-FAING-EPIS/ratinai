@@ -62,9 +62,14 @@ class CarpetaModel {
      */
     public function obtenerAnalisisDeCarpeta($id_carpeta, $id_medico) {
         $stmt = $this->db->prepare("
-            SELECT a.id, a.fecha_analisis, a.resultado_principal,
-                   a.probabilidad_principal, a.alerta_anomalia
+            SELECT a.id, a.id_paciente, a.fecha_analisis, a.fecha_captura, a.ojo,
+                   a.version_modelo, a.resultado_principal,
+                   a.probabilidad_principal, a.alerta_anomalia,
+                   i.estado AS estado_informe,
+                   s.estado AS estado_sincronizacion
             FROM analisis_retinales a
+            LEFT JOIN informes_clinicos i ON i.id_analisis = a.id
+            LEFT JOIN sincronizaciones_informes s ON s.id_informe = i.id
             WHERE a.id_carpeta = :id_carpeta
               AND a.id_medico  = :id_medico
             ORDER BY a.fecha_analisis DESC

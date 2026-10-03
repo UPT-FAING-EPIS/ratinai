@@ -1476,6 +1476,8 @@ body {
   margin-left: 224px;
   padding: 28px 50px;
   max-width: 100%;
+  min-width: 0;
+  width: calc(100% - 224px);
 }
 
 .sidebar-nav {

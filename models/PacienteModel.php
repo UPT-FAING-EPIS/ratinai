@@ -110,9 +110,14 @@ class PacienteModel {
 
         // Análisis sin carpeta para este médico y paciente
         $stmtA = $this->db->prepare("
-            SELECT a.id, a.fecha_analisis, a.resultado_principal,
-                   a.probabilidad_principal, a.alerta_anomalia
+            SELECT a.id, a.id_paciente, a.fecha_analisis, a.fecha_captura, a.ojo,
+                   a.version_modelo, a.resultado_principal,
+                   a.probabilidad_principal, a.alerta_anomalia,
+                   i.estado AS estado_informe,
+                   s.estado AS estado_sincronizacion
             FROM analisis_retinales a
+            LEFT JOIN informes_clinicos i ON i.id_analisis = a.id
+            LEFT JOIN sincronizaciones_informes s ON s.id_informe = i.id
             WHERE a.id_paciente = :id_paciente
               AND a.id_medico   = :id_medico
               AND a.id_carpeta  IS NULL

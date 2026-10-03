@@ -1,9 +1,9 @@
 const { defineConfig } = require('cypress');
 
 module.exports = defineConfig({
+    allowCypressEnv: false,
     e2e: {
-        baseUrl: 'https://retinai-ehcadnergkbkd9dr.eastus2-01.azurewebsites.net',
-        //baseUrl: 'http://localhost/ratinai',
+        baseUrl: 'http://ratinai.local',
 
         specPattern: 'tests/e2e/**/*.cy.js',
         supportFile: false,

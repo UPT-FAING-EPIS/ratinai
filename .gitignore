@@ -1,7 +1,12 @@
 node_modules
+vendor/
 phpunit.phar
+.phpunit.result.cache
 tests/coverage/
 .env
 ai_service/model/
 __pycache__/
 *.pyc
+cypress/screenshots/
+assets/uploads/retinografias/*
+almacenamiento/informes/

@@ -62,6 +62,20 @@ class Database {
 }
 
 define('ANALYSIS_AI_ENABLED', filter_var(env_value('ANALYSIS_AI_ENABLED', 'false'), FILTER_VALIDATE_BOOLEAN));
+define('ANALYSIS_PROVIDER', (string) env_value('ANALYSIS_PROVIDER', 'remoto'));
+define('APP_URL', rtrim((string) env_value('APP_URL', 'http://ratinai.local'), '/'));
+
+/** Indica si el servicio CNN remoto tiene todos los secretos y certificados necesarios. */
+function servicioAnalisisRemotoDisponible(): bool
+{
+    $rutaCertificado = dirname(__DIR__) . '/certs/retinai-ai-ca.crt';
+
+    return ANALYSIS_AI_ENABLED
+        && ANALYSIS_PROVIDER === 'remoto'
+        && trim((string) env_value('ANALYSIS_API_URL', '')) !== ''
+        && trim((string) env_value('ANALYSIS_API_KEY', '')) !== ''
+        && is_readable($rutaCertificado);
+}
 
 define('SMTP_HOST', 'smtp.gmail.com');
 define('SMTP_PORT', 587);

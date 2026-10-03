@@ -32,6 +32,11 @@ $_rol = $_SESSION['rol_codigo'] ?? '';
                 <svg class="nav-icon" viewBox="0 0 20 20" fill="none"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 14a6 6 0 10-12 0" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
                 Médicos
             </a>
+            <a href="<?= $base ?>views/admin/integraciones.php"
+               class="nav-item <?= $_page === 'integraciones.php' ? 'active' : '' ?>">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none"><path d="M6 7V4m8 3V4M5 7h10v4a5 5 0 01-10 0V7zM10 16v3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+                Almacenamiento
+            </a>
         </div>
 
         <?php elseif ($_rol === 'MED'): ?>
@@ -92,6 +97,11 @@ $_rol = $_SESSION['rol_codigo'] ?? '';
                 if (!empty($cnt_solicitudes_pendientes) && $cnt_solicitudes_pendientes > 0): ?>
                     <span class="nav-badge"><?= $cnt_solicitudes_pendientes ?></span>
                 <?php endif; ?>
+            </a>
+            <a href="<?= $base ?>views/superadmin/calidad_modelo.php"
+               class="nav-item <?= $_page === 'calidad_modelo.php' ? 'active' : '' ?>">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none"><path d="M3 16V9m5 7V4m5 12v-6m5 6V2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+                Seguimiento del modelo
             </a>
         </div>
         <?php endif; ?>

@@ -3,7 +3,7 @@ use PHPUnit\Framework\TestCase;
 
 require_once __DIR__ . '/../../services/MailService.php';
 
-class MailServiceTest extends TestCase {
+class RF01_TestUnitaria_ValidarCorreoTest extends TestCase {
 
     public function testSendVerificationCodeInvalidEmail() {
         $resultado = MailService::sendVerificationCode('correo-invalido', 'Juan', '123456');

@@ -2,6 +2,7 @@
 if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../models/PacienteModel.php';
 require_once __DIR__ . '/../models/CarpetaModel.php';
+require_once __DIR__ . '/../config/session_guard.php';
 
 class PacienteController {
     private $model;
@@ -173,15 +174,27 @@ class PacienteController {
         $fecha = date('d M Y H:i', strtotime($a['fecha_analisis']));
         $prob = number_format($a['probabilidad_principal'], 1) . '%';
         $resultado = htmlspecialchars(ucfirst($a['resultado_principal']));
+        $ojo = $a['ojo'] === 'derecho' ? 'OD' : ($a['ojo'] === 'izquierdo' ? 'OI' : 'Ojo no registrado');
+        $versionModelo = htmlspecialchars($a['version_modelo'] ?: 'Modelo no registrado');
+        $estadoInforme = $a['estado_informe'] ?: 'sin borrador';
+        $estadoSincronizacion = $a['estado_sincronizacion'] ?: 'sin sincronizar';
         ?>
         <div class="flex items-center gap-12" style="padding: 8px 0; border-bottom: 1px dashed var(--border);">
+            <?php if (!empty($a['ojo'])): ?>
+            <input type="checkbox" class="selector-comparacion" value="<?= (int)$a['id'] ?>" data-paciente="<?= (int)$a['id_paciente'] ?>" data-ojo="<?= htmlspecialchars($a['ojo']) ?>" aria-label="Seleccionar control para comparar">
+            <?php endif; ?>
             <div style="width:8px; height:8px; border-radius:50%; background:<?= $color ?>;"></div>
             <div style="flex:1;">
                 <p style="font-size:12px; font-weight:600; color:var(--text);"><?= $resultado ?> · <?= $prob ?></p>
-                <p style="font-size:11px; color:var(--text3);"><?= $fecha ?></p>
+                <p style="font-size:11px; color:var(--text3);"><?= $fecha ?> · <?= $ojo ?> · <?= $versionModelo ?></p>
+                <p style="font-size:11px;color:var(--text3)">Informe: <?= htmlspecialchars($estadoInforme) ?> · Sincronización: <?= htmlspecialchars($estadoSincronizacion) ?></p>
             </div>
             <span class="badge <?= $badge ?>"><?= $badgeText ?></span>
-            <button class="btn btn-ghost btn-sm" onclick="descargarPDF(<?= $a['id'] ?>)">PDF</button>
+            <?php if ($estadoInforme === 'aprobado'): ?>
+            <button class="btn btn-ghost btn-sm" onclick="descargarPDF(<?= (int)$a['id'] ?>)">PDF</button>
+            <?php elseif ($estadoInforme === 'borrador'): ?>
+            <a class="btn btn-ghost btn-sm" href="<?= get_base_path() ?>views/medico/nuevoanalisis.php?reanudar=<?= (int)$a['id'] ?>">Retomar</a>
+            <?php endif; ?>
         </div>
         <?php
     }

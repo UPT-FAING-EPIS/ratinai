@@ -50,7 +50,7 @@ class MailService {
             $mail->CharSet = 'UTF-8';
             $mail->Subject = 'Acceso a RetinAI - Su cuenta ha sido creada';
             
-            $loginUrl = 'https://retinai-ehcadnergkbkd9dr.eastus2-01.azurewebsites.net/views/auth/login.php';
+            $loginUrl = APP_URL . '/views/auth/login.php';
 
             $mail->Body = "
             <!DOCTYPE html>
@@ -177,7 +177,7 @@ class MailService {
             $mail->CharSet = 'UTF-8';
             $mail->Subject = 'Reseteo de contraseña de RetinAI';
             
-            $loginUrl = 'https://retinai-ehcadnergkbkd9dr.eastus2-01.azurewebsites.net/views/auth/login.php';
+            $loginUrl = APP_URL . '/views/auth/login.php';
 
             $mail->Body = "
             <!DOCTYPE html>
@@ -382,7 +382,7 @@ class MailService {
             $mail->CharSet = 'UTF-8';
             $mail->Subject = 'RetinAI — ¡Su solicitud fue aprobada!';
 
-            $loginUrl = 'https://retinai-ehcadnergkbkd9dr.eastus2-01.azurewebsites.net/views/auth/login.php';
+            $loginUrl = APP_URL . '/views/auth/login.php';
 
             $mail->Body = "
             <!DOCTYPE html>
@@ -477,7 +477,7 @@ class MailService {
             $mail->CharSet = 'UTF-8';
             $mail->Subject = 'RetinAI — Datos de su establecimiento actualizados';
 
-            $loginUrl = 'https://retinai-ehcadnergkbkd9dr.eastus2-01.azurewebsites.net/views/auth/login.php';
+            $loginUrl = APP_URL . '/views/auth/login.php';
 
             $mail->Body = "
             <!DOCTYPE html>
@@ -500,7 +500,7 @@ class MailService {
                                     </div>
                                     <h2 style='color:#0f172a;font-size:20px;font-weight:700;margin:0 0 14px;text-align:center;'>Datos Actualizados</h2>
                                     <p style='color:#475569;font-size:15px;line-height:1.6;margin:0 0 18px;'>
-                                        Estimado/a <strong>$nombre</strong>, le informamos que la información de su centro oftalmológico <strong>«$nombreCentro»</strong> ha sido actualizada por el equipo de administración de RetinAI.
+                                        Estimado/a <strong>{$nombre}</strong>, le informamos que la información de su centro oftalmológico <strong>«{$nombreCentro}»</strong> ha sido actualizada por el equipo de administración de RetinAI.
                                     </p>
                                     <p style='color:#475569;font-size:15px;line-height:1.6;margin:0 0 28px;'>
                                         Puede ingresar a la plataforma para revisar los cambios y continuar gestionando su establecimiento.

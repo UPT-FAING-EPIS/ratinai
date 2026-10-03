@@ -201,9 +201,14 @@ class DoctorController {
             $mailSent = MailService::sendResetPassword($doctor['correo'], $doctor['nombre'], $tempPass);
             
             if ($mailSent) {
-                echo json_encode(['success' => true]);
+                echo json_encode(['success' => true, 'correo_enviado' => true]);
             } else {
-                echo json_encode(['success' => false, 'message' => 'Contraseña reseteada, pero no se pudo enviar el correo.']);
+                echo json_encode([
+                    'success' => true,
+                    'correo_enviado' => false,
+                    'contrasena_temporal' => $tempPass,
+                    'message' => 'Contraseña reseteada. Entregue la clave temporal al médico por un canal seguro.'
+                ]);
             }
             exit;
         }

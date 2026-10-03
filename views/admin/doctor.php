@@ -76,6 +76,10 @@ if (isset($_GET['ok'])) {
 .btn-add-doctor { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; background: linear-gradient(135deg, #1A56DB 0%, #1e40af 100%); color: #fff; font-size: 13px; font-weight: 600; border-radius: 10px; text-decoration: none; border: none; cursor: pointer; transition: transform .15s, box-shadow .15s; box-shadow: 0 4px 14px rgba(26,86,219,.35); white-space: nowrap; }
 .btn-add-doctor:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(26,86,219,.45); }
 .btn-add-doctor svg { flex-shrink: 0; }
+.full-width-card { overflow-x: auto; }
+#tabla-medicos { min-width: 840px; }
+#tabla-medicos th:last-child, #tabla-medicos td:last-child { position: sticky; right: 0; background: var(--surface); box-shadow: -6px 0 10px rgba(15,23,42,.04); }
+#tabla-medicos tr:hover td:last-child { background: #F0F3F7; }
 </style>
 </head>
 <body>
@@ -279,7 +283,10 @@ document.getElementById('form-reset').addEventListener('submit', function(e) {
     }).then(r => r.json()).then(res => {
         if(res.success) {
             closeResetModal();
-            showFloatingMsg('La contraseña ha sido reseteada y enviada al correo del médico.');
+            const mensaje = res.correo_enviado
+                ? 'La contraseña ha sido reseteada y enviada al correo del médico.'
+                : `${res.message} Clave: ${res.contrasena_temporal}`;
+            showFloatingMsg(mensaje);
             setTimeout(() => location.reload(), 2000);
         } else {
             alert(res.message);

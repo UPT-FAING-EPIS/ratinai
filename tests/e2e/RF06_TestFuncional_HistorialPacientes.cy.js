@@ -43,12 +43,12 @@ describe('RF-06: Gestión de Historial de Pacientes', () => {
             // 6. Verificar el análisis y el porcentaje ("Catarata · 93.1%")
             cy.contains('Catarata · 93.1%').should('be.visible');
 
-            // 7. El botón PDF debe estar presente y se hace clic en él
+            // Un análisis histórico sin informe aprobado no debe ofrecer un PDF.
             cy.contains('Catarata · 93.1%')
               .closest('.flex')
+              .should('contain', 'Informe: sin borrador')
               .find('button')
-              .should('be.visible')
-              .click();
+              .should('not.exist');
         });
     });
 });

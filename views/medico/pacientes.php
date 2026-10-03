@@ -3,506 +3,259 @@ require_once __DIR__ . '/../../config/session_guard.php';
 require_once __DIR__ . '/../../models/PacienteModel.php';
 require_auth();
 require_role('MED');
-
 $user = current_user();
 $initials = get_initials($user['nombre']);
 $base = get_base_path();
 $logout_url = $base . 'controllers/AuthController.php?action=logout';
-
-$role_label   = '🩺 Médico';
-$role_class   = 'role-med';
+$role_label = '🩺 Médico';
+$role_class = 'role-med';
 $avatar_class = 'avatar-green';
-$header_sub   = 'Médico Oftalmólogo';
-
+$header_sub = 'Médico Oftalmólogo';
 $_page = 'pacientes.php';
-
-$pacienteModel = new PacienteModel();
-$pacientes = $pacienteModel->listarPacientesConAnalisisMedico($user['id']);
-$initialSearch = trim($_GET['q'] ?? '');
-$initialOpenPatient = (int)($_GET['open'] ?? 0);
+$pacientes = (new PacienteModel())->listarPacientesConAnalisisMedico((int)$user['id']);
 ?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>RetinAI — Historial de Pacientes</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<title>RetinAI — Historial de pacientes</title>
 <link rel="stylesheet" href="<?= $base ?>assets/css/dashboard/dashboard.css">
 <style>
-.paciente-card {
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 16px;
-    margin-bottom: 12px;
-    background: var(--surface);
-    transition: all 0.2s;
-}
-.paciente-card:hover {
-    border-color: var(--accent);
-    box-shadow: var(--shadow);
-}
-.paciente-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    cursor: pointer;
-}
-.paciente-info-main {
-    flex: 1;
-}
-.paciente-stats {
-    display: flex;
-    gap: 12px;
-    align-items: center;
-    font-size: 12px;
-    color: var(--text3);
-}
-.stat-badge {
-    background: var(--surface2);
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-weight: 600;
-}
-.stat-badge.alert {
-    background: var(--danger2);
-    color: var(--danger);
-}
-.detalle-btn {
-    font-size: 12px;
-    color: var(--accent);
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-weight: 600;
-    padding: 6px;
-}
-.detalle-btn:hover {
-    text-decoration: underline;
-}
-.paciente-detalle-wrapper {
-    display: none;
-    margin-top: 12px;
-    border-top: 1px dashed var(--border);
-    padding-top: 12px;
-}
-.history-code {
-    font-family: "DM Mono", monospace;
-    font-weight: 700;
-    letter-spacing: .02em;
-}
-.search-result-note {
-    display: none;
-    margin-top: 10px;
-    font-size: 12px;
-    color: var(--text3);
-}
-.search-result-note strong {
-    color: var(--text);
-}
+.paciente{border:1px solid var(--border);border-radius:10px;margin:10px 0;overflow:hidden}.paciente-cabecera{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:15px;cursor:pointer;background:var(--surface)}.paciente-cabecera:hover{background:var(--surface2)}.paciente-cabecera h3{font-size:14px;margin:0 0 4px}.paciente-resumen{display:flex;flex-wrap:wrap;gap:7px}.paciente-detalle{display:none;padding:0 15px 15px}.barra-comparacion{position:sticky;bottom:14px;z-index:8;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 15px;border:1px solid var(--accent);border-radius:10px;background:var(--surface);box-shadow:0 8px 26px rgba(15,23,42,.16)}.comparacion{display:none;margin-top:16px}.comparacion-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.control{border:1px solid var(--border);border-radius:9px;padding:13px}.probabilidad-comparada{display:grid;grid-template-columns:1fr auto;gap:5px;padding:5px 0;border-bottom:1px dashed var(--border)}.advertencia-version{padding:10px;border-radius:8px;background:#fff8e6;color:#784c00;margin-bottom:12px}@media(max-width:720px){.paciente-cabecera,.barra-comparacion{align-items:flex-start;flex-direction:column}.comparacion-grid{grid-template-columns:1fr}}
 </style>
 <script>const BASE_URL = '<?= $base ?>';</script>
 </head>
 <body>
-
 <?php require_once __DIR__ . '/../shared/header.php'; ?>
-
 <div class="app-shell">
-    <?php require_once __DIR__ . '/../shared/sidebar.php'; ?>
+<?php require_once __DIR__ . '/../shared/sidebar.php'; ?>
+<main class="main-content">
+    <div class="page-header"><h1 class="page-title">Historial de pacientes</h1><p class="page-sub">Consulte controles del mismo ojo, retome borradores y descargue informes aprobados.</p></div>
+    <section class="card mb-16">
+        <div class="card-title">Buscar paciente</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><input class="form-input-d" id="hist-dni" placeholder="DNI o código de paciente" autocomplete="off" style="flex:1;min-width:220px"><button class="btn btn-primary" type="button" id="buscar-historial">Buscar</button></div>
+        <p class="text-muted" id="history-search-note" style="font-size:12px;margin-top:7px" aria-live="polite"></p>
+    </section>
 
-    <main class="main-content">
-        <div class="page-header">
-            <h1 class="page-title">Historial de pacientes</h1>
-            <p class="page-sub">Consulte los pacientes atendidos y sus resultados de retinografías.</p>
-        </div>
-        
-        <div class="card mb-16">
-            <div class="card-title">Buscar paciente</div>
-            <div class="flex gap-8">
-                <input class="form-input-d" style="flex:1" type="text" id="hist-dni" placeholder="DNI o código de paciente..." onkeyup="filterHistory(false)">
-                <button class="btn btn-secondary btn-sm" type="button" onclick="filterHistory(true)">Buscar</button>
-                <button class="btn btn-ghost btn-sm" type="button" onclick="clearHistorySearch()">Limpiar</button>
+    <section class="card">
+        <div class="card-title">Pacientes recientes</div>
+        <?php if ($pacientes === []): ?>
+        <p class="text-muted">No hay pacientes con análisis registrados.</p>
+        <?php endif; ?>
+        <?php foreach ($pacientes as $paciente): ?>
+        <article class="paciente paciente-card" data-busqueda="<?= htmlspecialchars(strtolower($paciente['dni'] . ' ' . $paciente['codigo_paciente'])) ?>">
+            <div class="paciente-cabecera paciente-header" role="button" tabindex="0" data-id-paciente="<?= (int)$paciente['id'] ?>" aria-expanded="false">
+                <div><h3>Paciente #<?= htmlspecialchars($paciente['codigo_paciente']) ?></h3><p class="text-muted" style="font-size:12px">DNI <?= htmlspecialchars($paciente['dni']) ?> · Último control <?= date('d/m/Y', strtotime($paciente['ultimo_analisis'])) ?></p></div>
+                <div class="paciente-resumen"><span class="badge badge-info"><?= (int)$paciente['total_analisis'] ?> análisis</span><span class="badge badge-info"><?= (int)$paciente['total_carpetas'] ?> carpetas</span><?php if ((int)$paciente['total_alertas'] > 0): ?><span class="badge badge-pending"><?= (int)$paciente['total_alertas'] ?> alertas</span><?php endif; ?></div>
             </div>
-            <p id="history-search-note" class="search-result-note"></p>
-        </div>
+            <div class="paciente-detalle paciente-detalle-wrapper" id="detalle-<?= (int)$paciente['id'] ?>"><p class="text-muted">Cargando historial…</p></div>
+        </article>
+        <?php endforeach; ?>
+    </section>
 
-        <div class="card" id="history-container">
-            <div class="card-title">Pacientes recientes</div>
-            <?php if (empty($pacientes)): ?>
-                <p class="text-muted">No hay pacientes con análisis registrados.</p>
-            <?php else: ?>
-                <?php foreach ($pacientes as $p): 
-                    $search_text = strtolower($p['dni'] . ' ' . $p['codigo_paciente']);
-                    $ultimo = date('d M Y', strtotime($p['ultimo_analisis']));
-                ?>
-                <div class="paciente-card"
-                     data-search="<?= htmlspecialchars($search_text) ?>"
-                     data-dni="<?= htmlspecialchars($p['dni']) ?>"
-                     data-code="<?= htmlspecialchars($p['codigo_paciente']) ?>">
-                    <div class="paciente-header" onclick="toggleDetalle(<?= $p['id'] ?>, this)">
-                        <div class="paciente-info-main">
-                            <h3 style="font-size: 15px; color: var(--text); margin-bottom: 4px;">Paciente #<?= htmlspecialchars($p['codigo_paciente']) ?></h3>
-                            <p style="font-size: 13px; color: var(--text2);">DNI: <?= htmlspecialchars($p['dni']) ?> · Último análisis: <?= $ultimo ?></p>
-                        </div>
-                        <div class="paciente-stats">
-                            <span class="stat-badge"><?= $p['total_carpetas'] ?> Carpetas</span>
-                            <span class="stat-badge"><?= $p['total_analisis'] ?> Análisis</span>
-                            <?php if ($p['total_alertas'] > 0): ?>
-                                <span class="stat-badge alert"><?= $p['total_alertas'] ?> Alertas</span>
-                            <?php endif; ?>
-                            <button class="detalle-btn">Ver detalle ▼</button>
-                        </div>
-                    </div>
-                    <div id="detalle-<?= $p['id'] ?>" class="paciente-detalle-wrapper">
-                        <div style="text-align: center; color: var(--text3); font-size: 13px;">Cargando historial...</div>
-                    </div>
-                </div>
-                <?php endforeach; ?>
-            <?php endif; ?>
-        </div>
-    </main>
+    <section class="card comparacion" id="resultado-comparacion" aria-live="polite"></section>
+    <div class="barra-comparacion" id="barra-comparacion" style="display:none"><span id="conteo-comparacion">Seleccione dos controles del mismo ojo.</span><div><button class="btn btn-ghost btn-sm" id="limpiar-comparacion">Limpiar</button><button class="btn btn-primary btn-sm" id="comparar-controles" disabled>Comparar controles</button></div></div>
+</main>
 </div>
-
-<div id="toast" class="toast" style="display:none"></div>
-
+<div id="toast" class="toast" style="display:none" role="status" aria-live="polite"></div>
 <script>
-function filterHistory(showFeedback = false) {
-    const term = document.getElementById('hist-dni').value.trim().toLowerCase();
-    const items = document.querySelectorAll('.paciente-card');
-    const note = document.getElementById('history-search-note');
-    let matches = 0;
-    let exactDniMatch = null;
+(() => {
+    'use strict';
+    const DURACION_MENSAJE = 4000;
+    const detallesCargados = new Set();
+    const busqueda = document.getElementById('hist-dni');
+    const notaBusqueda = document.getElementById('history-search-note');
+    const botonBusqueda = document.getElementById('buscar-historial');
+    const barraComparacion = document.getElementById('barra-comparacion');
+    const conteoComparacion = document.getElementById('conteo-comparacion');
+    const botonComparar = document.getElementById('comparar-controles');
+    const resultadoComparacion = document.getElementById('resultado-comparacion');
 
-    items.forEach(item => {
-        const searchText = item.getAttribute('data-search');
-        const dni = (item.getAttribute('data-dni') || '').toLowerCase();
+    busqueda.addEventListener('input', () => {
+        const termino = busqueda.value.trim().toLowerCase();
+        let coincidencias = 0;
+        document.querySelectorAll('.paciente').forEach(paciente => {
+            const visible = !termino || paciente.dataset.busqueda.includes(termino);
+            paciente.style.display = visible ? 'block' : 'none';
+            if (visible) coincidencias += 1;
+        });
+        notaBusqueda.textContent = termino
+            ? (coincidencias ? `${coincidencias} paciente(s) encontrado(s).` : 'No se encontraron pacientes que coincidan con la búsqueda.')
+            : '';
+    });
 
-        if (!term || searchText.includes(term)) {
-            item.style.display = 'block';
-            matches++;
-            if (term && dni === term) {
-                exactDniMatch = item;
+    botonBusqueda.addEventListener('click', async () => {
+        const dni = busqueda.value.trim();
+        if (!/^\d{8}$/.test(dni)) {
+            notaBusqueda.textContent = 'Ingrese un DNI de 8 dígitos para recuperar el código de historial.';
+            return;
+        }
+        const formulario = new URLSearchParams({ dni });
+        try {
+            const respuesta = await fetch(`${BASE_URL}controllers/PacienteController.php?action=recuperar_codigo`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: formulario.toString()
+            }).then(resultado => resultado.json());
+            if (!respuesta.success) {
+                notaBusqueda.textContent = 'No se encontraron pacientes que coincidan con la búsqueda.';
+                return;
             }
-        } else {
-            item.style.display = 'none';
+            notaBusqueda.replaceChildren();
+            notaBusqueda.append('Paciente encontrado. Código de historial: ');
+            const codigo = document.createElement('strong');
+            codigo.className = 'history-code';
+            codigo.textContent = respuesta.paciente.codigo_paciente;
+            notaBusqueda.appendChild(codigo);
+        } catch (_) {
+            notaBusqueda.textContent = 'No se pudo consultar el historial en este momento.';
         }
     });
 
-    if (note) {
-        if (!term) {
-            note.style.display = 'none';
-            note.textContent = '';
-        } else if (exactDniMatch) {
-            const code = escapeHtml(exactDniMatch.getAttribute('data-code') || '');
-            note.style.display = 'block';
-            note.innerHTML = 'Paciente encontrado. Código de historial: <span class="history-code">' + code + '</span>';
-        } else if (matches === 0) {
-            note.style.display = 'block';
-            note.textContent = 'No se encontraron pacientes que coincidan con la búsqueda.';
-        } else if (showFeedback) {
-            note.style.display = 'block';
-            note.textContent = matches + ' paciente(s) encontrado(s).';
-        } else {
-            note.style.display = 'none';
-            note.textContent = '';
-        }
-    }
-}
+    document.querySelectorAll('.paciente-cabecera').forEach(cabecera => {
+        const alternar = () => cargarDetalle(cabecera);
+        cabecera.addEventListener('click', alternar);
+        cabecera.addEventListener('keydown', evento => {
+            if (evento.key === 'Enter' || evento.key === ' ') {
+                evento.preventDefault();
+                alternar();
+            }
+        });
+    });
 
-function clearHistorySearch() {
-    document.getElementById('hist-dni').value = '';
-    filterHistory(true);
-}
-
-function escapeHtml(value) {
-    return String(value)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
-}
-
-const cargados = {};
-
-async function toggleDetalle(id_paciente, headerElement) {
-    const wrapper = document.getElementById('detalle-' + id_paciente);
-    const btn = headerElement.querySelector('.detalle-btn');
-
-    if (wrapper.style.display === 'block') {
-        wrapper.style.display = 'none';
-        btn.textContent = 'Ver detalle ▼';
-        return;
-    }
-
-    wrapper.style.display = 'block';
-    btn.textContent = 'Ocultar ▲';
-
-    if (!cargados[id_paciente]) {
+    async function cargarDetalle(cabecera) {
+        const idPaciente = Number(cabecera.dataset.idPaciente);
+        const contenedor = document.getElementById(`detalle-${idPaciente}`);
+        const abierto = cabecera.getAttribute('aria-expanded') === 'true';
+        cabecera.setAttribute('aria-expanded', String(!abierto));
+        contenedor.style.display = abierto ? 'none' : 'block';
+        if (abierto || detallesCargados.has(idPaciente)) return;
         try {
-            const res = await fetch(BASE_URL + 'controllers/PacienteController.php?action=detalle_html&id_paciente=' + id_paciente);
-            const html = await res.text();
-            wrapper.innerHTML = html;
-            cargados[id_paciente] = true;
-        } catch (e) {
-            wrapper.innerHTML = '<p class="text-danger">Error al cargar el detalle.</p>';
+            const respuesta = await fetch(`${BASE_URL}controllers/PacienteController.php?action=detalle_html&id_paciente=${idPaciente}`);
+            contenedor.innerHTML = await respuesta.text();
+            detallesCargados.add(idPaciente);
+            conectarSelectoresComparacion(contenedor);
+        } catch (_) {
+            contenedor.textContent = 'No se pudo cargar el historial.';
         }
     }
-}
 
-function toggleAnalisis(folderId) {
-    const div = document.getElementById(folderId);
-    if (div) {
-        div.style.display = div.style.display === 'none' ? 'block' : 'none';
+    window.toggleAnalisis = identificador => {
+        const contenedor = document.getElementById(identificador);
+        if (contenedor) contenedor.style.display = contenedor.style.display === 'none' ? 'block' : 'none';
+    };
+    window.filterFolders = entrada => {
+        const termino = entrada.value.toLowerCase();
+        entrada.closest('.paciente-detalle-container').querySelectorAll('.carpeta-box').forEach(carpeta => {
+            carpeta.style.display = carpeta.textContent.toLowerCase().includes(termino) ? 'block' : 'none';
+        });
+    };
+    window.descargarPDF = idAnalisis => {
+        window.location.assign(`${BASE_URL}controllers/AnalisisController.php?action=descargar_informe&id_analisis=${idAnalisis}`);
+    };
+
+    function conectarSelectoresComparacion(contenedor) {
+        contenedor.querySelectorAll('.selector-comparacion').forEach(selector => {
+            selector.addEventListener('change', () => {
+                const seleccionados = obtenerSeleccionados();
+                if (seleccionados.length > 2) {
+                    selector.checked = false;
+                    mostrarMensaje('Solo puede comparar dos controles.', 'warning');
+                }
+                actualizarBarraComparacion();
+            });
+        });
     }
-}
 
-function filterFolders(input) {
-    const term = input.value.toLowerCase();
-    const container = input.closest('.paciente-detalle-container');
-    const folders = container.querySelectorAll('.carpeta-box');
-    folders.forEach(f => {
-        const titleText = f.querySelector('strong').textContent.toLowerCase();
-        if (titleText.includes(term)) {
-            f.style.display = 'block';
-        } else {
-            f.style.display = 'none';
+    function obtenerSeleccionados() {
+        return [...document.querySelectorAll('.selector-comparacion:checked')];
+    }
+
+    function actualizarBarraComparacion() {
+        const seleccionados = obtenerSeleccionados();
+        barraComparacion.style.display = seleccionados.length ? 'flex' : 'none';
+        conteoComparacion.textContent = `${seleccionados.length} de 2 controles seleccionados.`;
+        const mismoPaciente = seleccionados.length === 2 && seleccionados[0].dataset.paciente === seleccionados[1].dataset.paciente;
+        const mismoOjo = seleccionados.length === 2 && seleccionados[0].dataset.ojo === seleccionados[1].dataset.ojo;
+        botonComparar.disabled = !(mismoPaciente && mismoOjo);
+        if (seleccionados.length === 2 && (!mismoPaciente || !mismoOjo)) {
+            conteoComparacion.textContent = 'Seleccione controles del mismo paciente y ojo.';
         }
+    }
+
+    document.getElementById('limpiar-comparacion').addEventListener('click', () => {
+        obtenerSeleccionados().forEach(selector => { selector.checked = false; });
+        resultadoComparacion.style.display = 'none';
+        actualizarBarraComparacion();
     });
-}
 
-async function descargarPDF(id_analisis) {
-    try {
-        const res = await fetch(BASE_URL + 'controllers/AnalisisController.php?action=datos_pdf&id_analisis=' + id_analisis);
-        const json = await res.json();
-        if (json.success) {
-            generarPDF(json.analisis);
-            showToast('PDF descargado', 'success');
-        } else {
-            showToast(json.error || 'Error', 'danger');
-        }
-    } catch(e) {
-        showToast('Error al descargar PDF', 'danger');
-    }
-}
-
-// Generación PDF idéntica a la de nuevo análisis
-async function generarPDF(a) {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
-    const W  = doc.internal.pageSize.getWidth();
-    const pageH = doc.internal.pageSize.getHeight();
-    let y = 0;
-
-    doc.setFillColor(26, 86, 219);
-    doc.rect(0, 0, W, 30, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(20);
-    doc.text('RetinAI', 14, 13);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.text('Sistema de análisis retinal asistido por inteligencia artificial', 14, 20);
-    doc.setFontSize(8);
-    doc.text('Reporte #' + a.id, W - 14, 13, { align: 'right' });
-    doc.text('Análisis retinal — Reporte médico', W - 14, 20, { align: 'right' });
-
-    y = 38;
-    doc.setDrawColor(230, 235, 245);
-    doc.setFillColor(248, 250, 255);
-    doc.roundedRect(10, y, W - 20, 28, 3, 3, 'FD');
-
-    doc.setTextColor(26, 86, 219);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.text('MÉDICO TRATANTE', 16, y + 7);
-    doc.setTextColor(30, 30, 40);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.text('Dr. ' + (a.nombre_medico || 'N/D'), 16, y + 15);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.setTextColor(90, 95, 110);
-    const espLabel = a.especialidad_medico ? a.especialidad_medico : 'Médico Oftalmólogo';
-    doc.text(espLabel + (a.cmp_medico ? '   ·   CMP: ' + a.cmp_medico : ''), 16, y + 22);
-
-    let fechaStr = 'N/D';
-    if(a.fecha_analisis) {
-        const d = new Date(a.fecha_analisis.replace(' ', 'T'));
-        fechaStr = d.toLocaleDateString('es-PE', { day:'2-digit', month:'long', year:'numeric' }) + '  —  ' + d.toLocaleTimeString('es-PE', { hour:'2-digit', minute:'2-digit' });
-    }
-
-    doc.setTextColor(26, 86, 219);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.text('FECHA Y HORA DEL ANÁLISIS', W - 14, y + 7, { align: 'right' });
-    doc.setTextColor(30, 30, 40);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    doc.text(fechaStr, W - 14, y + 15, { align: 'right' });
-    if (a.codigo_paciente || a.dni_paciente) {
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(8);
-        doc.setTextColor(90, 95, 110);
-        doc.text((a.codigo_paciente ? 'Cód. Paciente: ' + a.codigo_paciente : '') + (a.dni_paciente ? '   DNI: ' + a.dni_paciente : ''), W - 14, y + 22, { align: 'right' });
-    }
-
-    y += 36;
-    const imgW  = 60;
-    const imgH  = 55;
-    const imgX  = 14;
-    const imgY  = y;
-
-    if (a.imagen_b64) {
+    botonComparar.addEventListener('click', async () => {
+        const seleccionados = obtenerSeleccionados();
         try {
-            const ext = a.imagen_b64.startsWith('data:image/png') ? 'PNG' : 'JPEG';
-            doc.addImage(a.imagen_b64, ext, imgX, imgY, imgW, imgH, '', 'MEDIUM');
-            doc.setDrawColor(200, 210, 230);
-            doc.setLineWidth(0.4);
-            doc.rect(imgX, imgY, imgW, imgH);
-        } catch(e) {}
-    }
-
-    doc.setFont('helvetica', 'italic');
-    doc.setFontSize(7);
-    doc.setTextColor(120, 125, 140);
-    doc.text('Retinografía analizada', imgX + imgW / 2, imgY + imgH + 5, { align: 'center' });
-
-    const rX = imgX + imgW + 8;
-    const rW = W - rX - 10;
-    const badgeColor = a.alerta_anomalia ? [220, 38, 38] : [5, 150, 105];
-
-    doc.setFillColor(...badgeColor);
-    doc.roundedRect(rX, imgY, rW, 22, 3, 3, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.text('RESULTADO PRINCIPAL', rX + rW / 2, imgY + 7, { align: 'center' });
-    doc.setFontSize(14);
-    doc.text((a.resultado_principal.charAt(0).toUpperCase() + a.resultado_principal.slice(1).toLowerCase()), rX + rW / 2, imgY + 17, { align: 'center' });
-
-    doc.setFillColor(240, 245, 255);
-    doc.setDrawColor(210, 220, 240);
-    doc.roundedRect(rX, imgY + 25, rW, 12, 2, 2, 'FD');
-    doc.setTextColor(26, 86, 219);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.text('Confianza: ' + Number(a.probabilidad_principal).toFixed(1) + '%', rX + rW / 2, imgY + 33, { align: 'center' });
-
-    const barY0 = imgY + 40;
-    const clases = [
-        { label: 'Retinopatía Diabética', val: a.probabilidad_diabetes, color: [220, 38, 38]  },
-        { label: 'Glaucoma',              val: a.probabilidad_glaucoma, color: [217, 119, 6]  },
-        { label: 'Catarata',              val: a.probabilidad_catarata, color: [37, 99, 235]  },
-        { label: 'Normal',                val: a.probabilidad_normal,   color: [5, 150, 105]  },
-    ];
-    const barMaxW = rW - 4;
-    clases.forEach((c, i) => {
-        const by = barY0 + i * 11;
-        const pct = Math.min(100, Math.max(0, Number(c.val)));
-        const filledW = (pct / 100) * barMaxW;
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(7.5);
-        doc.setTextColor(50, 55, 70);
-        doc.text(c.label, rX, by + 3.5);
-        doc.setTextColor(80, 85, 100);
-        doc.text(pct.toFixed(1) + '%', rX + rW, by + 3.5, { align: 'right' });
-        doc.setFillColor(230, 234, 242);
-        doc.roundedRect(rX, by + 5, barMaxW, 3.5, 1, 1, 'F');
-        if (filledW > 0) {
-            doc.setFillColor(...c.color);
-            doc.roundedRect(rX, by + 5, filledW, 3.5, 1, 1, 'F');
+            const ruta = `${BASE_URL}controllers/AnalisisController.php?action=comparar&id_primero=${seleccionados[0].value}&id_segundo=${seleccionados[1].value}`;
+            const respuesta = await fetch(ruta).then(resultado => resultado.json());
+            if (!respuesta.success) throw new Error(respuesta.error || 'No se pudo comparar.');
+            renderizarComparacion(respuesta);
+        } catch (error) {
+            mostrarMensaje(error.message, 'danger');
         }
     });
 
-    y = Math.max(imgY + imgH + 8, barY0 + clases.length * 11 + 6);
-
-    // Diagnóstico Médico
-    if (a.diagnostico_medico) {
-        doc.setFillColor(248, 250, 255);
-        doc.setDrawColor(210, 220, 240);
-        const diagLines = doc.splitTextToSize(a.diagnostico_medico, W - 32);
-        const diagH = diagLines.length * 4.5 + 14;
-        doc.roundedRect(10, y, W - 20, diagH, 2, 2, 'FD');
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(8);
-        doc.setTextColor(26, 86, 219);
-        doc.text('DIAGNÓSTICO Y OBSERVACIONES CLÍNICAS', 16, y + 7);
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(9);
-        doc.setTextColor(30, 30, 40);
-        doc.text(diagLines, 16, y + 14);
-        y += diagH + 8;
-    }
-
-    y += 4;
-    doc.setFillColor(255, 251, 235);
-    doc.setDrawColor(253, 230, 138);
-    doc.roundedRect(10, y, W - 20, 14, 2, 2, 'FD');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7.5);
-    doc.setTextColor(146, 64, 14);
-    doc.text('⚠  RESULTADO REFERENCIAL', 16, y + 6);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7);
-    doc.setTextColor(120, 80, 20);
-    doc.text('Este análisis fue generado por un modelo de inteligencia artificial. No constituye diagnóstico definitivo.', 16, y + 11);
-
-    y += 20;
-    const leyenda = 'Resultado generado por modelo de inteligencia artificial con fines de apoyo diagnóstico. La decisión clínica final corresponde al médico tratante.';
-    doc.setFillColor(241, 245, 249);
-    doc.setDrawColor(203, 213, 225);
-    const leyendaLines = doc.splitTextToSize(leyenda, W - 32);
-    const leyendaH = leyendaLines.length * 4.5 + 8;
-    doc.roundedRect(10, y, W - 20, leyendaH, 2, 2, 'FD');
-    doc.setFont('helvetica', 'italic');
-    doc.setFontSize(8);
-    doc.setTextColor(71, 85, 105);
-    doc.text(leyendaLines, 16, y + 7);
-
-    doc.setFillColor(26, 86, 219);
-    doc.rect(0, pageH - 12, W, 12, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7);
-    doc.text('RetinAI — Sistema de análisis retinal asistido por IA', 14, pageH - 5);
-    doc.text('Generado: ' + new Date().toLocaleString('es-PE'), W - 14, pageH - 5, { align: 'right' });
-
-    const fechaFile = new Date().toISOString().slice(0, 10);
-    doc.save('RetinAI_Reporte_' + a.id + '_' + fechaFile + '.pdf');
-}
-
-function showToast(msg, type = '') {
-    const t = document.getElementById('toast');
-    t.textContent = msg;
-    t.className   = 'toast ' + (type || '');
-    t.style.display = 'flex';
-    setTimeout(() => t.style.display = 'none', 3000);
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-    const initialSearch = <?= json_encode($initialSearch) ?>;
-    const initialOpenPatient = <?= (int)$initialOpenPatient ?>;
-
-    if (initialSearch) {
-        const input = document.getElementById('hist-dni');
-        input.value = initialSearch;
-        filterHistory(true);
-    }
-
-    if (initialOpenPatient > 0) {
-        const wrapper = document.getElementById('detalle-' + initialOpenPatient);
-        const card = wrapper ? wrapper.closest('.paciente-card') : null;
-        const header = card ? card.querySelector('.paciente-header') : null;
-
-        if (card && header) {
-            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            toggleDetalle(initialOpenPatient, header);
+    function renderizarComparacion(respuesta) {
+        resultadoComparacion.replaceChildren();
+        const titulo = document.createElement('div');
+        titulo.className = 'card-title';
+        titulo.textContent = 'Comparación de controles del mismo ojo';
+        resultadoComparacion.appendChild(titulo);
+        if (respuesta.versiones_diferentes) {
+            const advertencia = document.createElement('p');
+            advertencia.className = 'advertencia-version';
+            advertencia.textContent = 'Las versiones de la CNN son diferentes; las probabilidades no son directamente equivalentes.';
+            resultadoComparacion.appendChild(advertencia);
         }
+        const rejilla = document.createElement('div');
+        rejilla.className = 'comparacion-grid';
+        respuesta.controles.forEach(control => {
+            const tarjeta = document.createElement('article');
+            tarjeta.className = 'control';
+            const encabezado = document.createElement('h3');
+            encabezado.textContent = `${control.fecha_captura || control.fecha_analisis} · ${control.ojo}`;
+            tarjeta.appendChild(encabezado);
+            const modelo = document.createElement('p');
+            modelo.className = 'text-muted';
+            modelo.textContent = `Modelo ${control.version_modelo || 'no registrado'}`;
+            tarjeta.appendChild(modelo);
+            [['Normal', control.probabilidad_normal], ['Diabetes', control.probabilidad_diabetes], ['Glaucoma', control.probabilidad_glaucoma], ['Catarata', control.probabilidad_catarata]].forEach(([nombre, valor]) => {
+                const fila = document.createElement('div');
+                fila.className = 'probabilidad-comparada';
+                const etiqueta = document.createElement('span');
+                etiqueta.textContent = nombre;
+                const probabilidad = document.createElement('strong');
+                probabilidad.textContent = `${Number(valor).toFixed(1)}%`;
+                fila.append(etiqueta, probabilidad);
+                tarjeta.appendChild(fila);
+            });
+            rejilla.appendChild(tarjeta);
+        });
+        resultadoComparacion.appendChild(rejilla);
+        const aviso = document.createElement('p');
+        aviso.className = 'text-muted';
+        aviso.style.marginTop = '12px';
+        aviso.textContent = 'RetinAI muestra datos de ambos controles; la interpretación del cambio corresponde al médico.';
+        resultadoComparacion.appendChild(aviso);
+        resultadoComparacion.style.display = 'block';
+        resultadoComparacion.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
-});
+
+    function mostrarMensaje(mensaje, tipo) {
+        const elemento = document.getElementById('toast');
+        elemento.textContent = mensaje;
+        elemento.className = `toast ${tipo}`;
+        elemento.style.display = 'flex';
+        window.setTimeout(() => { elemento.style.display = 'none'; }, DURACION_MENSAJE);
+    }
+})();
 </script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-
 </body>
 </html>

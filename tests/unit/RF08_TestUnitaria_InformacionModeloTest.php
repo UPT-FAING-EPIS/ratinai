@@ -2,20 +2,24 @@
 use PHPUnit\Framework\TestCase;
 
 class RF08_TestUnitaria_InformacionModeloTest extends TestCase {
-    private $vista;
+    private $contenidoVista;
 
     protected function setUp(): void {
-        $this->vista = file_get_contents(__DIR__ . '/../../views/medico/modeloinfo.php');
+        $this->contenidoVista = file_get_contents(__DIR__ . '/../../views/medico/modeloinfo.php');
     }
 
-    public function testExponeLasMetricasOficialesDelModelo(): void {
-        foreach (['95.4%', '93.8%', '96.1%', 'ODIR-5K', 'CNN · TF Lite', '224×224 px'] as $metrica) {
-            $this->assertStringContainsString($metrica, $this->vista);
-        }
+    public function testNoPublicaMetricasClinicasSinEvidenciaVerificada(): void {
+        $this->assertStringContainsString('Métricas clínicas verificadas', $this->contenidoVista);
+        $this->assertStringContainsString('Pendientes', $this->contenidoVista);
+        $this->assertStringNotContainsString('95.4%', $this->contenidoVista);
+        $this->assertStringNotContainsString('ODIR-5K', $this->contenidoVista);
     }
 
-    public function testMuestraLaAdvertenciaDeUsoReferencial(): void {
-        $this->assertStringContainsString('apoyo diagnóstico referencial', $this->vista);
-        $this->assertStringContainsString('criterio clínico del médico especialista', $this->vista);
+    public function testExplicaLasLimitacionesRealesDeLaCnnV1(): void {
+        $this->assertStringContainsString('No evaluado por CNN v1', $this->contenidoVista);
+        $this->assertStringContainsString('No evaluada por CNN v1', $this->contenidoVista);
+        $this->assertStringContainsString('el análisis permanece bloqueado', $this->contenidoVista);
+        $this->assertStringContainsString('no está configurado', $this->contenidoVista);
+        $this->assertStringContainsString('requiere revisión y conclusión del médico especialista', $this->contenidoVista);
     }
 }

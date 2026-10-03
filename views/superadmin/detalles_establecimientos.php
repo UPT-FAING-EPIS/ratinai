@@ -103,6 +103,12 @@ try {
                         <label>Dirección</label>
                         <input type="text" name="direccion" value="<?= htmlspecialchars($establecimiento['direccion'] ?? '') ?>">
                     </div>
+                    <?php if ($establecimiento['latitud'] !== null && $establecimiento['longitud'] !== null): ?>
+                    <div class="form-group">
+                        <label>Ubicación confirmada</label>
+                        <a href="https://www.openstreetmap.org/?mlat=<?= rawurlencode((string)$establecimiento['latitud']) ?>&amp;mlon=<?= rawurlencode((string)$establecimiento['longitud']) ?>#map=17/<?= rawurlencode((string)$establecimiento['latitud']) ?>/<?= rawurlencode((string)$establecimiento['longitud']) ?>" target="_blank" rel="noopener noreferrer"><?= htmlspecialchars($establecimiento['latitud'] . ', ' . $establecimiento['longitud']) ?></a>
+                    </div>
+                    <?php endif; ?>
                     <div class="form-group">
                         <label>Tipo</label>
                         <select name="tipo">

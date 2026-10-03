@@ -16,7 +16,7 @@ class EstablecimientoModel {
 
     public function getByOwnerId($userId) {
         $stmt = $this->db->prepare(
-            "SELECT id, nombre, direccion, tipo, ruc FROM establecimientos WHERE id_usuario = :uid ORDER BY id ASC"
+            "SELECT id, nombre, direccion, latitud, longitud, tipo, ruc FROM establecimientos WHERE id_usuario = :uid ORDER BY id ASC"
         );
         $stmt->execute([':uid' => $userId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);

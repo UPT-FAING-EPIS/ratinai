@@ -148,6 +148,9 @@ try {
                             <strong><?= htmlspecialchars($s['nombre_centro']) ?></strong>
                             <span>RUC: <span class="mono"><?= htmlspecialchars($s['ruc']) ?></span></span>
                             <span><span class="badge-tipo" style="padding:1px 6px;font-size:10px;"><?= ucfirst(htmlspecialchars($s['tipo'])) ?></span> <?= htmlspecialchars($s['direccion']) ?></span>
+                            <?php if ($s['latitud'] !== null && $s['longitud'] !== null): ?>
+                            <a href="https://www.openstreetmap.org/?mlat=<?= rawurlencode((string)$s['latitud']) ?>&amp;mlon=<?= rawurlencode((string)$s['longitud']) ?>#map=17/<?= rawurlencode((string)$s['latitud']) ?>/<?= rawurlencode((string)$s['longitud']) ?>" target="_blank" rel="noopener noreferrer">Ver ubicación confirmada</a>
+                            <?php endif; ?>
                         </div>
                     </td>
                     <td>

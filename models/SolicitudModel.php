@@ -10,7 +10,7 @@ class SolicitudModel {
 
     public function getSolicitudesByContactEmailOrOwner($email, $userId) {
         $q = $this->db->prepare(
-            "SELECT id, nombre_centro, direccion, tipo, ruc, estado, fecha_solicitud
+            "SELECT id, nombre_centro, direccion, latitud, longitud, tipo, ruc, estado, fecha_solicitud
              FROM solicitudes_establecimiento
              WHERE correo_contacto = :correo OR id_usuario_solicitante = :uid
              ORDER BY fecha_solicitud DESC"
@@ -21,7 +21,7 @@ class SolicitudModel {
 
     public function getAllSolicitudesConOrigen() {
         return $this->db->query(
-            "SELECT s.id, s.nombre_centro, s.direccion, s.tipo, s.ruc,
+            "SELECT s.id, s.nombre_centro, s.direccion, s.latitud, s.longitud, s.tipo, s.ruc,
                     s.dni_titular, s.nombres_titular, s.apellidos_titular, s.telefono, s.correo_contacto,
                     s.evidencia_1, s.evidencia_1_nombre, s.evidencia_2, s.evidencia_2_nombre,
                     s.estado, s.fecha_solicitud,

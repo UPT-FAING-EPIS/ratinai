@@ -88,6 +88,7 @@ function handleSolicitar(): void
     $direccion        = trim($_POST['direccion']        ?? '');
     $tipo             = trim($_POST['tipo']             ?? '');
     $ruc              = trim($_POST['ruc']              ?? '');
+    [$latitud, $longitud] = obtenerCoordenadasOpcionales($_POST);
     
     // Datos Titular
     $dni_titular      = trim($_POST['dni_titular']      ?? '');
@@ -182,11 +183,11 @@ function handleSolicitar(): void
         // ── Insertar solicitud ────────────────────────
         $stmt = $db->prepare(
             "INSERT INTO solicitudes_establecimiento
-                (nombre_centro, direccion, tipo, ruc, dni_titular, nombres_titular, apellidos_titular, telefono, correo_contacto, evidencia_1, evidencia_1_nombre, evidencia_2, evidencia_2_nombre, estado, fecha_solicitud)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pendiente', NOW())"
+                (nombre_centro, direccion, latitud, longitud, tipo, ruc, dni_titular, nombres_titular, apellidos_titular, telefono, correo_contacto, evidencia_1, evidencia_1_nombre, evidencia_2, evidencia_2_nombre, estado, fecha_solicitud)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pendiente', NOW())"
         );
         $stmt->execute([
-            $nombre_centro, $direccion, $tipo, $ruc,
+            $nombre_centro, $direccion, $latitud, $longitud, $tipo, $ruc,
             $dni_titular, $nombres_titular, $apellidos_titular, $telefono, $correo_contacto,
             $evidencia_1_b64, $evidencia_1_nombre, 
             $evidencia_2_b64 ?: null, $evidencia_2_nombre ?: null
@@ -246,10 +247,10 @@ function handleAprobar(): void
         if ($usuario_existente_id) {
             // El ADM ya existe: solo crear el establecimiento y vincularlo
             $ins = $db->prepare(
-                "INSERT INTO establecimientos (nombre, direccion, tipo, ruc, id_usuario)
-                 VALUES (?, ?, ?, ?, ?)"
+                "INSERT INTO establecimientos (nombre, direccion, latitud, longitud, tipo, ruc, id_usuario)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)"
             );
-            $ins->execute([$sol['nombre_centro'], $sol['direccion'], $sol['tipo'], $sol['ruc'], $usuario_existente_id]);
+            $ins->execute([$sol['nombre_centro'], $sol['direccion'], $sol['latitud'], $sol['longitud'], $sol['tipo'], $sol['ruc'], $usuario_existente_id]);
             $establecimiento_id = $db->lastInsertId();
 
             // Marcar solicitud como aprobada
@@ -276,10 +277,10 @@ function handleAprobar(): void
 
             // Crear el establecimiento vinculado al nuevo usuario
             $ins = $db->prepare(
-                "INSERT INTO establecimientos (nombre, direccion, tipo, ruc, id_usuario)
-                 VALUES (?, ?, ?, ?, ?)"
+                "INSERT INTO establecimientos (nombre, direccion, latitud, longitud, tipo, ruc, id_usuario)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)"
             );
-            $ins->execute([$sol['nombre_centro'], $sol['direccion'], $sol['tipo'], $sol['ruc'], $nuevo_usuario_id]);
+            $ins->execute([$sol['nombre_centro'], $sol['direccion'], $sol['latitud'], $sol['longitud'], $sol['tipo'], $sol['ruc'], $nuevo_usuario_id]);
             $establecimiento_id = $db->lastInsertId();
 
             // Actualizar el establecimiento_id principal en el usuario
@@ -355,6 +356,7 @@ function handleSolicitarAdmin(): void
     $direccion        = trim($_POST['direccion']        ?? '');
     $tipo             = trim($_POST['tipo']             ?? '');
     $ruc              = trim($_POST['ruc']              ?? '');
+    [$latitud, $longitud] = obtenerCoordenadasOpcionales($_POST);
     
     // Datos Titular
     $dni_titular      = trim($_POST['dni_titular']      ?? '');
@@ -434,11 +436,11 @@ function handleSolicitarAdmin(): void
 
         $stmt = $db->prepare(
             "INSERT INTO solicitudes_establecimiento
-                (nombre_centro, direccion, tipo, ruc, dni_titular, nombres_titular, apellidos_titular, telefono, correo_contacto, id_usuario_solicitante, evidencia_1, evidencia_1_nombre, evidencia_2, evidencia_2_nombre, estado, fecha_solicitud)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pendiente', NOW())"
+                (nombre_centro, direccion, latitud, longitud, tipo, ruc, dni_titular, nombres_titular, apellidos_titular, telefono, correo_contacto, id_usuario_solicitante, evidencia_1, evidencia_1_nombre, evidencia_2, evidencia_2_nombre, estado, fecha_solicitud)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pendiente', NOW())"
         );
         $stmt->execute([
-            $nombre_centro, $direccion, $tipo, $ruc,
+            $nombre_centro, $direccion, $latitud, $longitud, $tipo, $ruc,
             $dni_titular, $nombres_titular, $apellidos_titular, $telefono, $correo_contacto,
             $user['id'],
             $evidencia_1_b64, $evidencia_1_nombre,
@@ -454,4 +456,27 @@ function handleSolicitarAdmin(): void
         header('Location: ' . $redirect_form);
         exit;
     }
+}
+
+/**
+ * Acepta coordenadas solo si el par está completo y dentro de los límites geográficos.
+ */
+function obtenerCoordenadasOpcionales(array $entrada): array
+{
+    $latitudCruda = trim((string) ($entrada['latitud'] ?? ''));
+    $longitudCruda = trim((string) ($entrada['longitud'] ?? ''));
+    if ($latitudCruda === '' && $longitudCruda === '') {
+        return [null, null];
+    }
+    if (!is_numeric($latitudCruda) || !is_numeric($longitudCruda)) {
+        return [null, null];
+    }
+
+    $latitud = (float) $latitudCruda;
+    $longitud = (float) $longitudCruda;
+    if ($latitud < -90 || $latitud > 90 || $longitud < -180 || $longitud > 180) {
+        return [null, null];
+    }
+
+    return [$latitud, $longitud];
 }

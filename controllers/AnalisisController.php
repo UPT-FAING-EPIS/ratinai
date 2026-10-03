@@ -1,274 +1,632 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) session_start();
+
+declare(strict_types=1);
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../models/AnalisisModel.php';
 require_once __DIR__ . '/../models/PacienteModel.php';
-require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../models/CarpetaModel.php';
+require_once __DIR__ . '/../models/InformeClinicoModel.php';
+require_once __DIR__ . '/../services/ServicioBorradorClinicoLocal.php';
+require_once __DIR__ . '/../services/ServicioBorradorClinicoOpenAI.php';
+require_once __DIR__ . '/../services/ServicioPdfClinico.php';
+require_once __DIR__ . '/../services/ServicioAlmacenamientoInstitucionalLocal.php';
+require_once __DIR__ . '/../services/ServicioAlmacenamientoInforme.php';
 
-class AnalisisController {
-    private $model;
+class AnalisisController
+{
+    private const TAMANO_MAXIMO_IMAGEN = 10485760;
+    private const TIEMPO_MAXIMO_SERVICIO = 30;
+    private const LONGITUD_MAXIMA_INFORME = 12000;
+    private const LONGITUD_MAXIMA_MOTIVO = 255;
+    private const LONGITUD_MAXIMA_COMENTARIO = 1000;
+    private const OJOS_PERMITIDOS = ['derecho', 'izquierdo'];
+    private const VALORACIONES_PERMITIDAS = ['coincido', 'discrepo', 'evaluar_despues'];
+    private const RESULTADOS_CLINICOS_PERMITIDOS = ['diabetes', 'glaucoma', 'catarata', 'normal'];
+    private const PROBABILIDAD_MINIMA = 0.0;
+    private const PROBABILIDAD_MAXIMA = 100.0;
 
-    public function __construct() {
-        $this->model = new AnalisisModel();
+    private AnalisisModel $model;
+    private InformeClinicoModel $modeloInforme;
+
+    public function __construct(?AnalisisModel $modeloAnalisis = null, ?InformeClinicoModel $modeloInforme = null)
+    {
+        $this->model = $modeloAnalisis ?? new AnalisisModel();
+        $this->modeloInforme = $modeloInforme ?? new InformeClinicoModel();
     }
 
-    public function analizar() {
-        header('Content-Type: application/json');
-
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            echo json_encode(['success' => false, 'error' => 'Método no permitido']);
+    public function analizar(): void
+    {
+        if (!$this->esMetodo('POST')) {
+            $this->responderJson(['success' => false, 'error' => 'Método no permitido'], 405);
+            return;
+        }
+        if (!$this->sesionMedicaValida()) {
+            $this->responderJson([
+                'success' => false,
+                'error' => 'Su sesión ha expirado. Por favor inicie sesión nuevamente.',
+                'expired' => true,
+            ], 401);
+            return;
+        }
+        if (!isset($_FILES['imagen']) || $_FILES['imagen']['error'] !== UPLOAD_ERR_OK) {
+            $this->responderJson(['success' => false, 'error' => 'Error al subir la imagen'], 422);
             return;
         }
 
-        if (!isset($_SESSION['user_id']) || $_SESSION['rol_codigo'] !== 'MED') {
-            echo json_encode(['success' => false, 'error' => 'Su sesión ha expirado. Por favor inicie sesión nuevamente.', 'expired' => true]);
+        $archivo = $_FILES['imagen'];
+        $extension = strtolower(pathinfo((string) $archivo['name'], PATHINFO_EXTENSION));
+        if (!in_array($extension, ['jpg', 'jpeg', 'png'], true)) {
+            $this->responderJson([
+                'success' => false,
+                'error' => 'Formato no permitido. Por favor sube una imagen en formato JPG o PNG.',
+            ], 415);
             return;
         }
-
-        if (!ANALYSIS_AI_ENABLED) {
-            echo json_encode([
+        if ((int) $archivo['size'] > self::TAMANO_MAXIMO_IMAGEN) {
+            $this->responderJson([
+                'success' => false,
+                'error' => 'El archivo supera el tamaño máximo permitido de 10 MB.',
+            ], 413);
+            return;
+        }
+        if (!servicioAnalisisRemotoDisponible()) {
+            $this->responderJson([
                 'success' => false,
                 'ai_disabled' => true,
-                'error' => 'El análisis automatizado está temporalmente desactivado. Puede continuar usando las demás funciones del sistema.'
+                'error' => 'El servicio CNN remoto no está configurado. No se generará ningún resultado clínico simulado.',
+            ], 503);
+            return;
+        }
+
+        $dniPaciente = trim((string) ($_POST['dni_paciente'] ?? ''));
+        $ojo = trim((string) ($_POST['ojo'] ?? ''));
+        if (!preg_match('/^\d{8}$/', $dniPaciente)) {
+            $this->responderJson(['success' => false, 'error' => 'Ingrese un DNI válido de 8 dígitos.'], 422);
+            return;
+        }
+        if (!in_array($ojo, self::OJOS_PERMITIDOS, true)) {
+            $this->responderJson(['success' => false, 'error' => 'Seleccione el ojo de la retinografía.'], 422);
+            return;
+        }
+
+        $modeloPaciente = new PacienteModel();
+        $paciente = $modeloPaciente->buscarPorDNI($dniPaciente);
+        if ($paciente === false) {
+            $idPacienteCreado = $modeloPaciente->registrarPaciente($dniPaciente);
+            $paciente = $modeloPaciente->buscarPorDNI($dniPaciente);
+            if (!$idPacienteCreado || $paciente === false) {
+                $this->responderJson(['success' => false, 'error' => 'No se pudo identificar al paciente.'], 500);
+                return;
+            }
+        }
+
+        $directorioCarga = __DIR__ . '/../assets/uploads/retinografias/';
+        if (!is_dir($directorioCarga) && !mkdir($directorioCarga, 0750, true) && !is_dir($directorioCarga)) {
+            $this->responderJson(['success' => false, 'error' => 'No se pudo preparar el almacenamiento de imágenes.'], 500);
+            return;
+        }
+
+        $nombreArchivo = bin2hex(random_bytes(16)) . '.' . $extension;
+        $rutaDestino = $directorioCarga . $nombreArchivo;
+        $rutaRelativa = 'assets/uploads/retinografias/' . $nombreArchivo;
+        if (!move_uploaded_file((string) $archivo['tmp_name'], $rutaDestino)) {
+            $this->responderJson(['success' => false, 'error' => 'Error al guardar la imagen en el servidor'], 500);
+            return;
+        }
+
+        try {
+            $salidaModelo = $this->solicitarAnalisis($rutaDestino, (string) $archivo['name']);
+            $datosPersistencia = $this->normalizarSalidaModelo($salidaModelo);
+            $datosPersistencia += [
+                'id_medico' => (int) $_SESSION['user_id'],
+                'id_paciente' => (int) $paciente['id'],
+                'id_carpeta' => $this->obtenerCarpetaPermitida((int) ($_POST['id_carpeta'] ?? 0)),
+                'ojo' => $ojo,
+                'fecha_captura' => $this->normalizarFechaCaptura((string) ($_POST['fecha_captura'] ?? '')),
+                'imagen_path' => $rutaRelativa,
+                'hash_imagen' => hash_file('sha256', $rutaDestino),
+                'diagnostico_medico' => null,
+                'salida_original_json' => json_encode($salidaModelo, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            ];
+
+            $idAnalisis = $this->model->registrarAnalisis($datosPersistencia);
+            if (!$idAnalisis) {
+                throw new RuntimeException('No se pudo registrar el análisis.');
+            }
+
+            if ((string) env_value('ANALYSIS_CONTRACT_VERSION', 'v1') === 'v1') {
+                $salidaModelo['validacion'] = null;
+            }
+            $salidaModelo['id_analisis'] = (int) $idAnalisis;
+            $this->responderJson(['success' => true, 'data' => $salidaModelo, 'imagen_path' => $rutaRelativa]);
+        } catch (Throwable $error) {
+            if (is_file($rutaDestino)) {
+                unlink($rutaDestino);
+            }
+            $this->responderJson(['success' => false, 'error' => $error->getMessage()], 502);
+        }
+    }
+
+    public function registrar_final(): void
+    {
+        if (!$this->validarSolicitudMedicaPost()) {
+            return;
+        }
+        $idAnalisis = (int) ($_POST['id_analisis'] ?? 0);
+        $diagnostico = trim((string) ($_POST['diagnostico_medico'] ?? ''));
+        if ($idAnalisis <= 0) {
+            $this->responderJson(['success' => false, 'error' => 'ID de análisis inválido.'], 422);
+            return;
+        }
+        $actualizado = $this->model->actualizarDiagnostico(
+            $idAnalisis,
+            (int) $_SESSION['user_id'],
+            $diagnostico === '' ? null : $diagnostico
+        );
+        if (!$actualizado) {
+            $this->responderJson(['success' => false, 'error' => 'Análisis no encontrado.'], 404);
+            return;
+        }
+        $this->responderJson(['success' => true, 'id_analisis' => $idAnalisis]);
+    }
+
+    public function generarBorrador(): void
+    {
+        if (!$this->validarSolicitudMedicaPost()) {
+            return;
+        }
+        $idAnalisis = (int) ($_POST['id_analisis'] ?? 0);
+        $idMedico = (int) $_SESSION['user_id'];
+        $analisis = $this->model->obtenerPorId($idAnalisis, $idMedico);
+        if (!$this->analisisAptoParaInforme($analisis)) {
+            $this->responderJson(['success' => false, 'error' => 'Solo se puede generar un informe para una retinografía evaluable.'], 422);
+            return;
+        }
+        $informeExistente = $this->modeloInforme->obtenerPorAnalisis($idAnalisis, $idMedico);
+        if ($informeExistente !== null) {
+            $this->responderJson(['success' => true, 'informe' => $informeExistente]);
+            return;
+        }
+        $controles = $this->model->obtenerControlesPrevios($idAnalisis, $idMedico);
+        try {
+            $textoGenerado = (new ServicioBorradorClinicoOpenAI())->generar($analisis, $controles);
+        } catch (Throwable $error) {
+            $this->responderJson(['success' => false, 'error' => $error->getMessage()], 503);
+            return;
+        }
+        $this->modeloInforme->guardarBorrador($idAnalisis, $idMedico, $textoGenerado, $textoGenerado);
+        $this->responderJson([
+            'success' => true,
+            'informe' => $this->modeloInforme->obtenerPorAnalisis($idAnalisis, $idMedico),
+        ]);
+    }
+
+    public function guardarBorrador(): void
+    {
+        if (!$this->validarSolicitudMedicaPost()) {
+            return;
+        }
+        $idAnalisis = (int) ($_POST['id_analisis'] ?? 0);
+        $texto = trim((string) ($_POST['texto_informe'] ?? ''));
+        if ($texto === '' || mb_strlen($texto) > self::LONGITUD_MAXIMA_INFORME) {
+            $this->responderJson(['success' => false, 'error' => 'El borrador debe contener entre 1 y 12 000 caracteres.'], 422);
+            return;
+        }
+        if (!$this->modeloInforme->actualizarTextoBorrador($idAnalisis, (int) $_SESSION['user_id'], $texto)) {
+            $this->responderJson(['success' => false, 'error' => 'No existe un borrador editable para este análisis.'], 404);
+            return;
+        }
+        $this->responderJson(['success' => true]);
+    }
+
+    public function aprobarInforme(): void
+    {
+        if (!$this->validarSolicitudMedicaPost()) {
+            return;
+        }
+        $idAnalisis = (int) ($_POST['id_analisis'] ?? 0);
+        $texto = trim((string) ($_POST['texto_informe'] ?? ''));
+        $idMedico = (int) $_SESSION['user_id'];
+        if ($texto === '' || mb_strlen($texto) > self::LONGITUD_MAXIMA_INFORME) {
+            $this->responderJson(['success' => false, 'error' => 'El informe debe contener entre 1 y 12 000 caracteres.'], 422);
+            return;
+        }
+        $analisis = $this->model->obtenerPorId($idAnalisis, $idMedico);
+        if (!$this->analisisAptoParaInforme($analisis)) {
+            $this->responderJson(['success' => false, 'error' => 'El análisis no es apto para aprobación.'], 422);
+            return;
+        }
+
+        try {
+            $borrador = $this->modeloInforme->obtenerPorAnalisis($idAnalisis, $idMedico);
+            if ($borrador === null || $borrador['estado'] !== 'borrador') {
+                throw new RuntimeException('No existe un borrador editable para aprobar.');
+            }
+
+            $fechaAprobacion = date('Y-m-d H:i:s');
+            $vistaPreviaInforme = $borrador;
+            $vistaPreviaInforme['texto_editado'] = $texto;
+            $vistaPreviaInforme['fecha_aprobacion'] = $fechaAprobacion;
+            $contenidoPdf = (new ServicioPdfClinico())->generar($analisis, $vistaPreviaInforme);
+            $informe = $this->modeloInforme->aprobar($idAnalisis, $idMedico, $texto, $fechaAprobacion);
+            try {
+                $almacenamiento = (new ServicioAlmacenamientoInforme())->guardar(
+                    (int) $analisis['establecimiento_id'],
+                    (int) $informe['id'],
+                    (string) ($analisis['codigo_paciente'] ?: 'SIN_CODIGO'),
+                    $contenidoPdf
+                );
+                $estadoSincronizacion = $almacenamiento['estado'];
+            } catch (Throwable $errorAlmacenamiento) {
+                $estadoSincronizacion = 'fallida';
+            }
+            $this->responderJson([
+                'success' => true,
+                'id_informe' => (int) $informe['id'],
+                'estado_sincronizacion' => $estadoSincronizacion,
             ]);
+        } catch (Throwable $error) {
+            $this->responderJson(['success' => false, 'error' => $error->getMessage()], 409);
+        }
+    }
+
+    public function valorarResultado(): void
+    {
+        if (!$this->validarSolicitudMedicaPost()) {
             return;
         }
-
-        $id_medico = $_SESSION['user_id'];
-        $dni_paciente = trim($_POST['dni_paciente'] ?? '');
-        $id_carpeta_input = (int)($_POST['id_carpeta'] ?? 0);
-
-        $id_paciente = null;
-        if (!empty($dni_paciente) && strlen($dni_paciente) === 8 && ctype_digit($dni_paciente)) {
-            $pacModel = new PacienteModel();
-            $paciente = $pacModel->buscarPorDNI($dni_paciente);
-            if ($paciente) {
-                $id_paciente = $paciente['id'];
-            }
-        }
-
-        // Validar que la carpeta pertenezca al médico (si se especificó)
-        $id_carpeta = null;
-        if ($id_carpeta_input > 0) {
-            require_once __DIR__ . '/../models/CarpetaModel.php';
-            $carpetaModel = new CarpetaModel();
-            $carpeta = $carpetaModel->obtenerPorId($id_carpeta_input);
-            if ($carpeta && (int)$carpeta['id_medico'] === (int)$id_medico) {
-                $id_carpeta = $id_carpeta_input;
-            }
-        }
-
-
-        if (!isset($_FILES['imagen']) || $_FILES['imagen']['error'] !== UPLOAD_ERR_OK) {
-            echo json_encode(['success' => false, 'error' => 'Error al subir la imagen']);
+        $idAnalisis = (int) ($_POST['id_analisis'] ?? 0);
+        $valoracion = trim((string) ($_POST['valoracion'] ?? ''));
+        $motivo = trim((string) ($_POST['motivo'] ?? ''));
+        $comentario = trim((string) ($_POST['comentario'] ?? ''));
+        if (!in_array($valoracion, self::VALORACIONES_PERMITIDAS, true)) {
+            $this->responderJson(['success' => false, 'error' => 'Valoración no permitida.'], 422);
             return;
         }
-
-        $file = $_FILES['imagen'];
-        $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-
-        if (!in_array($ext, ['jpg', 'jpeg', 'png'])) {
-            echo json_encode(['success' => false, 'error' => 'Formato no permitido. Por favor sube una imagen en formato JPG o PNG.']);
+        if ($valoracion === 'discrepo' && $motivo === '') {
+            $this->responderJson(['success' => false, 'error' => 'Indique el motivo de la discrepancia.'], 422);
             return;
         }
+        try {
+            $this->modeloInforme->guardarValoracion(
+                $idAnalisis,
+                (int) $_SESSION['user_id'],
+                $valoracion,
+                $motivo === '' ? null : mb_substr($motivo, 0, self::LONGITUD_MAXIMA_MOTIVO),
+                $comentario === '' ? null : mb_substr($comentario, 0, self::LONGITUD_MAXIMA_COMENTARIO)
+            );
+            $this->responderJson(['success' => true]);
+        } catch (Throwable $error) {
+            $this->responderJson(['success' => false, 'error' => $error->getMessage()], 403);
+        }
+    }
 
-        if ($file['size'] > 10 * 1024 * 1024) {
-            echo json_encode(['success' => false, 'error' => 'El archivo supera el tamaño máximo permitido de 10 MB.']);
+    public function comparar(): void
+    {
+        if (!$this->sesionMedicaValida()) {
+            $this->responderJson(['success' => false, 'error' => 'Sesión inválida', 'expired' => true], 401);
             return;
         }
-
-        $uploadDir = __DIR__ . '/../assets/uploads/retinografias/';
-        if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0755, true);
-        }
-
-        $filename = uniqid('retina_') . '.' . $ext;
-        $destPath = $uploadDir . $filename;
-        $relPath = 'assets/uploads/retinografias/' . $filename;
-
-        if (!move_uploaded_file($file['tmp_name'], $destPath)) {
-            echo json_encode(['success' => false, 'error' => 'Error al guardar la imagen en el servidor']);
+        $comparacion = $this->model->compararControles(
+            (int) ($_GET['id_primero'] ?? 0),
+            (int) ($_GET['id_segundo'] ?? 0),
+            (int) $_SESSION['user_id']
+        );
+        if ($comparacion === null) {
+            $this->responderJson(['success' => false, 'error' => 'Los controles deben pertenecer al mismo paciente y al mismo ojo.'], 422);
             return;
         }
+        $this->responderJson(['success' => true] + $comparacion);
+    }
 
-        // --- LLAMADA A LA API PRIVADA DEL MODELO ---
-        $modelApiUrl = rtrim((string) env_value('ANALYSIS_API_URL', ''), '/');
-        $modelApiKey = (string) env_value('ANALYSIS_API_KEY', '');
-        $modelApiCaFile = __DIR__ . '/../certs/retinai-ai-ca.crt';
-        if ($modelApiUrl === '' || $modelApiKey === '' || !is_readable($modelApiCaFile)) {
-            echo json_encode(['success' => false, 'error' => 'El servicio de análisis no está configurado. Contacte al administrador.']);
+    public function descargarInforme(): void
+    {
+        if (!$this->sesionMedicaValida()) {
+            http_response_code(401);
             return;
         }
+        $idAnalisis = (int) ($_GET['id_analisis'] ?? 0);
+        $informe = $this->modeloInforme->obtenerPorAnalisis($idAnalisis, (int) $_SESSION['user_id']);
+        if ($informe === null || $informe['estado'] !== 'aprobado' || empty($informe['ruta_pdf'])) {
+            http_response_code(404);
+            return;
+        }
+        $rutaBase = realpath(__DIR__ . '/../almacenamiento/informes');
+        $rutaPdf = realpath(__DIR__ . '/../' . $informe['ruta_pdf']);
+        $prefijoPermitido = $rutaBase === false ? '' : $rutaBase . DIRECTORY_SEPARATOR;
+        if ($rutaBase === false || $rutaPdf === false || !str_starts_with($rutaPdf, $prefijoPermitido) || !is_file($rutaPdf)) {
+            http_response_code(404);
+            return;
+        }
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: attachment; filename="RetinAI_Informe_' . (int) $informe['id'] . '.pdf"');
+        header('Content-Length: ' . filesize($rutaPdf));
+        readfile($rutaPdf);
+    }
 
-        $ch = curl_init("{$modelApiUrl}/api/analizar");
-        $curlFile = new CURLFile($destPath, mime_content_type($destPath), $file['name']);
+    public function datosPdf(): void
+    {
+        if (!$this->sesionMedicaValida()) {
+            $this->responderJson(['success' => false, 'error' => 'Sesión inválida', 'expired' => true], 401);
+            return;
+        }
+        $analisis = $this->model->obtenerPorId(
+            (int) ($_GET['id_analisis'] ?? 0),
+            (int) $_SESSION['user_id']
+        );
+        if ($analisis === false) {
+            $this->responderJson(['success' => false, 'error' => 'Análisis no encontrado'], 404);
+            return;
+        }
+        $this->responderJson(['success' => true, 'analisis' => $analisis]);
+    }
 
-        curl_setopt_array($ch, [
+    private function solicitarAnalisis(string $rutaImagen, string $nombreOriginal): array
+    {
+        $urlServicio = rtrim((string) env_value('ANALYSIS_API_URL', ''), '/');
+        $claveServicio = (string) env_value('ANALYSIS_API_KEY', '');
+        $rutaCertificado = __DIR__ . '/../certs/retinai-ai-ca.crt';
+        if ($urlServicio === '' || $claveServicio === '' || !is_readable($rutaCertificado)) {
+            throw new RuntimeException('El servicio de análisis no está configurado. Contacte al administrador.');
+        }
+        $conexion = curl_init($urlServicio . '/api/analizar');
+        curl_setopt_array($conexion, [
             CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => ['file' => $curlFile],
+            CURLOPT_POSTFIELDS => ['file' => new CURLFile($rutaImagen, (string) mime_content_type($rutaImagen), $nombreOriginal)],
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => 30, // Permitimos que tarde lo necesario, el frontend mostrará advertencia a los 5s
-            CURLOPT_HTTPHEADER => ["X-API-Key: {$modelApiKey}"],
-            CURLOPT_CAINFO => $modelApiCaFile,
+            CURLOPT_TIMEOUT => self::TIEMPO_MAXIMO_SERVICIO,
+            CURLOPT_HTTPHEADER => ['X-API-Key: ' . $claveServicio],
+            CURLOPT_CAINFO => $rutaCertificado,
             CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_SSL_VERIFYHOST => 2,
         ]);
-
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
-        $error = curl_error($ch);
-        curl_close($ch);
-
-        if ($error || !$response || $httpCode !== 200) {
-            echo json_encode(['success' => false, 'error' => 'No se pudo completar el análisis. Por favor intente nuevamente o contacte al administrador.']);
-            return;
+        $respuesta = curl_exec($conexion);
+        $codigoHttp = curl_getinfo($conexion, CURLINFO_RESPONSE_CODE);
+        $errorConexion = curl_error($conexion);
+        curl_close($conexion);
+        if ($errorConexion !== '' || $respuesta === false || $codigoHttp !== 200) {
+            throw new RuntimeException('No se pudo completar el análisis con el servicio CNN.');
         }
-
-        $resJson = json_decode($response, true);
-        if (!$resJson || !isset($resJson['resultado_principal'])) {
-            echo json_encode(['success' => false, 'error' => 'Respuesta inválida del modelo CNN']);
-            return;
+        $salida = json_decode($respuesta, true);
+        if (!is_array($salida)) {
+            throw new RuntimeException('El servicio CNN devolvió una respuesta inválida.');
         }
-
-        echo json_encode([
-            'success' => true,
-            'data' => $resJson,
-            'imagen_path' => $relPath
-        ]);
+        return $salida;
     }
 
-    public function registrar_final() {
-        header('Content-Type: application/json');
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            echo json_encode(['success' => false, 'error' => 'Método no permitido']);
-            return;
-        }
-        if (!isset($_SESSION['user_id']) || $_SESSION['rol_codigo'] !== 'MED') {
-            echo json_encode(['success' => false, 'error' => 'Sesión expirada', 'expired' => true]);
-            return;
+    private function normalizarSalidaModelo(array $salida): array
+    {
+        if ((string) env_value('ANALYSIS_CONTRACT_VERSION', 'v1') === 'v1') {
+            return $this->normalizarSalidaModeloV1($salida);
         }
 
-        $id_medico = $_SESSION['user_id'];
-        $dni_paciente = trim($_POST['dni_paciente'] ?? '');
-        $id_carpeta_input = (int)($_POST['id_carpeta'] ?? 0);
-        $imagen_path = trim($_POST['imagen_path'] ?? '');
-        $diagnostico_medico = trim($_POST['diagnostico_medico'] ?? '');
-
-        if(empty($imagen_path)) {
-            echo json_encode(['success' => false, 'error' => 'Falta la imagen analizada']);
-            return;
+        $validacion = $salida['validacion'] ?? null;
+        if (!is_array($validacion)
+            || !array_key_exists('es_retinografia', $validacion)
+            || !array_key_exists('es_evaluable', $validacion)
+            || !isset($salida['tiempo_analisis'])
+            || !is_numeric($salida['tiempo_analisis'])
+            || (float) $salida['tiempo_analisis'] < self::PROBABILIDAD_MINIMA
+            || trim((string) ($salida['modelo_version'] ?? '')) === '') {
+            throw new RuntimeException('La versión del modelo no cumple el contrato de validación RF-10.');
+        }
+        $esRetinografia = filter_var($validacion['es_retinografia'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+        $esEvaluable = filter_var($validacion['es_evaluable'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+        if ($esRetinografia === null || $esEvaluable === null) {
+            throw new RuntimeException('El servicio CNN devolvió estados de validación inválidos.');
         }
 
-        $id_paciente = null;
-        if (!empty($dni_paciente) && strlen($dni_paciente) === 8 && ctype_digit($dni_paciente)) {
-            $pacModel = new PacienteModel();
-            $paciente = $pacModel->buscarPorDNI($dni_paciente);
-            if ($paciente) {
-                $id_paciente = $paciente['id'];
-            }
-        }
+        $probabilidadRetinografia = $this->obtenerProbabilidadObligatoria(
+            $validacion,
+            'probabilidad_retinografia',
+            'retinografía'
+        );
+        $probabilidadCalidad = $this->obtenerProbabilidadObligatoria(
+            $validacion,
+            'probabilidad_calidad',
+            'calidad'
+        );
+        $aceptada = $esRetinografia && $esEvaluable;
 
-        $id_carpeta = null;
-        if ($id_carpeta_input > 0) {
-            require_once __DIR__ . '/../models/CarpetaModel.php';
-            $carpetaModel = new CarpetaModel();
-            $carpeta = $carpetaModel->obtenerPorId($id_carpeta_input);
-            if ($carpeta && (int)$carpeta['id_medico'] === (int)$id_medico) {
-                $id_carpeta = $id_carpeta_input;
-            }
-        }
-
-        $data = [
-            'id_medico'              => $id_medico,
-            'id_paciente'            => $id_paciente,
-            'id_carpeta'             => $id_carpeta,
-            'imagen_path'            => $imagen_path,
-            'resultado_principal'    => $_POST['resultado_principal'] ?? 'Desconocido',
-            'probabilidad_principal' => (float)($_POST['probabilidad_principal'] ?? 0),
-            'probabilidad_normal'    => (float)($_POST['probabilidad_normal'] ?? 0),
-            'probabilidad_diabetes'  => (float)($_POST['probabilidad_diabetes'] ?? 0),
-            'probabilidad_glaucoma'  => (float)($_POST['probabilidad_glaucoma'] ?? 0),
-            'probabilidad_catarata'  => (float)($_POST['probabilidad_catarata'] ?? 0),
-            'diagnostico_medico'     => $diagnostico_medico ?: null,
-            'alerta_anomalia'        => (int)($_POST['alerta_anomalia'] ?? 0),
-            'es_referencial'         => (int)($_POST['es_referencial'] ?? 1),
-            'tiempo_analisis'        => isset($_POST['tiempo_analisis']) ? (float)$_POST['tiempo_analisis'] : null
+        $resultadoPrincipal = null;
+        $probabilidadPrincipal = null;
+        $probabilidadesClinicas = [
+            'normal' => null,
+            'diabetes' => null,
+            'glaucoma' => null,
+            'catarata' => null,
         ];
-
-        $idAnalisis = $this->model->registrarAnalisis($data);
-        if (!$idAnalisis) {
-            echo json_encode(['success' => false, 'error' => 'Error al registrar análisis en base de datos']);
-            return;
+        $alertaAnomalia = false;
+        if ($aceptada) {
+            $resultadoPrincipal = trim((string) ($salida['resultado_principal'] ?? ''));
+            if (!in_array($resultadoPrincipal, self::RESULTADOS_CLINICOS_PERMITIDOS, true)
+                || !is_array($salida['probabilidades'] ?? null)
+                || !array_key_exists('alerta_anomalia', $salida)) {
+                throw new RuntimeException('La salida clínica del modelo está incompleta.');
+            }
+            $probabilidadPrincipal = $this->obtenerProbabilidadObligatoria(
+                $salida,
+                'probabilidad_principal',
+                'resultado principal'
+            );
+            foreach (array_keys($probabilidadesClinicas) as $categoria) {
+                $probabilidadesClinicas[$categoria] = $this->obtenerProbabilidadObligatoria(
+                    $salida['probabilidades'],
+                    $categoria,
+                    $categoria
+                );
+            }
+            $alertaAnomalia = filter_var(
+                $salida['alerta_anomalia'],
+                FILTER_VALIDATE_BOOLEAN,
+                FILTER_NULL_ON_FAILURE
+            );
+            if ($alertaAnomalia === null) {
+                throw new RuntimeException('El servicio CNN devolvió una alerta de anomalía inválida.');
+            }
+        } elseif (trim((string) ($validacion['motivo_rechazo'] ?? '')) === '') {
+            throw new RuntimeException('El servicio CNN rechazó la imagen sin indicar el motivo.');
         }
 
-        echo json_encode([
-            'success' => true,
-            'id_analisis' => $idAnalisis
-        ]);
+        return [
+            'version_modelo' => (string) $salida['modelo_version'],
+            'es_retinografia' => $esRetinografia ? 1 : 0,
+            'probabilidad_retinografia' => $probabilidadRetinografia,
+            'es_evaluable' => $esEvaluable ? 1 : 0,
+            'probabilidad_calidad' => $probabilidadCalidad,
+            'motivo_rechazo' => $aceptada ? null : trim((string) $validacion['motivo_rechazo']),
+            'resultado_principal' => $resultadoPrincipal,
+            'probabilidad_principal' => $probabilidadPrincipal,
+            'probabilidad_normal' => $probabilidadesClinicas['normal'],
+            'probabilidad_diabetes' => $probabilidadesClinicas['diabetes'],
+            'probabilidad_glaucoma' => $probabilidadesClinicas['glaucoma'],
+            'probabilidad_catarata' => $probabilidadesClinicas['catarata'],
+            'alerta_anomalia' => $alertaAnomalia ? 1 : 0,
+            'es_referencial' => 1,
+            'tiempo_analisis' => (float) $salida['tiempo_analisis'],
+        ];
     }
 
-    /**
-     * Devuelve en JSON los datos de un análisis para generar el PDF desde el frontend.
-     * Requiere GET param: id_analisis
-     */
-    public function datosPdf() {
-        header('Content-Type: application/json');
-
-        if (!isset($_SESSION['user_id']) || $_SESSION['rol_codigo'] !== 'MED') {
-            echo json_encode(['success' => false, 'error' => 'Sesión inválida', 'expired' => true]);
-            return;
+    /** Conserva la salida clínica real de la CNN v1 sin atribuirle validaciones que no ejecuta. */
+    private function normalizarSalidaModeloV1(array $salida): array
+    {
+        $resultadoPrincipal = trim((string) ($salida['resultado_principal'] ?? ''));
+        $probabilidades = $salida['probabilidades'] ?? null;
+        if (!in_array($resultadoPrincipal, self::RESULTADOS_CLINICOS_PERMITIDOS, true)
+            || !is_array($probabilidades)
+            || !isset($salida['tiempo_analisis'])
+            || !is_numeric($salida['tiempo_analisis'])
+            || (float) $salida['tiempo_analisis'] < self::PROBABILIDAD_MINIMA
+            || trim((string) ($salida['modelo_version'] ?? '')) === '') {
+            throw new RuntimeException('La CNN v1 devolvió una respuesta incompleta.');
         }
 
-        $id_analisis = (int)($_GET['id_analisis'] ?? 0);
-        if ($id_analisis <= 0) {
-            echo json_encode(['success' => false, 'error' => 'ID de análisis inválido']);
-            return;
+        $probabilidadesClinicas = [];
+        foreach (self::RESULTADOS_CLINICOS_PERMITIDOS as $categoria) {
+            $probabilidadesClinicas[$categoria] = $this->obtenerProbabilidadObligatoria(
+                $probabilidades,
+                $categoria,
+                $categoria
+            );
         }
 
-        $id_medico = (int)$_SESSION['user_id'];
-        $analisis  = $this->model->obtenerPorId($id_analisis, $id_medico);
-
-        if (!$analisis) {
-            echo json_encode(['success' => false, 'error' => 'Análisis no encontrado']);
-            return;
+        $alertaAnomalia = filter_var($salida['alerta_anomalia'] ?? null, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+        if ($alertaAnomalia === null) {
+            throw new RuntimeException('La CNN v1 devolvió una alerta de anomalía inválida.');
         }
 
-        // Convertir imagen a base64 para incrustarla en el PDF sin problemas de ruta
-        $imagePath = __DIR__ . '/../' . $analisis['imagen_path'];
-        $imageB64  = '';
-        if (file_exists($imagePath)) {
-            $mime     = mime_content_type($imagePath);
-            $imageB64 = 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($imagePath));
+        return [
+            'version_modelo' => (string) $salida['modelo_version'],
+            'es_retinografia' => null,
+            'probabilidad_retinografia' => null,
+            'es_evaluable' => null,
+            'probabilidad_calidad' => null,
+            'motivo_rechazo' => null,
+            'resultado_principal' => $resultadoPrincipal,
+            'probabilidad_principal' => $this->obtenerProbabilidadObligatoria($salida, 'probabilidad_principal', 'resultado principal'),
+            'probabilidad_normal' => $probabilidadesClinicas['normal'],
+            'probabilidad_diabetes' => $probabilidadesClinicas['diabetes'],
+            'probabilidad_glaucoma' => $probabilidadesClinicas['glaucoma'],
+            'probabilidad_catarata' => $probabilidadesClinicas['catarata'],
+            'alerta_anomalia' => $alertaAnomalia ? 1 : 0,
+            'es_referencial' => 1,
+            'tiempo_analisis' => (float) $salida['tiempo_analisis'],
+        ];
+    }
+
+    /** Obtiene una probabilidad requerida y rechaza respuestas parciales o fuera de rango. */
+    private function obtenerProbabilidadObligatoria(array $contenedor, string $clave, string $etiqueta): float
+    {
+        if (!array_key_exists($clave, $contenedor) || !is_numeric($contenedor[$clave])) {
+            throw new RuntimeException("El servicio CNN no informó la probabilidad de {$etiqueta}.");
         }
 
-        echo json_encode([
-            'success'   => true,
-            'analisis'  => [
-                'id'                     => $analisis['id'],
-                'nombre_medico'          => $analisis['nombre_medico'],
-                'cmp_medico'             => $analisis['cmp_medico'],
-                'especialidad_medico'    => $analisis['especialidad_medico'],
-                'fecha_analisis'         => $analisis['fecha_analisis'],
-                'resultado_principal'    => $analisis['resultado_principal'],
-                'probabilidad_principal' => (float)$analisis['probabilidad_principal'],
-                'probabilidad_normal'    => (float)$analisis['probabilidad_normal'],
-                'probabilidad_diabetes'  => (float)$analisis['probabilidad_diabetes'],
-                'probabilidad_glaucoma'  => (float)$analisis['probabilidad_glaucoma'],
-                'probabilidad_catarata'  => (float)$analisis['probabilidad_catarata'],
-                'alerta_anomalia'        => (bool)$analisis['alerta_anomalia'],
-                'diagnostico_medico'     => $analisis['diagnostico_medico'] ?? null,
-                'codigo_paciente'        => $analisis['codigo_paciente'] ?? null,
-                'dni_paciente'           => $analisis['dni_paciente'] ?? null,
-                'imagen_b64'             => $imageB64,
-            ]
-        ]);
+        $probabilidad = (float) $contenedor[$clave];
+        if ($probabilidad < self::PROBABILIDAD_MINIMA || $probabilidad > self::PROBABILIDAD_MAXIMA) {
+            throw new RuntimeException("La probabilidad de {$etiqueta} está fuera del rango permitido.");
+        }
+
+        return $probabilidad;
+    }
+
+    private function obtenerCarpetaPermitida(int $idCarpeta): ?int
+    {
+        if ($idCarpeta <= 0) {
+            return null;
+        }
+        $carpeta = (new CarpetaModel())->obtenerPorId($idCarpeta);
+        return $carpeta && (int) $carpeta['id_medico'] === (int) $_SESSION['user_id'] ? $idCarpeta : null;
+    }
+
+    private function normalizarFechaCaptura(string $fecha): string
+    {
+        if ($fecha === '') {
+            return date('Y-m-d H:i:s');
+        }
+        $marcaTiempo = strtotime($fecha);
+        return $marcaTiempo === false ? date('Y-m-d H:i:s') : date('Y-m-d H:i:s', $marcaTiempo);
+    }
+
+    private function analisisAptoParaInforme($analisis): bool
+    {
+        return is_array($analisis)
+            && $analisis['resultado_principal'] !== null
+            && $analisis['probabilidad_principal'] !== null
+            && trim((string) ($analisis['version_modelo'] ?? '')) !== ''
+            && ($analisis['es_retinografia'] === null || (int) $analisis['es_retinografia'] === 1)
+            && ($analisis['es_evaluable'] === null || (int) $analisis['es_evaluable'] === 1);
+    }
+
+    private function validarSolicitudMedicaPost(): bool
+    {
+        if (!$this->esMetodo('POST')) {
+            $this->responderJson(['success' => false, 'error' => 'Método no permitido'], 405);
+            return false;
+        }
+        if (!$this->sesionMedicaValida()) {
+            $this->responderJson(['success' => false, 'error' => 'Sesión expirada', 'expired' => true], 401);
+            return false;
+        }
+        return true;
+    }
+
+    private function sesionMedicaValida(): bool
+    {
+        return isset($_SESSION['user_id'], $_SESSION['rol_codigo']) && $_SESSION['rol_codigo'] === 'MED';
+    }
+
+    private function esMetodo(string $metodo): bool
+    {
+        return ($_SERVER['REQUEST_METHOD'] ?? '') === $metodo;
+    }
+
+    private function responderJson(array $contenido, int $codigoHttp = 200): void
+    {
+        http_response_code($codigoHttp);
+        if (!headers_sent()) {
+            header('Content-Type: application/json; charset=utf-8');
+        }
+        echo json_encode($contenido, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
 }
 
 if (isset($_GET['action'])) {
-    $controller = new AnalisisController();
+    $controlador = new AnalisisController();
     switch ($_GET['action']) {
-        case 'analizar':   $controller->analizar();   break;
-        case 'registrar_final': $controller->registrar_final(); break;
-        case 'datos_pdf':  $controller->datosPdf();   break;
+        case 'analizar': $controlador->analizar(); break;
+        case 'registrar_final': $controlador->registrar_final(); break;
+        case 'generar_borrador': $controlador->generarBorrador(); break;
+        case 'guardar_borrador': $controlador->guardarBorrador(); break;
+        case 'aprobar_informe': $controlador->aprobarInforme(); break;
+        case 'valorar_resultado': $controlador->valorarResultado(); break;
+        case 'comparar': $controlador->comparar(); break;
+        case 'descargar_informe': $controlador->descargarInforme(); break;
+        case 'datos_pdf': $controlador->datosPdf(); break;
+        default: http_response_code(404);
     }
 }

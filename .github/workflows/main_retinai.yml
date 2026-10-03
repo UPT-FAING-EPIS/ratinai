@@ -51,6 +51,20 @@ jobs:
             test -f "$ruta" || { echo "Falta archivo esencial: $ruta"; exit 1; }
           done
 
+      - name: Renderizar vistas médicas con sesión de prueba
+        run: |
+          for vista in views/medico/nuevoanalisis.php views/medico/modeloinfo.php; do
+            VISTA="$vista" php -r '
+              $_SERVER["SCRIPT_FILENAME"] = realpath(getenv("VISTA"));
+              session_start();
+              $_SESSION["user_id"] = 1;
+              $_SESSION["rol_codigo"] = "MED";
+              $_SESSION["nombre"] = "Verificación";
+              include getenv("VISTA");
+            ' > /dev/null
+            echo "$vista: renderizada sin errores"
+          done
+
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
         with:

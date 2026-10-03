@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../config/session_guard.php';
+require_once __DIR__ . '/../../config/config.php';
 require_auth();
 require_role('MED');
 $user = current_user();

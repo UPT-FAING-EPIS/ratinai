@@ -57,6 +57,16 @@ Fecha de inicio: 29 de septiembre de 2026.
 
 La CNN v2 queda fuera de esta entrega. Las credenciales ya configuradas en Azure no se copiaron al entorno local ni al repositorio.
 
-## Siguiente puerta de aprobación
+## Criterio previo al despliegue (registro histórico)
 
 Antes de migrar a nube se debe respaldar la base destino, aplicar `php migraciones/aplicar.php` sobre una copia, comparar conteos y hashes, y recorrer RF-10, RF-09, RF-11 y RF-12 con las credenciales del proveedor institucional elegido. Las migraciones aplicadas no se editan; cualquier ajuste posterior se agrega como una nueva versión numerada.
+
+## Verificación del flujo médico en Azure — 3 de octubre de 2026
+
+- El análisis real `#72` del médico autorizado conserva la salida de la CNN v1 (`1.0`), su imagen y los controles previos en la base de Azure. No se creó un análisis de prueba.
+- `generar_borrador` produjo y guardó el informe `#7` con hechos estructurados y texto real de OpenAI. La segunda solicitud recuperó el mismo informe sin regenerarlo.
+- `guardar_borrador` respondió correctamente incluso cuando el médico no modificó el texto. El PDF se generó en memoria a partir de ese análisis e informe reales; no se aprobó clínicamente ni se publicó un PDF sin intervención médica.
+- La conexión OneDrive del establecimiento `#1` respondió correctamente a la comprobación OAuth. La sincronización de un informe aprobado queda pendiente de una aprobación médica real.
+- En la vista de nuevo análisis, tras la respuesta válida de la CNN se ocultan la identificación, carpetas, carga y botón de análisis. Permanecen resultado, edición y retinografía. Aprobar queda deshabilitado si no existe borrador guardado.
+- El 404 HTML que Azure mostraba para el borrador ocultaba un error de la aplicación: OpenAI había incluido cifras en la redacción y la validación la rechazaba. La generación ahora vuelve a solicitar texto sin cifras y las fallas se devuelven como JSON legible. El 401 indica sesión ausente o expirada y redirige al acceso.
+- Verificación: PHPUnit 30/30, Jest 6/6, sintaxis PHP y JavaScript correcta, rutas HTTP y lectura/guardado reales en Azure. En esta iteración no hubo cambios de esquema ni migraciones.

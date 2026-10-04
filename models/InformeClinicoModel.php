@@ -75,7 +75,15 @@ class InformeClinicoModel
             'id_medico' => $idMedico,
         ]);
 
-        return $consulta->rowCount() > 0;
+        if ($consulta->rowCount() > 0) {
+            return true;
+        }
+
+        // MySQL informa cero filas si el médico guarda el mismo texto sin cambios.
+        $informe = $this->obtenerPorAnalisis($idAnalisis, $idMedico);
+        return $informe !== null
+            && $informe['estado'] === 'borrador'
+            && (string) $informe['texto_editado'] === $textoEditado;
     }
 
     public function aprobar(

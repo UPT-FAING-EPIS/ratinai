@@ -182,28 +182,34 @@ class AnalisisController
         }
         $idAnalisis = (int) ($_POST['id_analisis'] ?? 0);
         $idMedico = (int) $_SESSION['user_id'];
-        $analisis = $this->model->obtenerPorId($idAnalisis, $idMedico);
-        if (!$this->analisisAptoParaInforme($analisis)) {
-            $this->responderJson(['success' => false, 'error' => 'Solo se puede generar un informe para una retinografía evaluable.'], 422);
-            return;
-        }
-        $informeExistente = $this->modeloInforme->obtenerPorAnalisis($idAnalisis, $idMedico);
-        if ($informeExistente !== null) {
-            $this->responderJson(['success' => true, 'informe' => $informeExistente]);
-            return;
-        }
-        $controles = $this->model->obtenerControlesPrevios($idAnalisis, $idMedico);
         try {
+            $analisis = $this->model->obtenerPorId($idAnalisis, $idMedico);
+            if (!$this->analisisAptoParaInforme($analisis)) {
+                $this->responderJson(['success' => false, 'error' => 'Solo se puede generar un informe para una retinografía evaluable.'], 422);
+                return;
+            }
+            $informeExistente = $this->modeloInforme->obtenerPorAnalisis($idAnalisis, $idMedico);
+            if ($informeExistente !== null) {
+                $this->responderJson(['success' => true, 'informe' => $informeExistente]);
+                return;
+            }
+            $controles = $this->model->obtenerControlesPrevios($idAnalisis, $idMedico);
             $textoGenerado = (new ServicioBorradorClinicoOpenAI())->generar($analisis, $controles);
+            $this->modeloInforme->guardarBorrador($idAnalisis, $idMedico, $textoGenerado, $textoGenerado);
+            $this->responderJson([
+                'success' => true,
+                'informe' => $this->modeloInforme->obtenerPorAnalisis($idAnalisis, $idMedico),
+            ]);
         } catch (Throwable $error) {
-            $this->responderJson(['success' => false, 'error' => $error->getMessage()], 503);
-            return;
+            error_log('RetinAI generarBorrador: ' . $error->getMessage());
+            $this->responderJson([
+                'success' => false,
+                'error' => $error instanceof PDOException
+                    ? 'No se pudo consultar o guardar el informe en la base de datos.'
+                    : $error->getMessage(),
+                'diagnostico' => $error instanceof PDOException ? 'DB-' . $error->getCode() : null,
+            ], $error instanceof PDOException ? 500 : 503);
         }
-        $this->modeloInforme->guardarBorrador($idAnalisis, $idMedico, $textoGenerado, $textoGenerado);
-        $this->responderJson([
-            'success' => true,
-            'informe' => $this->modeloInforme->obtenerPorAnalisis($idAnalisis, $idMedico),
-        ]);
     }
 
     public function guardarBorrador(): void

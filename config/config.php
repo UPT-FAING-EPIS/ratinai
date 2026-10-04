@@ -77,9 +77,10 @@ function servicioAnalisisRemotoDisponible(): bool
         && is_readable($rutaCertificado);
 }
 
-define('SMTP_HOST', (string) env_value('SMTP_HOST', 'smtp.gmail.com'));
-define('SMTP_PORT', (int) env_value('SMTP_PORT', '587'));
-define('SMTP_USER', (string) env_value('SMTP_USER', ''));
-define('SMTP_PASS', (string) env_value('SMTP_PASS', ''));
-define('SMTP_FROM', (string) env_value('SMTP_FROM', ''));
+define('SMTP_HOST', trim((string) env_value('SMTP_HOST', 'smtp.gmail.com')));
+define('SMTP_PORT', (int) trim((string) env_value('SMTP_PORT', '587')));
+define('SMTP_USER', trim((string) env_value('SMTP_USER', '')));
+// Google separa visualmente la contraseña de aplicación en grupos; SMTP requiere los 16 caracteres sin espacios.
+define('SMTP_PASS', preg_replace('/\s+/', '', trim((string) env_value('SMTP_PASS', ''))));
+define('SMTP_FROM', trim((string) env_value('SMTP_FROM', '')));
 define('SMTP_FROM_NAME', (string) env_value('SMTP_FROM_NAME', 'RetinAI'));

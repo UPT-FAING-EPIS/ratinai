@@ -32,7 +32,6 @@ class ServicioBorradorClinicoOpenAI
                 return [
                     'resultado_cnn' => (string) $control['resultado_principal'],
                     'probabilidad_principal' => (float) $control['probabilidad_principal'],
-                    'misma_version' => (string) $control['version_modelo'],
                 ];
             }, array_slice($controlesPrevios, 0, 3)),
         ];
@@ -41,7 +40,7 @@ class ServicioBorradorClinicoOpenAI
             'store' => false,
             'reasoning' => ['effort' => 'none'],
             'max_output_tokens' => 450,
-            'instructions' => 'Eres un asistente de redacción clínica. Escribe en español un único párrafo referencial para revisión por un médico oftalmólogo. No diagnostiques, no prescribas, no atribuyas validación de retinografía o calidad a la CNN v1. No incluyas números, porcentajes ni datos identificables: la aplicación añade los hechos exactos por separado. No infieras progresión entre controles.',
+            'instructions' => 'Eres un asistente de redacción clínica. Escribe en español un único párrafo referencial para revisión por un médico oftalmólogo. No diagnostiques, no prescribas, no atribuyas validación de retinografía o calidad al modelo CNN actual. No incluyas dígitos, números escritos, porcentajes, versiones ni datos identificables: la aplicación añade los hechos exactos por separado. No infieras progresión entre controles.',
             'input' => json_encode($hechos, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
             'text' => [
                 'format' => [
@@ -63,46 +62,55 @@ class ServicioBorradorClinicoOpenAI
         if ($proyecto !== '') {
             $encabezados[] = 'OpenAI-Project: ' . $proyecto;
         }
-        $conexion = curl_init(self::URL_RESPUESTAS);
-        curl_setopt_array($conexion, [
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => json_encode($contenidoSolicitud, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
-            CURLOPT_HTTPHEADER => $encabezados,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => self::TIEMPO_MAXIMO_SEGUNDOS,
-        ]);
-        $respuestaCruda = curl_exec($conexion);
-        $codigoHttp = (int) curl_getinfo($conexion, CURLINFO_RESPONSE_CODE);
-        $errorTransporte = curl_error($conexion);
-        curl_close($conexion);
-        if (!is_string($respuestaCruda)) {
-            error_log('RetinAI OpenAI transporte: ' . $errorTransporte);
-            throw new RuntimeException('No se pudo conectar con OpenAI para generar el borrador.');
-        }
-        if ($codigoHttp !== 200) {
-            $errorProveedor = json_decode($respuestaCruda, true);
-            $codigoProveedor = (string) ($errorProveedor['error']['code'] ?? $errorProveedor['error']['type'] ?? 'sin_codigo');
-            $codigoProveedor = preg_replace('/[^a-zA-Z0-9_\-]/', '', $codigoProveedor);
-            error_log('RetinAI OpenAI HTTP ' . $codigoHttp . ' código ' . $codigoProveedor);
-            throw new RuntimeException('OpenAI rechazó el borrador (HTTP ' . $codigoHttp . ', código ' . $codigoProveedor . ').');
-        }
+        $narrativa = '';
+        for ($intento = 0; $intento < 2; $intento++) {
+            if ($intento > 0) {
+                $contenidoSolicitud['instructions'] .= ' La respuesta anterior incluyó cifras. Reescribe desde los hechos originales sin ningún carácter numérico ni referencias a versiones del modelo.';
+            }
+            $conexion = curl_init(self::URL_RESPUESTAS);
+            curl_setopt_array($conexion, [
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => json_encode($contenidoSolicitud, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+                CURLOPT_HTTPHEADER => $encabezados,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => self::TIEMPO_MAXIMO_SEGUNDOS,
+            ]);
+            $respuestaCruda = curl_exec($conexion);
+            $codigoHttp = (int) curl_getinfo($conexion, CURLINFO_RESPONSE_CODE);
+            $errorTransporte = curl_error($conexion);
+            curl_close($conexion);
+            if (!is_string($respuestaCruda)) {
+                error_log('RetinAI OpenAI transporte: ' . $errorTransporte);
+                throw new RuntimeException('No se pudo conectar con OpenAI para generar el borrador.');
+            }
+            if ($codigoHttp !== 200) {
+                $errorProveedor = json_decode($respuestaCruda, true);
+                $codigoProveedor = (string) ($errorProveedor['error']['code'] ?? $errorProveedor['error']['type'] ?? 'sin_codigo');
+                $codigoProveedor = preg_replace('/[^a-zA-Z0-9_\-]/', '', $codigoProveedor);
+                error_log('RetinAI OpenAI HTTP ' . $codigoHttp . ' código ' . $codigoProveedor);
+                throw new RuntimeException('OpenAI rechazó el borrador (HTTP ' . $codigoHttp . ', código ' . $codigoProveedor . ').');
+            }
 
-        $respuesta = json_decode($respuestaCruda, true, 512, JSON_THROW_ON_ERROR);
-        $textoEstructurado = null;
-        foreach (($respuesta['output'] ?? []) as $salida) {
-            foreach (($salida['content'] ?? []) as $contenido) {
-                if (($contenido['type'] ?? '') === 'output_text') {
-                    $textoEstructurado = $contenido['text'] ?? null;
+            $respuesta = json_decode($respuestaCruda, true, 512, JSON_THROW_ON_ERROR);
+            $textoEstructurado = null;
+            foreach (($respuesta['output'] ?? []) as $salida) {
+                foreach (($salida['content'] ?? []) as $contenido) {
+                    if (($contenido['type'] ?? '') === 'output_text') {
+                        $textoEstructurado = $contenido['text'] ?? null;
+                    }
                 }
             }
-        }
-        $estructura = is_string($textoEstructurado) ? json_decode($textoEstructurado, true) : null;
-        $narrativa = trim((string) ($estructura['narrativa'] ?? ''));
-        if ($narrativa === '') {
-            throw new RuntimeException('OpenAI no devolvió texto para el borrador.');
-        }
-        if (mb_strlen($narrativa) > self::LONGITUD_MAXIMA_NARRATIVA) {
-            throw new RuntimeException('OpenAI devolvió un borrador demasiado largo.');
+            $estructura = is_string($textoEstructurado) ? json_decode($textoEstructurado, true) : null;
+            $narrativa = trim((string) ($estructura['narrativa'] ?? ''));
+            if ($narrativa === '') {
+                throw new RuntimeException('OpenAI no devolvió texto para el borrador.');
+            }
+            if (mb_strlen($narrativa) > self::LONGITUD_MAXIMA_NARRATIVA) {
+                throw new RuntimeException('OpenAI devolvió un borrador demasiado largo.');
+            }
+            if (!preg_match('/\d/u', $narrativa)) {
+                break;
+            }
         }
         if (preg_match('/\d/u', $narrativa)) {
             throw new RuntimeException('OpenAI incluyó cifras no verificadas en el borrador.');

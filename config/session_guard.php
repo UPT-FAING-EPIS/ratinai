@@ -67,9 +67,9 @@ function get_login_url() {
 function get_dashboard_url($rol) {
     $base = get_base_path();
     switch ($rol) {
-        case 'SAD': return $base . 'views/dashboard/superadmin/index.php';
-        case 'ADM': return $base . 'views/dashboard/admin/index.php';
-        case 'MED': return $base . 'views/dashboard/medico/index.php';
+        case 'SAD': return $base . 'views/superadmin/index.php';
+        case 'ADM': return $base . 'views/admin/index.php';
+        case 'MED': return $base . 'views/medico/index.php';
         default:    return $base . 'views/auth/login.php';
     }
 }

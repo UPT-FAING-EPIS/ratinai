@@ -34,3 +34,9 @@ A partir de este punto, se establece una directiva inquebrantable para el idioma
 *   **Sin sustitutos silenciosos:** Si una dependencia real no está configurada, no responde o no puede verificarse, la aplicación debe informar ese estado de forma explícita y detener el flujo afectado. Nunca debe fabricar una respuesta alternativa.
 *   **Aplicación en todos los entornos:** Esta regla rige por igual para desarrollo local, pruebas, integración continua, Azure, AWS y cualquier despliegue. Una excepción solo puede aplicarse tras confirmación expresa del usuario para el caso concreto.
 *   **CNN v2 en espera:** Todas las actividades que dependan de la CNN versión 2 permanecen en espera hasta una instrucción expresa del usuario. La CNN actualmente desplegada se conserva como servicio remoto real; no se reemplaza ni se emula.
+
+## 4. Información de ayuda en la interfaz
+
+*   **Vistas orientadas a la tarea:** No se deben colocar párrafos extensos que expliquen cómo funciona una vista dentro del contenido principal. La interfaz debe priorizar datos, estados y acciones.
+*   **Ayuda bajo demanda:** Cuando una explicación sea necesaria, debe ubicarse en un botón de información `i` discreto y mostrarse mediante un mensaje flotante breve al solicitarla.
+*   **Sin textos defensivos o técnicos:** No se mostrarán al usuario explicaciones internas, exclusiones de datos, decisiones de implementación ni advertencias técnicas extensas en el cuerpo de una vista.

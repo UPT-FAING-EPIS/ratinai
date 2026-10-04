@@ -65,6 +65,7 @@ try {
 <meta name="description" content="Gestión de centros oftalmológicos registrados en RetinAI.">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="<?= $base ?>assets/css/dashboard/dashboard.css">
+<link rel="stylesheet" href="<?= $base ?>assets/css/dashboard/paneles.css">
 <style>
 .tabs-bar { display:flex; gap:4px; margin-bottom:24px; border-bottom:2px solid var(--border,#e5e9f0); padding-bottom:0; }
 .tab-btn {
@@ -121,14 +122,17 @@ try {
 
         <!-- ── Centros activos ── -->
         <div class="card">
+            <div class="filtros-tabla" style="grid-template-columns:1fr">
+                <input class="campo-filtro" id="filtro-establecimiento" type="search" placeholder="Buscar por nombre, RUC o dirección">
+            </div>
             <?php if (empty($establecimientos)): ?>
             <p class="empty-msg">No hay establecimientos registrados.</p>
             <?php else: ?>
-            <table class="data-table">
+            <table class="data-table" id="tabla-establecimientos">
                 <thead><tr><th>#</th><th>Nombre</th><th>Dirección</th><th>Médicos</th><th>Estado</th><th>Acción</th></tr></thead>
                 <tbody>
                 <?php foreach ($establecimientos as $e): ?>
-                <tr>
+                <tr data-fila data-busqueda="<?= htmlspecialchars(mb_strtolower(($e['nombre'] ?? '') . ' ' . ($e['direccion'] ?? '') . ' ' . ($e['ruc'] ?? ''))) ?>">
                     <td class="mono"><?= (int)$e['id'] ?></td>
                     <td><strong><?= htmlspecialchars($e['nombre']) ?></strong></td>
                     <td><?= htmlspecialchars($e['direccion'] ?? '—') ?></td>
@@ -148,11 +152,13 @@ try {
 </div>
 
 <script src="<?= $base ?>assets/js/session.service.js"></script>
+<script src="<?= $base ?>assets/js/paneles.js"></script>
 <script>
     if (typeof SessionService !== 'undefined') {
         SessionService.init({ timeout: 300000, loginUrl: '<?= htmlspecialchars($base."views/auth/login.php") ?>' });
     }
 </script>
+<script>document.getElementById('filtro-establecimiento')?.addEventListener('input',()=>PanelesRetinAI.filtrarTabla('#tabla-establecimientos',[{selector:'#filtro-establecimiento',campo:'busqueda'}]));</script>
 <script src="<?= $base ?>assets/js/dashboard/establecimientos.js"></script>
 </body>
 </html>

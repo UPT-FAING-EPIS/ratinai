@@ -42,11 +42,28 @@ try {
     }
     $admins  = $model->getAdminByEstablecimiento($id_establecimiento);
     $medicos = $model->getMedicosByEstablecimiento($id_establecimiento);
+    $conexion = (new Database())->getConnection();
+    $consultaResumen = $conexion->prepare(
+        "SELECT COUNT(DISTINCT a.id_paciente) AS pacientes, COUNT(DISTINCT a.id) AS analisis,
+                COUNT(DISTINCT CASE WHEN i.estado='aprobado' THEN i.id END) AS informes,
+                MAX(a.fecha_analisis) AS ultima_actividad
+         FROM usuarios u
+         LEFT JOIN analisis_retinales a ON a.id_medico=u.id
+         LEFT JOIN informes_clinicos i ON i.id_analisis=a.id
+         WHERE u.establecimiento_id=?"
+    );
+    $consultaResumen->execute([$id_establecimiento]);
+    $resumen = $consultaResumen->fetch(PDO::FETCH_ASSOC) ?: ['pacientes'=>0,'analisis'=>0,'informes'=>0,'ultima_actividad'=>null];
+    $consultaIntegracion = $conexion->prepare("SELECT proveedor,ultima_prueba_estado,ultima_prueba_fecha FROM configuraciones_almacenamiento WHERE id_establecimiento=? LIMIT 1");
+    $consultaIntegracion->execute([$id_establecimiento]);
+    $integracion = $consultaIntegracion->fetch(PDO::FETCH_ASSOC) ?: ['proveedor'=>'local','ultima_prueba_estado'=>'sin_probar','ultima_prueba_fecha'=>null];
 } catch (Exception $ex) {
     $msg_error       = 'Error cargando detalles del establecimiento.';
     $establecimiento = [];
     $admins          = [];
     $medicos         = [];
+    $resumen         = ['pacientes'=>0,'analisis'=>0,'informes'=>0,'ultima_actividad'=>null];
+    $integracion     = ['proveedor'=>'local','ultima_prueba_estado'=>'sin_probar','ultima_prueba_fecha'=>null];
 }
 ?>
 <!DOCTYPE html>
@@ -57,6 +74,8 @@ try {
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="<?= $base ?>assets/css/dashboard/dashboard.css">
 <link rel="stylesheet" href="<?= $base ?>assets/css/dashboard/detalles_establecimientos.css">
+<link rel="stylesheet" href="<?= $base ?>assets/css/dashboard/paneles.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
 
@@ -77,14 +96,22 @@ try {
         <div class="section-header">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div>
-                    <h1 class="page-title">Detalles del Establecimiento</h1>
-                    <p class="page-sub">Edita la información y gestiona los usuarios del establecimiento.</p>
+                    <h1 class="page-title"><?= htmlspecialchars($establecimiento['nombre'] ?? 'Establecimiento') ?></h1>
+                    <p class="page-sub">Información institucional, actividad y usuarios asociados.</p>
                 </div>
                 <a href="Establecimientos.php" class="btn btn-outline" style="text-decoration:none; display:inline-flex; align-items:center; gap: 8px; padding:8px 16px;">
                     <svg viewBox="0 0 20 20" fill="none" width="16" height="16"><path d="M10 19l-7-7m0 0l7-7m-7 7h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     Volver
                 </a>
             </div>
+        </div>
+
+        <div class="panel-kpis" style="grid-template-columns:repeat(5,minmax(140px,1fr))">
+            <article class="panel-kpi"><span class="panel-kpi__etiqueta">Médicos</span><strong class="panel-kpi__valor"><?= count($medicos) ?></strong></article>
+            <article class="panel-kpi"><span class="panel-kpi__etiqueta">Pacientes</span><strong class="panel-kpi__valor"><?= (int)$resumen['pacientes'] ?></strong></article>
+            <article class="panel-kpi"><span class="panel-kpi__etiqueta">Análisis</span><strong class="panel-kpi__valor"><?= (int)$resumen['analisis'] ?></strong></article>
+            <article class="panel-kpi"><span class="panel-kpi__etiqueta">Informes</span><strong class="panel-kpi__valor"><?= (int)$resumen['informes'] ?></strong></article>
+            <article class="panel-kpi"><span class="panel-kpi__etiqueta">Última actividad</span><strong class="panel-kpi__detalle" style="font-size:13px;color:var(--text);margin-top:12px"><?= $resumen['ultima_actividad'] ? htmlspecialchars(date('d/m/Y H:i', strtotime($resumen['ultima_actividad']))) : 'Sin actividad' ?></strong></article>
         </div>
 
         <div class="detalles-grid">
@@ -103,12 +130,6 @@ try {
                         <label>Dirección</label>
                         <input type="text" name="direccion" value="<?= htmlspecialchars($establecimiento['direccion'] ?? '') ?>">
                     </div>
-                    <?php if ($establecimiento['latitud'] !== null && $establecimiento['longitud'] !== null): ?>
-                    <div class="form-group">
-                        <label>Ubicación confirmada</label>
-                        <a href="https://www.openstreetmap.org/?mlat=<?= rawurlencode((string)$establecimiento['latitud']) ?>&amp;mlon=<?= rawurlencode((string)$establecimiento['longitud']) ?>#map=17/<?= rawurlencode((string)$establecimiento['latitud']) ?>/<?= rawurlencode((string)$establecimiento['longitud']) ?>" target="_blank" rel="noopener noreferrer"><?= htmlspecialchars($establecimiento['latitud'] . ', ' . $establecimiento['longitud']) ?></a>
-                    </div>
-                    <?php endif; ?>
                     <div class="form-group">
                         <label>Tipo</label>
                         <select name="tipo">
@@ -121,10 +142,11 @@ try {
                         <label>RUC</label>
                         <input type="text" name="ruc" value="<?= htmlspecialchars($establecimiento['ruc'] ?? '') ?>" maxlength="11" pattern="\d{11}">
                     </div>
-                    <div class="form-actions">
+                <div class="form-actions">
                         <button type="submit" class="btn btn-primary">Guardar Cambios</button>
                     </div>
                 </form>
+                <div style="margin-top:22px"><h3 class="card-title">Ubicación</h3><?php if ($establecimiento['latitud'] !== null && $establecimiento['longitud'] !== null): ?><div class="mapa-detalle" id="mapa-establecimiento"></div><?php else: ?><div class="estado-vacio">Sin coordenadas registradas.</div><?php endif; ?></div>
             </div>
 
             <!-- Información de Usuarios -->
@@ -147,6 +169,10 @@ try {
                             <?php endforeach; ?>
                         </div>
                     <?php endif; ?>
+                </div>
+                <div class="card list-card">
+                    <h3 class="card-title">Almacenamiento documental</h3>
+                    <div class="detalle-datos"><div class="detalle-dato"><span>Proveedor</span><strong><?= htmlspecialchars(match($integracion['proveedor']){'google_drive'=>'Google Drive','onedrive'=>'OneDrive',default=>'Copia local'}) ?></strong></div><div class="detalle-dato"><span>Estado</span><strong><?= htmlspecialchars(str_replace('_',' ',ucfirst($integracion['ultima_prueba_estado']))) ?></strong></div><div class="detalle-dato"><span>Última verificación</span><strong><?= $integracion['ultima_prueba_fecha']?htmlspecialchars(date('d/m/Y H:i',strtotime($integracion['ultima_prueba_fecha']))):'Sin verificar' ?></strong></div><div class="detalle-dato"><span>Tipo</span><strong><?= htmlspecialchars(ucfirst($establecimiento['tipo']??'Sin registrar')) ?></strong></div></div>
                 </div>
 
                 <!-- Médicos -->
@@ -197,5 +223,6 @@ try {
     if (flash) setTimeout(() => { flash.style.opacity = '0'; setTimeout(() => flash.remove(), 400); }, 3500);
 </script>
 <script src="<?= $base ?>assets/js/dashboard/detalles_establecimientos.js"></script>
+<?php if ($establecimiento['latitud'] !== null && $establecimiento['longitud'] !== null): ?><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script>const latitud=<?= json_encode((float)$establecimiento['latitud']) ?>,longitud=<?= json_encode((float)$establecimiento['longitud']) ?>,mapa=L.map('mapa-establecimiento').setView([latitud,longitud],16);L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(mapa);L.marker([latitud,longitud]).addTo(mapa).bindPopup(<?= json_encode($establecimiento['nombre'],JSON_UNESCAPED_UNICODE) ?>).openPopup();</script><?php endif; ?>
 </body>
 </html>

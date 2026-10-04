@@ -1,136 +1,39 @@
 <?php
 require_once __DIR__ . '/../../config/session_guard.php';
 require_once __DIR__ . '/../../config/config.php';
-require_role('ADM');
-$user     = current_user();
-$initials = get_initials($user['nombre']);
-$base     = get_base_path();
-$est_id   = (int)($user['establecimiento_id'] ?? 0);
-$logout_url = $base . 'controllers/AuthController.php?action=logout';
-
 require_once __DIR__ . '/../../models/EstablecimientoModel.php';
-require_once __DIR__ . '/../../models/DoctorModel.php';
-require_once __DIR__ . '/../../models/IntegracionModel.php';
-
-$role_label   = '🛡️ Administrador';
-$role_class   = 'role-adm';
-$avatar_class = 'avatar-adm';
-
-try {
-    $estModel = new EstablecimientoModel();
-    $docModel = new DoctorModel();
-
-    $user_id = (int)($user['id'] ?? 0);
-
-    // Todos los establecimientos del admin
-    $mis_establecimientos = $estModel->getByOwnerId($user_id);
-
-    // Fallback
-    if (empty($mis_establecimientos) && $est_id > 0) {
-        $est = $estModel->getById($est_id);
-        if ($est) $mis_establecimientos = [$est];
-    }
-
-    $est_nombre = $mis_establecimientos[0]['nombre'] ?? 'Mi Establecimiento';
-    $header_sub = $est_nombre;
-
-    if (!empty($mis_establecimientos)) {
-        $ids_est = array_map('intval', array_column($mis_establecimientos, 'id'));
-
-        // Solicitudes pendientes (activo=0)
-        $pendientes = $docModel->getPendingDoctorsByEstablishments($ids_est);
-
-        // Contadores para KPIs y sidebar badge
-        $cnt_pendientes = count($pendientes);
-        $cnt_activos    = $docModel->countActiveByEstablishments($ids_est);
-        $resumen_integracion = (new IntegracionModel())->contarEstadosPorEstablecimientos($ids_est);
-    } else {
-        $pendientes = [];
-        $cnt_pendientes = 0;
-        $cnt_activos = 0;
-        $resumen_integracion = ['completadas' => 0, 'fallidas' => 0, 'pendientes' => 0];
-    }
-
-} catch (Exception $ex) {
-    $est_nombre = ''; $pendientes = [];
-    $cnt_pendientes = 0; $cnt_activos = 0; $header_sub = '';
-    $resumen_integracion = ['completadas' => 0, 'fallidas' => 0, 'pendientes' => 0];
-}
-
-$msg_ok = $msg_err = '';
-if (isset($_GET['ok'])) $msg_ok = htmlspecialchars($_GET['ok']);
+require_role('ADM');
+$usuario=current_user();$initials=get_initials($usuario['nombre']);$base=get_base_path();$logout_url=$base.'controllers/AuthController.php?action=logout';
+$role_label='🛡️ Administrador';$role_class='role-adm';$avatar_class='avatar-adm';$header_sub='Administración institucional';$_page='index.php';
+$establecimientos=(new EstablecimientoModel())->getByOwnerId((int)$usuario['id']);
+if($establecimientos===[]&&!empty($usuario['establecimiento_id'])){$establecimiento=(new EstablecimientoModel())->getById((int)$usuario['establecimiento_id']);if($establecimiento)$establecimientos[]=$establecimiento;}
+$ids=array_values(array_unique(array_map('intval',array_column($establecimientos,'id'))));
+$indicadores=['establecimientos'=>count($ids),'medicos'=>0,'pacientes'=>0,'analisis'=>0,'informes'=>0,'pendientes'=>0];
+$actividad=$resultados=$medicos=$sincronizaciones=$analisisRecientes=[];
+try{
+ $conexion=(new Database())->getConnection();
+ if($ids!==[]){$lista=implode(',',$ids);
+  $indicadores['medicos']=(int)$conexion->query("SELECT COUNT(*) FROM usuarios WHERE rol_codigo='MED' AND activo=1 AND establecimiento_id IN ($lista)")->fetchColumn();
+  $indicadores['pacientes']=(int)$conexion->query("SELECT COUNT(DISTINCT a.id_paciente) FROM analisis_retinales a JOIN usuarios u ON u.id=a.id_medico WHERE u.establecimiento_id IN ($lista)")->fetchColumn();
+  $indicadores['analisis']=(int)$conexion->query("SELECT COUNT(*) FROM analisis_retinales a JOIN usuarios u ON u.id=a.id_medico WHERE u.establecimiento_id IN ($lista)")->fetchColumn();
+  $indicadores['informes']=(int)$conexion->query("SELECT COUNT(*) FROM informes_clinicos i JOIN analisis_retinales a ON a.id=i.id_analisis JOIN usuarios u ON u.id=a.id_medico WHERE i.estado='aprobado' AND u.establecimiento_id IN ($lista)")->fetchColumn();
+  $indicadores['pendientes']=(int)$conexion->query("SELECT COUNT(*) FROM solicitudes_establecimiento WHERE estado='pendiente' AND id_usuario_solicitante=".(int)$usuario['id'])->fetchColumn();
+  $actividad=$conexion->query("SELECT DATE_FORMAT(a.fecha_analisis,'%Y-%m') AS periodo,COUNT(*) AS total FROM analisis_retinales a JOIN usuarios u ON u.id=a.id_medico WHERE u.establecimiento_id IN ($lista) AND a.fecha_analisis>=DATE_SUB(CURDATE(),INTERVAL 5 MONTH) GROUP BY periodo ORDER BY periodo")->fetchAll(PDO::FETCH_ASSOC);
+  $resultados=$conexion->query("SELECT COALESCE(a.resultado_principal,'Sin resultado') AS etiqueta,COUNT(*) AS total FROM analisis_retinales a JOIN usuarios u ON u.id=a.id_medico WHERE u.establecimiento_id IN ($lista) GROUP BY etiqueta ORDER BY total DESC")->fetchAll(PDO::FETCH_ASSOC);
+  $medicos=$conexion->query("SELECT u.nombre,u.cmp,COUNT(a.id) AS analisis,MAX(a.fecha_analisis) AS ultima_actividad FROM usuarios u LEFT JOIN analisis_retinales a ON a.id_medico=u.id WHERE u.rol_codigo='MED' AND u.activo=1 AND u.establecimiento_id IN ($lista) GROUP BY u.id,u.nombre,u.cmp ORDER BY analisis DESC,u.nombre LIMIT 8")->fetchAll(PDO::FETCH_ASSOC);
+  $sincronizaciones=$conexion->query("SELECT estado,COUNT(*) AS total FROM sincronizaciones_informes WHERE id_establecimiento IN ($lista) GROUP BY estado")->fetchAll(PDO::FETCH_ASSOC);
+  $analisisRecientes=$conexion->query("SELECT a.fecha_analisis,a.resultado_principal,u.nombre AS medico,e.nombre AS establecimiento FROM analisis_retinales a JOIN usuarios u ON u.id=a.id_medico JOIN establecimientos e ON e.id=u.establecimiento_id WHERE u.establecimiento_id IN ($lista) ORDER BY a.fecha_analisis DESC LIMIT 8")->fetchAll(PDO::FETCH_ASSOC);
+ }}catch(Throwable $error){error_log('No se pudo construir dashboard ADM: '.$error->getMessage());}
+$datosActividad=array_map(static fn($fila)=>[$fila['periodo'],(int)$fila['total']],$actividad);$datosResultados=array_map(static fn($fila)=>[$fila['etiqueta'],(int)$fila['total']],$resultados);$datosMedicos=array_map(static fn($fila)=>[$fila['nombre'],$fila['cmp'],(int)$fila['analisis'],$fila['ultima_actividad']],$medicos);
 ?>
-<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>RetinAI — Dashboard Admin</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="<?= $base ?>assets/css/dashboard/dashboard.css">
-</head>
-<body>
-
-<?php require_once __DIR__ . '/../shared/header.php'; ?>
-
-<div class="app-shell">
-
-    <?php require_once __DIR__ . '/../shared/sidebar.php'; ?>
-
-    <main class="main-content">
-
-        <?php if ($msg_ok): ?><div class="alert-flash alert-ok" id="flash-msg"><?= $msg_ok ?></div><?php endif; ?>
-        <?php if ($msg_err): ?><div class="alert-flash alert-err"><?= $msg_err ?></div><?php endif; ?>
-
-        <!-- KPIs -->
-        <div class="kpi-grid">
-            <div class="kpi-card">
-                <div class="kpi-icon kpi-warning">⏳</div>
-                <div class="kpi-body">
-                    <span class="kpi-value"><?= $cnt_pendientes ?></span>
-                    <span class="kpi-label">Solicitudes pendientes</span>
-                </div>
-            </div>
-            <div class="kpi-card">
-                <div class="kpi-icon kpi-green">✅</div>
-                <div class="kpi-body">
-                    <span class="kpi-value"><?= $cnt_activos ?></span>
-                    <span class="kpi-label">Médicos activos</span>
-                </div>
-            </div>
-            <a class="kpi-card" href="integraciones.php" style="text-decoration:none;color:inherit">
-                <div class="kpi-icon kpi-warning">📁</div>
-                <div class="kpi-body">
-                    <span class="kpi-value"><?= $resumen_integracion['fallidas'] + $resumen_integracion['pendientes'] ?></span>
-                    <span class="kpi-label">Copias locales por atender</span>
-                </div>
-            </a>
-            <a class="kpi-card" href="integraciones.php" style="text-decoration:none;color:inherit">
-                <div class="kpi-icon kpi-green">📄</div>
-                <div class="kpi-body">
-                    <span class="kpi-value"><?= $resumen_integracion['completadas'] ?></span>
-                    <span class="kpi-label">Informes en copia local</span>
-                </div>
-            </a>
-        </div>
-
-
-    </main>
-</div>
-
-<script src="<?= $base ?>assets/js/session.service.js"></script>
-<script>
-SessionService.init({ timeout: 300000, loginUrl: '<?= htmlspecialchars($base . "views/auth/login.php") ?>' });
-let remaining = 300;
-const cd = document.getElementById('session-countdown');
-setInterval(() => {
-    const m = Math.floor(remaining / 60).toString().padStart(2, '0');
-    const s = (remaining % 60).toString().padStart(2, '0');
-    cd.textContent = m + ':' + s;
-    if (remaining > 0) remaining--;
-}, 1000);
-
-const flash = document.getElementById('flash-msg');
-if (flash) setTimeout(() => { flash.style.opacity = '0'; setTimeout(() => flash.remove(), 400); }, 3000);
-</script>
-</body>
-</html>
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>RetinAI — Dashboard institucional</title><link rel="stylesheet" href="<?= $base ?>assets/css/dashboard/dashboard.css"><link rel="stylesheet" href="<?= $base ?>assets/css/dashboard/paneles.css"></head><body><?php require_once __DIR__.'/../shared/header.php'; ?><div class="app-shell"><?php require_once __DIR__.'/../shared/sidebar.php'; ?><main class="main-content">
+<header class="panel-cabecera"><div><h1 class="page-title">Dashboard institucional</h1><p class="page-sub">Actividad de los establecimientos bajo su administración.</p></div><div class="panel-acciones"><button class="boton-informacion" data-ayuda="ayuda-admin" aria-label="Información">i</button><button class="boton-exportar" onclick='PanelesRetinAI.descargarCsv("resumen_institucional.csv",["Indicador","Total"],<?= json_encode(array_map(static fn($clave,$valor)=>[$clave,$valor],array_keys($indicadores),$indicadores),JSON_HEX_APOS|JSON_HEX_QUOT) ?>)'>Descargar resumen</button></div></header>
+<div class="panel-kpis"><?php foreach([['Establecimientos',$indicadores['establecimientos']],['Médicos activos',$indicadores['medicos']],['Pacientes atendidos',$indicadores['pacientes']],['Análisis',$indicadores['analisis']],['Informes aprobados',$indicadores['informes']],['Solicitudes pendientes',$indicadores['pendientes']]] as $indicador): ?><article class="panel-kpi"><span class="panel-kpi__etiqueta"><?= htmlspecialchars($indicador[0]) ?></span><strong class="panel-kpi__valor"><?= (int)$indicador[1] ?></strong></article><?php endforeach; ?></div>
+<div class="panel-rejilla">
+<section class="panel-tarjeta panel-ancho-8"><div class="panel-titulo"><h2>Análisis por mes</h2><button class="boton-exportar" onclick='PanelesRetinAI.descargarCsv("analisis_institucionales.csv",["Mes","Análisis"],<?= json_encode($datosActividad,JSON_HEX_APOS|JSON_HEX_QUOT) ?>)'>CSV</button></div><div class="panel-grafico"><canvas id="grafico-actividad"></canvas></div></section>
+<section class="panel-tarjeta panel-ancho-4"><div class="panel-titulo"><h2>Resultados referenciales</h2><button class="boton-exportar" onclick='PanelesRetinAI.descargarCsv("resultados_referenciales.csv",["Resultado","Total"],<?= json_encode($datosResultados,JSON_HEX_APOS|JSON_HEX_QUOT) ?>)'>CSV</button></div><div class="panel-grafico"><canvas id="grafico-resultados"></canvas></div></section>
+<section class="panel-tarjeta panel-ancho-7"><div class="panel-titulo"><h2>Actividad médica</h2><button class="boton-exportar" onclick='PanelesRetinAI.descargarCsv("actividad_medicos.csv",["Médico","CMP","Análisis","Última actividad"],<?= json_encode($datosMedicos,JSON_HEX_APOS|JSON_HEX_QUOT) ?>)'>CSV</button></div><div class="table-responsive"><table class="data-table"><thead><tr><th>Médico</th><th>CMP</th><th>Análisis</th><th>Última actividad</th></tr></thead><tbody><?php if($medicos===[]): ?><tr><td colspan="4" class="estado-vacio">Sin médicos activos.</td></tr><?php endif; ?><?php foreach($medicos as $fila): ?><tr><td><strong><?= htmlspecialchars($fila['nombre']) ?></strong></td><td><?= htmlspecialchars($fila['cmp']??'—') ?></td><td><?= (int)$fila['analisis'] ?></td><td><?= $fila['ultima_actividad']?htmlspecialchars(date('d/m/Y H:i',strtotime($fila['ultima_actividad']))):'Sin actividad' ?></td></tr><?php endforeach; ?></tbody></table></div></section>
+<section class="panel-tarjeta panel-ancho-5"><div class="panel-titulo"><h2>Estado documental</h2></div><div class="panel-lista"><?php if($sincronizaciones===[]): ?><div class="estado-vacio">Aún no hay sincronizaciones.</div><?php endif; ?><?php foreach($sincronizaciones as $fila): ?><div class="panel-lista__fila"><span><?= htmlspecialchars(ucfirst($fila['estado'])) ?></span><strong class="panel-lista__valor"><?= (int)$fila['total'] ?></strong></div><?php endforeach; ?></div><div class="panel-acciones" style="margin-top:16px"><a class="btn btn-ghost" href="integraciones.php">Administrar almacenamiento</a></div></section>
+<section class="panel-tarjeta panel-ancho-12"><div class="panel-titulo"><h2>Análisis recientes</h2></div><div class="table-responsive"><table class="data-table"><thead><tr><th>Fecha</th><th>Establecimiento</th><th>Médico</th><th>Resultado</th></tr></thead><tbody><?php if($analisisRecientes===[]): ?><tr><td colspan="4" class="estado-vacio">Sin análisis registrados.</td></tr><?php endif; ?><?php foreach($analisisRecientes as $fila): ?><tr><td><?= htmlspecialchars(date('d/m/Y H:i',strtotime($fila['fecha_analisis']))) ?></td><td><?= htmlspecialchars($fila['establecimiento']) ?></td><td><?= htmlspecialchars($fila['medico']) ?></td><td><?= htmlspecialchars($fila['resultado_principal']??'Sin resultado') ?></td></tr><?php endforeach; ?></tbody></table></div></section>
+</div><aside class="ayuda-flotante" id="ayuda-admin">Este panel consolida exclusivamente los establecimientos asociados a su cuenta. Las descargas incluyen los datos del bloque correspondiente.</aside>
+</main></div><script src="https://cdn.jsdelivr.net/npm/chart.js"></script><script src="<?= $base ?>assets/js/paneles.js"></script><script src="<?= $base ?>assets/js/session.service.js"></script><script>const actividad=<?= json_encode($actividad,JSON_UNESCAPED_UNICODE) ?>,resultados=<?= json_encode($resultados,JSON_UNESCAPED_UNICODE) ?>,opciones={responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}}};new Chart(document.getElementById('grafico-actividad'),{type:'bar',data:{labels:actividad.map(f=>f.periodo),datasets:[{label:'Análisis',data:actividad.map(f=>Number(f.total)),backgroundColor:'#2563eb'}]},options:opciones});new Chart(document.getElementById('grafico-resultados'),{type:'doughnut',data:{labels:resultados.map(f=>f.etiqueta),datasets:[{data:resultados.map(f=>Number(f.total)),backgroundColor:['#2563eb','#10b981','#f59e0b','#ef4444','#64748b']}]},options:opciones});SessionService.init({timeout:300000,loginUrl:'<?= htmlspecialchars($base.'views/auth/login.php') ?>'});</script></body></html>

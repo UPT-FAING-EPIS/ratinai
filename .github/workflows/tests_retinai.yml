@@ -1,4 +1,4 @@
-name: Automated Testing (Jest & Cypress)
+name: Automated Testing (Jest & Safe Smoke)
 
 # Este flujo de trabajo se dispara automáticamente
 # SOLO cuando el flujo de despliegue ("Build and deploy PHP app to Azure Web App - retinai") 
@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     
     # Solo ejecutar si el despliegue anterior fue exitoso
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     
     steps:
       - name: Checkout Code
@@ -25,7 +25,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           
       - name: Install Dependencies
         run: npm ci || npm install
@@ -33,7 +33,17 @@ jobs:
       - name: Run Unit Tests (Jest)
         run: npm test
         
-      - name: Run E2E Tests (Cypress)
-        run: npm run cypress:run
-        env:
-          CYPRESS_baseUrl: 'https://retinai-ehcadnergkbkd9dr.eastus2-01.azurewebsites.net'
+      - name: Run read-only production smoke tests
+        shell: bash
+        run: |
+          base='https://retinai-ehcadnergkbkd9dr.eastus2-01.azurewebsites.net'
+          for ruta in /index.php /views/auth/login.php /views/auth/solicitud_registro.php /assets/js/medico_analisis.js /assets/css/dashboard/paneles.css; do
+            codigo=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' "$base$ruta")
+            test "$codigo" = '200' || { echo "$ruta respondió $codigo"; exit 1; }
+          done
+          for ruta in /views/medico/nuevoanalisis.php /views/admin/integraciones.php /views/superadmin/SolicitudesRegistro.php; do
+            codigo=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' "$base$ruta")
+            test "$codigo" = '302' || { echo "$ruta respondió $codigo"; exit 1; }
+          done
+          codigo=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --request POST "$base/controllers/AnalisisController.php?action=generar_borrador")
+          test "$codigo" = '401' || { echo "generar_borrador respondió $codigo"; exit 1; }

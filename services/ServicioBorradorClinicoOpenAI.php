@@ -73,9 +73,18 @@ class ServicioBorradorClinicoOpenAI
         ]);
         $respuestaCruda = curl_exec($conexion);
         $codigoHttp = (int) curl_getinfo($conexion, CURLINFO_RESPONSE_CODE);
+        $errorTransporte = curl_error($conexion);
         curl_close($conexion);
-        if (!is_string($respuestaCruda) || $codigoHttp !== 200) {
-            throw new RuntimeException('OpenAI no pudo generar el borrador. Compruebe la clave, el saldo y el modelo habilitado.');
+        if (!is_string($respuestaCruda)) {
+            error_log('RetinAI OpenAI transporte: ' . $errorTransporte);
+            throw new RuntimeException('No se pudo conectar con OpenAI para generar el borrador.');
+        }
+        if ($codigoHttp !== 200) {
+            $errorProveedor = json_decode($respuestaCruda, true);
+            $codigoProveedor = (string) ($errorProveedor['error']['code'] ?? $errorProveedor['error']['type'] ?? 'sin_codigo');
+            $codigoProveedor = preg_replace('/[^a-zA-Z0-9_\-]/', '', $codigoProveedor);
+            error_log('RetinAI OpenAI HTTP ' . $codigoHttp . ' código ' . $codigoProveedor);
+            throw new RuntimeException('OpenAI rechazó el borrador (HTTP ' . $codigoHttp . ', código ' . $codigoProveedor . ').');
         }
 
         $respuesta = json_decode($respuestaCruda, true, 512, JSON_THROW_ON_ERROR);

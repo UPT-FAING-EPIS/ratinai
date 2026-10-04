@@ -148,7 +148,8 @@ class AnalisisController
             if (is_file($rutaDestino)) {
                 unlink($rutaDestino);
             }
-            $this->responderJson(['success' => false, 'error' => $error->getMessage()], 502);
+            error_log('RetinAI analizar: ' . $error->getMessage());
+            $this->responderJson(['success' => false, 'error' => $error->getMessage()], 422);
         }
     }
 
@@ -208,7 +209,7 @@ class AnalisisController
                     ? 'No se pudo consultar o guardar el informe en la base de datos.'
                     : $error->getMessage(),
                 'diagnostico' => $error instanceof PDOException ? 'DB-' . $error->getCode() : null,
-            ], $error instanceof PDOException ? 500 : 503);
+            ], 422);
         }
     }
 
@@ -427,7 +428,8 @@ class AnalisisController
         $errorConexion = curl_error($conexion);
         curl_close($conexion);
         if ($errorConexion !== '' || $respuesta === false || $codigoHttp !== 200) {
-            throw new RuntimeException('No se pudo completar el análisis con el servicio CNN.');
+            error_log('RetinAI CNN HTTP ' . $codigoHttp . ' transporte: ' . $errorConexion);
+            throw new RuntimeException('No se pudo completar el análisis con el servicio CNN (HTTP ' . $codigoHttp . ').');
         }
         $salida = json_decode($respuesta, true);
         if (!is_array($salida)) {

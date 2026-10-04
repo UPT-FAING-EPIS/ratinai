@@ -27,3 +27,10 @@ A partir de este punto, se establece una directiva inquebrantable para el idioma
 *   **Todo a Español:** Todas las interfaces, variables, nombres de archivos, módulos, funciones, clases, comentarios y mensajes de commit deben ser escritos íntegramente en español.
 *   **Refactorización Automática:** Si en el análisis o contexto existe código previo escrito en inglés, es una obligación traducirlo y refactorizarlo al español en la respuesta generada. (Ejemplo: cambiar `getUserData()` a `obtenerDatosDeUsuario()`, `interface User` a `interface Usuario`).
 *   **Consistencia:** Mantener una traducción coherente (ej. usar siempre `obtener` para `get`, `establecer` o `asignar` para `set`, `manejar` para `handle`).
+
+## 3. Prohibición de simulaciones y datos ficticios
+
+*   **Datos reales exclusivamente:** Está prohibido incorporar, presentar, almacenar o desplegar valores, resultados, métricas, pacientes, imágenes, credenciales, cuentas, estados o integraciones simuladas, de demostración, ficticias o de prueba como si pertenecieran al sistema.
+*   **Sin sustitutos silenciosos:** Si una dependencia real no está configurada, no responde o no puede verificarse, la aplicación debe informar ese estado de forma explícita y detener el flujo afectado. Nunca debe fabricar una respuesta alternativa.
+*   **Aplicación en todos los entornos:** Esta regla rige por igual para desarrollo local, pruebas, integración continua, Azure, AWS y cualquier despliegue. Una excepción solo puede aplicarse tras confirmación expresa del usuario para el caso concreto.
+*   **CNN v2 en espera:** Todas las actividades que dependan de la CNN versión 2 permanecen en espera hasta una instrucción expresa del usuario. La CNN actualmente desplegada se conserva como servicio remoto real; no se reemplaza ni se emula.

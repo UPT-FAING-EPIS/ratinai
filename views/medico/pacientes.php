@@ -7,7 +7,7 @@ $user = current_user();
 $initials = get_initials($user['nombre']);
 $base = get_base_path();
 $logout_url = $base . 'controllers/AuthController.php?action=logout';
-$role_label = '🩺 Médico';
+$role_label = 'Médico';
 $role_class = 'role-med';
 $avatar_class = 'avatar-green';
 $header_sub = 'Médico Oftalmólogo';

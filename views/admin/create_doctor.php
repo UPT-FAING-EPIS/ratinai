@@ -13,7 +13,7 @@ require_once __DIR__ . '/../../models/EstablecimientoModel.php';
 require_once __DIR__ . '/../../models/MaestroModel.php';
 require_once __DIR__ . '/../../models/DoctorModel.php';
 
-$role_label   = '🛡️ Administrador';
+$role_label   = 'Administrador';
 $role_class   = 'role-adm';
 $avatar_class = 'avatar-adm';
 
@@ -152,17 +152,17 @@ unset($_SESSION['flash_errors'], $_SESSION['flash_success'], $_SESSION['flash_te
                 <?php if (!empty($errors)): ?>
                 <div class="alert-list" role="alert">
                     <?php foreach ($errors as $e): ?>
-                    <p>⚠ <?= htmlspecialchars($e) ?></p>
+                    <p><?= htmlspecialchars($e) ?></p>
                     <?php endforeach; ?>
                 </div>
                 <?php endif; ?>
 
                 <?php if ($msg_ok): ?>
                 <div class="alert-ok-box">
-                    <p>✅ <?= $msg_ok ?></p>
+                    <p><?= $msg_ok ?></p>
                     <?php if ($temp_pass_display): ?>
                     <div class="temp-pass-box">
-                        <p>⚠ El correo no pudo enviarse. Entregue esta contraseña temporal al médico de forma manual:</p>
+                        <p>El correo no pudo enviarse. Entregue esta contraseña temporal al médico de forma manual:</p>
                         <span class="temp-pass-val" id="temp-pass-val"><?= htmlspecialchars($temp_pass_display) ?></span>
                         <button type="button" onclick="copyPass()" style="margin-left:12px;padding:6px 14px;background:rgba(26,86,219,.3);border:1px solid rgba(26,86,219,.5);border-radius:8px;color:#93c5fd;font-size:12px;cursor:pointer">Copiar</button>
                         <p style="margin-top:10px;font-size:12px">El médico deberá cambiarla en su primer inicio de sesión.</p>
@@ -250,7 +250,7 @@ unset($_SESSION['flash_errors'], $_SESSION['flash_success'], $_SESSION['flash_te
                                         </div>
                                         <?php endforeach; ?>
                                         <div class="combo-opt nueva" data-value="__nueva__">
-                                            ➕ Agregar nueva especialidad…
+                                            Agregar nueva especialidad…
                                         </div>
                                     </div>
                                 </div>

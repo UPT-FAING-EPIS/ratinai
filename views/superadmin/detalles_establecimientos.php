@@ -8,7 +8,7 @@ $user         = current_user();
 $initials     = get_initials($user['nombre']);
 $base         = get_base_path();
 $logout_url   = $base . 'controllers/AuthController.php?action=logout';
-$role_label   = '⚡ Super Administrador';
+$role_label   = 'Super Administrador';
 $role_class   = 'role-sad';
 $avatar_class = 'avatar-sad';
 $header_sub   = 'Detalles del Establecimiento';

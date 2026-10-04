@@ -127,12 +127,29 @@ class ServicioOAuthDocumental
         return $this->normalizarTokens($respuesta, (string) ($tokens['refresh_token'] ?? ''));
     }
 
-    public function guardarPdf(string $proveedor, array $tokens, int $idEstablecimiento, int $idInforme, string $contenidoPdf): string
+    public function guardarPdf(
+        string $proveedor,
+        array $tokens,
+        int $idEstablecimiento,
+        int $idInforme,
+        string $contenidoPdf,
+        string $codigoPaciente = 'SIN_CODIGO',
+        array $rutaDocumental = []
+    ): string
     {
-        $nombreArchivo = 'centro_' . $idEstablecimiento . '_informe_' . $idInforme . '.pdf';
+        $codigoSeguro = preg_replace('/[^A-Za-z0-9_-]/', '_', $codigoPaciente) ?: 'SIN_CODIGO';
+        $nombreArchivo = 'informe_' . $codigoSeguro . '_' . $idInforme . '.pdf';
+        $segmentos = [
+            self::CARPETA_INFORMES,
+            'Medicos',
+            $this->normalizarSegmento((string) ($rutaDocumental['medico'] ?? 'Medico')),
+            $this->normalizarSegmento((string) ($rutaDocumental['carpeta'] ?? 'Sin carpeta')),
+            mb_strtolower(trim((string) ($rutaDocumental['ojo'] ?? ''))) === 'izquierdo' ? 'Ojo Izquierdo' : 'Ojo Derecho',
+        ];
         $autorizacion = ['Authorization: Bearer ' . $tokens['access_token']];
         if ($proveedor === 'onedrive') {
-            $ruta = '/RetinAI/' . $nombreArchivo;
+            $this->asegurarRutaOneDrive($autorizacion, $segmentos);
+            $ruta = '/' . implode('/', array_map('rawurlencode', array_merge($segmentos, [$nombreArchivo])));
             $url = 'https://graph.microsoft.com/v1.0/me/drive/root:' . $ruta . ':/content';
             $respuesta = $this->solicitar('PUT', $url, $contenidoPdf, array_merge($autorizacion, [
                 'Content-Type: application/pdf',
@@ -140,8 +157,9 @@ class ServicioOAuthDocumental
             return (string) ($respuesta['webUrl'] ?? throw new RuntimeException('OneDrive no confirmó el archivo.'));
         }
 
-        $idCarpeta = $this->obtenerOCrearCarpetaGoogle($autorizacion);
-        $consulta = rawurlencode("name = '{$nombreArchivo}' and '{$idCarpeta}' in parents and trashed = false");
+        $idCarpeta = $this->obtenerOCrearRutaGoogle($autorizacion, $segmentos);
+        $nombreConsulta = $this->escaparConsultaGoogle($nombreArchivo);
+        $consulta = rawurlencode("name = '{$nombreConsulta}' and '{$idCarpeta}' in parents and trashed = false");
         $existente = $this->solicitar('GET', 'https://www.googleapis.com/drive/v3/files?q=' . $consulta . '&fields=files(id,webViewLink)', null, $autorizacion);
         $idArchivo = $existente['files'][0]['id'] ?? null;
         if (is_string($idArchivo) && $idArchivo !== '') {
@@ -166,46 +184,89 @@ class ServicioOAuthDocumental
 
     public function comprobarYPreparar(string $proveedor, array $tokens): void
     {
+        $autorizacion = ['Authorization: Bearer ' . $tokens['access_token']];
         if ($proveedor === 'google_drive') {
-            $this->obtenerOCrearCarpetaGoogle(['Authorization: Bearer ' . $tokens['access_token']]);
+            $this->obtenerOCrearRutaGoogle($autorizacion, [self::CARPETA_INFORMES, 'Medicos']);
             return;
         }
         $this->solicitar('GET', 'https://graph.microsoft.com/v1.0/me/drive', null, [
             'Authorization: Bearer ' . $tokens['access_token'],
         ]);
-        $carpetas = $this->solicitar('GET', 'https://graph.microsoft.com/v1.0/me/drive/root/children?$select=name,folder', null, [
-            'Authorization: Bearer ' . $tokens['access_token'],
-        ]);
-        foreach (($carpetas['value'] ?? []) as $carpeta) {
-            if (($carpeta['name'] ?? '') === self::CARPETA_INFORMES && isset($carpeta['folder'])) {
-                return;
-            }
-        }
-        $this->solicitar('POST', 'https://graph.microsoft.com/v1.0/me/drive/root/children', json_encode([
-            'name' => self::CARPETA_INFORMES,
-            'folder' => new stdClass(),
-        ], JSON_THROW_ON_ERROR), [
-            'Authorization: Bearer ' . $tokens['access_token'],
-            'Content-Type: application/json',
-        ]);
+        $this->asegurarRutaOneDrive($autorizacion, [self::CARPETA_INFORMES, 'Medicos']);
     }
 
-    private function obtenerOCrearCarpetaGoogle(array $autorizacion): string
+    private function obtenerOCrearRutaGoogle(array $autorizacion, array $segmentos): string
     {
-        $consulta = rawurlencode("name = '" . self::CARPETA_INFORMES . "' and mimeType = 'application/vnd.google-apps.folder' and trashed = false");
-        $existente = $this->solicitar('GET', 'https://www.googleapis.com/drive/v3/files?q=' . $consulta . '&fields=files(id)', null, $autorizacion);
-        $idCarpeta = $existente['files'][0]['id'] ?? null;
-        if (!is_string($idCarpeta) || $idCarpeta === '') {
-            $carpeta = $this->solicitar('POST', 'https://www.googleapis.com/drive/v3/files?fields=id', json_encode([
-                'name' => self::CARPETA_INFORMES,
-                'mimeType' => 'application/vnd.google-apps.folder',
-            ], JSON_THROW_ON_ERROR), array_merge($autorizacion, ['Content-Type: application/json']));
-            $idCarpeta = $carpeta['id'] ?? null;
+        $idPadre = null;
+        foreach ($segmentos as $segmento) {
+            $nombre = $this->normalizarSegmento((string) $segmento);
+            $nombreConsulta = $this->escaparConsultaGoogle($nombre);
+            $filtroPadre = $idPadre === null ? " and 'root' in parents" : " and '{$idPadre}' in parents";
+            $consulta = rawurlencode("name = '{$nombreConsulta}' and mimeType = 'application/vnd.google-apps.folder'{$filtroPadre} and trashed = false");
+            $existente = $this->solicitar('GET', 'https://www.googleapis.com/drive/v3/files?q=' . $consulta . '&fields=files(id)', null, $autorizacion);
+            $idCarpeta = $existente['files'][0]['id'] ?? null;
+            if (!is_string($idCarpeta) || $idCarpeta === '') {
+                $metadatos = ['name' => $nombre, 'mimeType' => 'application/vnd.google-apps.folder'];
+                if ($idPadre !== null) {
+                    $metadatos['parents'] = [$idPadre];
+                }
+                $carpeta = $this->solicitar('POST', 'https://www.googleapis.com/drive/v3/files?fields=id', json_encode(
+                    $metadatos,
+                    JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+                ), array_merge($autorizacion, ['Content-Type: application/json']));
+                $idCarpeta = $carpeta['id'] ?? null;
+            }
+            if (!is_string($idCarpeta) || $idCarpeta === '') {
+                throw new RuntimeException('Google Drive no confirmó la carpeta documental.');
+            }
+            $idPadre = $idCarpeta;
         }
-        if (!is_string($idCarpeta) || $idCarpeta === '') {
-            throw new RuntimeException('Google Drive no confirmó la carpeta de informes.');
+        if ($idPadre === null) {
+            throw new RuntimeException('La ruta documental de Google Drive está vacía.');
         }
-        return $idCarpeta;
+        return $idPadre;
+    }
+
+    private function asegurarRutaOneDrive(array $autorizacion, array $segmentos): void
+    {
+        $ruta = [];
+        foreach ($segmentos as $segmento) {
+            $nombre = $this->normalizarSegmento((string) $segmento);
+            $urlHijos = $ruta === []
+                ? 'https://graph.microsoft.com/v1.0/me/drive/root/children?$select=name,folder'
+                : 'https://graph.microsoft.com/v1.0/me/drive/root:/' . implode('/', array_map('rawurlencode', $ruta)) . ':/children?$select=name,folder';
+            $hijos = $this->solicitar('GET', $urlHijos, null, $autorizacion);
+            $existe = false;
+            foreach (($hijos['value'] ?? []) as $hijo) {
+                if (isset($hijo['folder']) && mb_strtolower((string) ($hijo['name'] ?? '')) === mb_strtolower($nombre)) {
+                    $existe = true;
+                    break;
+                }
+            }
+            if (!$existe) {
+                $urlCrear = $ruta === []
+                    ? 'https://graph.microsoft.com/v1.0/me/drive/root/children'
+                    : 'https://graph.microsoft.com/v1.0/me/drive/root:/' . implode('/', array_map('rawurlencode', $ruta)) . ':/children';
+                $this->solicitar('POST', $urlCrear, json_encode([
+                    'name' => $nombre,
+                    'folder' => new stdClass(),
+                    '@microsoft.graph.conflictBehavior' => 'fail',
+                ], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR), array_merge($autorizacion, ['Content-Type: application/json']));
+            }
+            $ruta[] = $nombre;
+        }
+    }
+
+    private function normalizarSegmento(string $segmento): string
+    {
+        $segmento = preg_replace('/[\\\\\/:*?"<>|\x00-\x1F]/u', '-', trim($segmento)) ?? '';
+        $segmento = preg_replace('/\s+/u', ' ', $segmento) ?? '';
+        return mb_substr(trim($segmento, " .-"), 0, 100) ?: 'Sin nombre';
+    }
+
+    private function escaparConsultaGoogle(string $valor): string
+    {
+        return str_replace(["\\", "'"], ["\\\\", "\\'"], $valor);
     }
 
     private function normalizarTokens(array $respuesta, string $renovacionAnterior = ''): array

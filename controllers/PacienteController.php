@@ -70,7 +70,7 @@ class PacienteController {
                 <?php foreach ($carpetas as $c): ?>
                     <div class="carpeta-box" style="margin-bottom: 12px;">
                         <div class="carpeta-header flex items-center gap-8" style="margin-bottom: 8px; cursor: pointer;" onclick="toggleAnalisis('folder-<?= $c['id'] ?>')">
-                            <span style="font-size: 16px;">📂</span>
+                            <svg width="17" height="17" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M2.5 5.5h5l1.5 2h8.5v8h-15z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
                             <strong style="font-size: 13px; color: var(--text);"><?= htmlspecialchars($c['nombre']) ?></strong>
                             <span class="badge badge-info"><?= $c['total_analisis'] ?> análisis</span>
                         </div>
@@ -91,7 +91,7 @@ class PacienteController {
                 <?php if (!empty($sin_carpeta)): ?>
                     <div class="carpeta-box">
                         <div class="carpeta-header flex items-center gap-8" style="margin-bottom: 8px; cursor: pointer;" onclick="toggleAnalisis('folder-none')">
-                            <span style="font-size: 16px;">📁</span>
+                            <svg width="17" height="17" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M2.5 5.5h5l1.5 2h8.5v8h-15z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
                             <strong style="font-size: 13px; color: var(--text);">Análisis sin carpeta</strong>
                             <span class="badge badge-info"><?= count($sin_carpeta) ?> análisis</span>
                         </div>

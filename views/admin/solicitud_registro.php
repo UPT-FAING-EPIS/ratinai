@@ -11,7 +11,7 @@ $logout_url = $base . 'controllers/AuthController.php?action=logout';
 require_once __DIR__ . '/../../models/EstablecimientoModel.php';
 require_once __DIR__ . '/../../models/DoctorModel.php';
 
-$role_label   = '🛡️ Administrador';
+$role_label   = 'Administrador';
 $role_class   = 'role-adm';
 $avatar_class = 'avatar-adm';
 
@@ -113,7 +113,7 @@ if (isset($_GET['ok'])) $msg_ok = htmlspecialchars($_GET['ok']);
             </div>
             <div class="card">
                 <?php if (empty($pendientes)): ?>
-                <p class="empty-msg">✅ No hay solicitudes pendientes.</p>
+                <p class="empty-msg">No hay solicitudes pendientes.</p>
                 <?php else: ?>
                 <table class="data-table" id="tabla-pendientes">
                     <thead>

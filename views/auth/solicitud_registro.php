@@ -44,7 +44,7 @@ if (isset($_SESSION['solicitud_error'])) {
         <?php if ($success_msg): ?>
         <!-- ── Pantalla de éxito ── -->
         <div class="success-screen">
-            <div class="success-icon">✅</div>
+            <div class="success-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><path d="m7 12 3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
             <h2>¡Solicitud enviada!</h2>
             <p><?= htmlspecialchars($success_msg) ?></p>
             <a href="../../index.php" class="back-home-link">
@@ -86,7 +86,7 @@ if (isset($_SESSION['solicitud_error'])) {
             <!-- ──────────────────────────────────────
                  SECCIÓN 1: Datos del Centro
             ────────────────────────────────────── -->
-            <div class="form-section-title">🏥 Datos del Centro</div>
+            <div class="form-section-title">Datos del Centro</div>
 
             <div class="form-group">
                 <label class="form-label" for="nombre_centro">Nombre del centro <span class="req">*</span></label>
@@ -108,13 +108,13 @@ if (isset($_SESSION['solicitud_error'])) {
                     <div class="tipo-option">
                         <input type="radio" id="tipo_publico" name="tipo" value="publico">
                         <label for="tipo_publico">
-                            <span class="tipo-icon">🏛️</span>Público
+                            <span class="tipo-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m3 9 9-5 9 5M5 10v8m4-8v8m6-8v8m4-8v8M3 20h18" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Público
                         </label>
                     </div>
                     <div class="tipo-option">
                         <input type="radio" id="tipo_privado" name="tipo" value="privado">
                         <label for="tipo_privado">
-                            <span class="tipo-icon">🏥</span>Privado
+                            <span class="tipo-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 21V5h11v16M15 9h5v12M8 9h3M8 13h3M8 17h3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span>Privado
                         </label>
                     </div>
                 </div>
@@ -132,7 +132,7 @@ if (isset($_SESSION['solicitud_error'])) {
             <!-- ──────────────────────────────────────
                  SECCIÓN 2: Datos del Titular
             ────────────────────────────────────── -->
-            <div class="form-section-title">👤 Datos del Titular / Dueño</div>
+            <div class="form-section-title">Datos del Titular / Dueño</div>
 
             <div class="form-group">
                 <label class="form-label" for="dni_titular">DNI del titular <span class="req">*</span></label>
@@ -167,7 +167,7 @@ if (isset($_SESSION['solicitud_error'])) {
             <!-- ──────────────────────────────────────
                  SECCIÓN 3: Verificación de correo
             ────────────────────────────────────── -->
-            <div class="form-section-title">📧 Correo y Verificación</div>
+            <div class="form-section-title">Correo y Verificación</div>
 
             <p class="form-hint" style="margin-bottom:14px;font-size:12px;color:var(--text2);">
                 El correo ingresado será usado para crear su cuenta de acceso a RetinAI una vez aprobada la solicitud.
@@ -219,14 +219,14 @@ if (isset($_SESSION['solicitud_error'])) {
             <!-- ──────────────────────────────────────
                  SECCIÓN 4: Evidencias
             ────────────────────────────────────── -->
-            <div class="form-section-title">📎 Evidencias del Establecimiento</div>
+            <div class="form-section-title">Evidencias del Establecimiento</div>
 
             <p class="form-hint" style="margin-bottom:12px;font-size:12px;color:var(--text2);">
                 Adjunte documentos o imágenes que acrediten la existencia del establecimiento (ej. licencia, fachada, etc.). <strong>Mínimo 1, máximo 2 archivos. Máx. 200 KB cada uno.</strong>
             </p>
 
             <div class="upload-area" id="upload-area" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)">
-                <div class="upload-icon-wrap">📁</div>
+                <div class="upload-icon-wrap"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 7h7l2 2h9v11H3z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M12 17v-5m0 0-2 2m2-2 2 2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
                 <h4>Arrastra aquí o haz clic para seleccionar</h4>
                 <p>JPG, PNG o PDF — máx. 200 KB por archivo</p>
                 <input type="file" id="file-input" accept=".jpg,.jpeg,.png,.pdf" multiple>

@@ -7,7 +7,7 @@ $initials = get_initials($user['nombre']);
 $base = get_base_path();
 $logout_url = $base . 'controllers/AuthController.php?action=logout';
 
-$role_label   = '⚡ Super Administrador';
+$role_label   = 'Super Administrador';
 $role_class   = 'role-sad';
 $avatar_class = 'avatar-sad';
 $header_sub   = 'Control Global';
@@ -24,7 +24,7 @@ try {
 
     // Establecimientos activos
     $establecimientos = $db->query(
-        "SELECT e.id, e.nombre, e.direccion,
+        "SELECT e.id, e.nombre, e.direccion, e.ruc,
          COUNT(u.id) AS medicos
          FROM establecimientos e
          LEFT JOIN usuarios u ON u.establecimiento_id=e.id AND u.rol_codigo='MED' AND u.activo=1
@@ -122,8 +122,8 @@ try {
 
         <!-- ── Centros activos ── -->
         <div class="card">
-            <div class="filtros-tabla" style="grid-template-columns:1fr">
-                <input class="campo-filtro" id="filtro-establecimiento" type="search" placeholder="Buscar por nombre, RUC o dirección">
+            <div class="filter-bar">
+                <label class="filter-search" aria-label="Buscar establecimientos"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="m16.5 16.5 4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><input id="filtro-establecimiento" type="search" placeholder="Buscar por nombre, RUC o dirección"></label>
             </div>
             <?php if (empty($establecimientos)): ?>
             <p class="empty-msg">No hay establecimientos registrados.</p>

@@ -259,7 +259,12 @@ class AnalisisController
                     (int) $analisis['establecimiento_id'],
                     (int) $informe['id'],
                     (string) ($analisis['codigo_paciente'] ?: 'SIN_CODIGO'),
-                    $contenidoPdf
+                    $contenidoPdf,
+                    [
+                        'medico' => (string) ($analisis['nombre_medico'] ?? 'Medico'),
+                        'carpeta' => (string) ($analisis['nombre_carpeta'] ?? 'Sin carpeta'),
+                        'ojo' => (string) ($analisis['ojo'] ?? ''),
+                    ]
                 );
                 $estadoSincronizacion = $almacenamiento['estado'];
             } catch (Throwable $errorAlmacenamiento) {

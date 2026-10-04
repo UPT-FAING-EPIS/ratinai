@@ -4,7 +4,7 @@ require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../models/EstablecimientoModel.php';
 require_role('ADM');
 $usuario=current_user();$initials=get_initials($usuario['nombre']);$base=get_base_path();$logout_url=$base.'controllers/AuthController.php?action=logout';
-$role_label='🛡️ Administrador';$role_class='role-adm';$avatar_class='avatar-adm';$header_sub='Administración institucional';$_page='index.php';
+$role_label='Administrador';$role_class='role-adm';$avatar_class='avatar-adm';$header_sub='Administración institucional';$_page='index.php';
 $establecimientos=(new EstablecimientoModel())->getByOwnerId((int)$usuario['id']);
 if($establecimientos===[]&&!empty($usuario['establecimiento_id'])){$establecimiento=(new EstablecimientoModel())->getById((int)$usuario['establecimiento_id']);if($establecimiento)$establecimientos[]=$establecimiento;}
 $ids=array_values(array_unique(array_map('intval',array_column($establecimientos,'id'))));

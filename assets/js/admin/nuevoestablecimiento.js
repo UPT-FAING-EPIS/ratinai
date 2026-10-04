@@ -100,14 +100,16 @@ function renderPreviews() {
         let div = document.createElement('div');
         div.className = 'upload-item';
         let ext = f.file.name.split('.').pop().toUpperCase();
-        let icon = ext === 'PDF' ? '📄' : '🖼️';
+        const icon = ext === 'PDF'
+            ? '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 2h8l4 4v16H6z" stroke="currentColor" stroke-width="1.7"/><path d="M14 2v5h5M8.5 16h7M8.5 12h7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>'
+            : '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.7"/><circle cx="9" cy="10" r="2" stroke="currentColor" stroke-width="1.7"/><path d="m5 18 5-5 3 3 2-2 4 4" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>';
         div.innerHTML = `
             <div class="upload-item-icon">${icon}</div>
             <div class="upload-item-info">
                 <span class="upload-item-name">${f.file.name}</span>
                 <span class="upload-item-size">${(f.file.size / 1024).toFixed(1)} KB</span>
             </div>
-            <button type="button" class="upload-item-remove" onclick="removeFile(${idx})">✖</button>
+            <button type="button" class="upload-item-remove" onclick="removeFile(${idx})" aria-label="Quitar archivo"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
         `;
         uploadPreviews.appendChild(div);
     });

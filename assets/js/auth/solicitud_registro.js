@@ -255,7 +255,7 @@ function renderPreviews() {
         } else {
             const icono = document.createElement('span');
             icono.className = 'file-icon';
-            icono.textContent = '📄';
+            icono.innerHTML = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 2h8l4 4v16H6z" stroke="currentColor" stroke-width="1.7"/><path d="M14 2v5h5M8.5 16h7M8.5 12h7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
             item.appendChild(icono);
         }
 

@@ -169,7 +169,7 @@ async function generarPDF(a) {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(7.5);
     doc.setTextColor(146, 64, 14);
-    doc.text('⚠  RESULTADO REFERENCIAL', 16, y + 6);
+    doc.text('RESULTADO REFERENCIAL', 16, y + 6);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
     doc.setTextColor(120, 80, 20);

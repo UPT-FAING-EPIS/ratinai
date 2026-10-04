@@ -401,7 +401,7 @@ class MailService {
                             <tr>
                                 <td style='padding:44px 40px;'>
                                     <div style='text-align:center;margin-bottom:28px;'>
-                                        <div style='width:60px;height:60px;border-radius:50%;background:#d1fae5;border:2px solid #6ee7b7;display:inline-flex;align-items:center;justify-content:center;font-size:28px;'>✅</div>
+                                        <div style='width:60px;height:60px;border-radius:50%;background:#d1fae5;border:2px solid #6ee7b7;display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;'>OK</div>
                                     </div>
                                     <h2 style='color:#0f172a;font-size:20px;font-weight:700;margin:0 0 14px;text-align:center;'>¡Solicitud Aprobada!</h2>
                                     <p style='color:#475569;font-size:15px;line-height:1.6;margin:0 0 18px;'>
@@ -496,7 +496,7 @@ class MailService {
                             <tr>
                                 <td style='padding:44px 40px;'>
                                     <div style='text-align:center;margin-bottom:28px;'>
-                                        <div style='width:60px;height:60px;border-radius:50%;background:#e0f2fe;border:2px solid #7dd3fc;display:inline-flex;align-items:center;justify-content:center;font-size:28px;'>✏️</div>
+                                        <div style='width:60px;height:60px;border-radius:50%;background:#e0f2fe;border:2px solid #7dd3fc;display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;'>INFO</div>
                                     </div>
                                     <h2 style='color:#0f172a;font-size:20px;font-weight:700;margin:0 0 14px;text-align:center;'>Datos Actualizados</h2>
                                     <p style='color:#475569;font-size:15px;line-height:1.6;margin:0 0 18px;'>

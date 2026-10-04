@@ -100,7 +100,7 @@
                 <div class="section-heading reveal"><div><p class="eyebrow">01 / LA PLATAFORMA</p><h2 id="platform-title">De una imagen<br>a una visión más completa.</h2></div><p>Un espacio para analizar, consultar y documentar. Con la información a mano y tu criterio en el centro.</p></div>
                 <div class="platform-showcase reveal">
                     <div class="showcase-sidebar">
-                        <span class="showcase-brand">Retin<span>AI</span><span class="demo-tag">DEMO VISUAL</span></span>
+                        <span class="showcase-brand">Retin<span>AI</span><span class="demo-tag">FLUJO DEL SISTEMA</span></span>
                         <div class="demo-tabs" role="tablist" aria-label="Explorar funciones de RetinAI" aria-orientation="vertical">
                             <button id="tab-analysis" class="demo-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="demo-analysis" data-demo="analysis"><span class="tab-number">01</span><span><strong>Analiza</strong><small>Una imagen. Información útil.</small></span><svg class="icon" aria-hidden="true"><use href="#icon-arrow"/></svg></button>
                             <button id="tab-history" class="demo-tab" type="button" role="tab" aria-selected="false" aria-controls="demo-history" tabindex="-1" data-demo="history"><span class="tab-number">02</span><span><strong>Consulta</strong><small>Cada control, en su lugar.</small></span><svg class="icon" aria-hidden="true"><use href="#icon-arrow"/></svg></button>
@@ -111,30 +111,29 @@
                     <div class="demo-workspace">
                         <div class="workspace-top"><span><span class="workspace-dot"></span> Espacio del médico</span><span class="workspace-avatar" aria-hidden="true">DR</span></div>
                         <div id="demo-analysis" class="demo-panel" role="tabpanel" aria-labelledby="tab-analysis" tabindex="0">
-                            <div class="demo-heading"><div><span class="micro-label">ANÁLISIS RETINAL</span><h3>Una imagen, otra perspectiva.</h3></div><span class="example-badge">Ejemplo ilustrativo</span></div>
+                            <div class="demo-heading"><div><span class="micro-label">ANÁLISIS RETINAL</span><h3>Una imagen, otra perspectiva.</h3></div><span class="example-badge">Proceso</span></div>
                             <div class="analysis-preview">
                                 <figure class="retina-preview"><img src="assets/images/retinopatia_normal.jpg" alt="Ejemplo de fotografía de fondo de ojo" width="512" height="512" loading="lazy"><figcaption>Retinografía de ejemplo<span>JPG</span></figcaption></figure>
                                 <div class="probability-preview"><p class="micro-label">SALIDA REFERENCIAL DEL MODELO</p><div class="demo-result">Probabilidades por categoría</div>
-                                    <div class="probability-row"><span>Normal</span><strong>91,2 %</strong><div class="probability-track"><i style="--value:91.2%"></i></div></div>
-                                    <div class="probability-row"><span>Retinopatía diabética</span><strong>4,1 %</strong><div class="probability-track"><i style="--value:4.1%"></i></div></div>
-                                    <div class="probability-row"><span>Glaucoma</span><strong>2,9 %</strong><div class="probability-track"><i style="--value:2.9%"></i></div></div>
-                                    <div class="probability-row"><span>Catarata</span><strong>1,8 %</strong><div class="probability-track"><i style="--value:1.8%"></i></div></div>
-                                    <p class="demo-disclaimer">Valores ficticios para mostrar la interfaz. No corresponden a un análisis de esta imagen.</p>
+                                    <div class="probability-row"><span>Normal</span><strong>—</strong><div class="probability-track"><i style="--value:0%"></i></div></div>
+                                    <div class="probability-row"><span>Retinopatía diabética</span><strong>—</strong><div class="probability-track"><i style="--value:0%"></i></div></div>
+                                    <div class="probability-row"><span>Glaucoma</span><strong>—</strong><div class="probability-track"><i style="--value:0%"></i></div></div>
+                                    <div class="probability-row"><span>Catarata</span><strong>—</strong><div class="probability-track"><i style="--value:0%"></i></div></div>
+                                    <p class="demo-disclaimer">Los valores aparecen después de procesar una retinografía con el servicio CNN.</p>
                                 </div>
                             </div>
                         </div>
                         <div id="demo-history" class="demo-panel" role="tabpanel" aria-labelledby="tab-history" tabindex="0" hidden>
-                            <div class="demo-heading"><div><span class="micro-label">HISTORIAL DEL PACIENTE</span><h3>Cada consulta tiene contexto.</h3></div><span class="example-badge">Datos de ejemplo</span></div>
-                            <div class="history-patient"><span class="patient-monogram" aria-hidden="true">P</span><div><strong>Paciente de demostración</strong><span>Código de historial: RT-DEMO-01</span></div><span class="history-total">3 controles</span></div>
+                            <div class="demo-heading"><div><span class="micro-label">HISTORIAL DEL PACIENTE</span><h3>Cada consulta tiene contexto.</h3></div><span class="example-badge">Proceso</span></div>
+                            <div class="history-patient"><span class="patient-monogram" aria-hidden="true">P</span><div><strong>Paciente identificado</strong><span>Historial vinculado al código real del paciente</span></div><span class="history-total">Controles</span></div>
                             <div class="timeline">
-                                <div class="timeline-entry"><span class="timeline-point"></span><div><time datetime="2026-09-10">10 SEP 2026</time><h4>Control más reciente</h4><p>Imagen, resultados y observaciones médicas.</p></div><span class="timeline-document"><svg class="icon" aria-hidden="true"><use href="#icon-document"/></svg>PDF</span></div>
-                                <div class="timeline-entry"><span class="timeline-point"></span><div><time datetime="2026-03-12">12 MAR 2026</time><h4>Control de seguimiento</h4><p>Información organizada para volver a consultar.</p></div><span class="timeline-document"><svg class="icon" aria-hidden="true"><use href="#icon-document"/></svg>PDF</span></div>
-                                <div class="timeline-entry"><span class="timeline-point"></span><div><time datetime="2025-09-15">15 SEP 2025</time><h4>Primer registro</h4><p>El inicio de un historial accesible.</p></div><span class="timeline-document"><svg class="icon" aria-hidden="true"><use href="#icon-document"/></svg>PDF</span></div>
+                                <div class="timeline-entry"><span class="timeline-point"></span><div><h4>Control más reciente</h4><p>Imagen, resultados y observaciones médicas reales.</p></div><span class="timeline-document"><svg class="icon" aria-hidden="true"><use href="#icon-document"/></svg>PDF</span></div>
+                                <div class="timeline-entry"><span class="timeline-point"></span><div><h4>Seguimiento</h4><p>Los controles se ordenan por su fecha real.</p></div><span class="timeline-document"><svg class="icon" aria-hidden="true"><use href="#icon-history"/></svg></span></div>
                             </div>
                         </div>
                         <div id="demo-report" class="demo-panel" role="tabpanel" aria-labelledby="tab-report" tabindex="0" hidden>
-                            <div class="demo-heading"><div><span class="micro-label">REPORTE DEL ANÁLISIS</span><h3>La información que importa.</h3></div><span class="example-badge">Documento ilustrativo</span></div>
-                            <div class="report-preview"><div class="paper-header"><strong>Retin<span>AI</span></strong><span>INFORME REFERENCIAL<br>RT-DEMO-01</span></div><h4>Análisis de retinografía</h4><div class="paper-meta"><span>Paciente de demostración</span><span>10 / 09 / 2026</span></div><div class="paper-results"><img src="assets/images/retinopatia_normal.jpg" width="512" height="512" alt="" loading="lazy"><div><span class="micro-label">RESULTADO DE IA</span><p>Imagen analizada y probabilidades por categoría.</p><span class="micro-label">VALORACIÓN MÉDICA</span><p>Espacio para el diagnóstico y las observaciones del especialista.</p></div></div><p class="paper-footer">Apoyo referencial. La decisión clínica corresponde al médico.</p></div>
+                            <div class="demo-heading"><div><span class="micro-label">REPORTE DEL ANÁLISIS</span><h3>La información que importa.</h3></div><span class="example-badge">Estructura</span></div>
+                            <div class="report-preview"><div class="paper-header"><strong>Retin<span>AI</span></strong><span>INFORME REFERENCIAL</span></div><h4>Análisis de retinografía</h4><div class="paper-meta"><span>Datos del paciente identificado</span><span>Fecha del análisis</span></div><div class="paper-results"><div><span class="micro-label">RESULTADO DE IA</span><p>Salida real de la CNN y probabilidades por categoría.</p><span class="micro-label">VALORACIÓN MÉDICA</span><p>Diagnóstico y observaciones aprobados por el especialista.</p></div></div><p class="paper-footer">Apoyo referencial. La decisión clínica corresponde al médico.</p></div>
                         </div>
                     </div>
                 </div>

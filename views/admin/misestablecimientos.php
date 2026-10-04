@@ -13,7 +13,7 @@ require_once __DIR__ . '/../../models/EstablecimientoModel.php';
 require_once __DIR__ . '/../../models/SolicitudModel.php';
 require_once __DIR__ . '/../../models/DoctorModel.php';
 
-$role_label   = '🛡️ Administrador';
+$role_label   = 'Administrador';
 $role_class   = 'role-adm';
 $avatar_class = 'avatar-adm';
 
@@ -115,7 +115,7 @@ if (isset($_SESSION['solicitud_success'])) {
             <div class="est-grid">
                 <?php foreach ($mis_establecimientos as $e): ?>
                 <div class="est-card">
-                    <p class="est-card-title">🏥 <?= htmlspecialchars($e['nombre']) ?></p>
+                    <p class="est-card-title"><?= htmlspecialchars($e['nombre']) ?></p>
                     <p><strong>RUC:</strong> <?= htmlspecialchars($e['ruc'] ?? '—') ?></p>
                     <p><strong>Dirección:</strong> <?= htmlspecialchars($e['direccion'] ?? '—') ?></p>
                     <span class="badge-tipo <?= $e['tipo'] === 'privado' ? 'privado' : '' ?>">

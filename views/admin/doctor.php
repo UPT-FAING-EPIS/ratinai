@@ -12,7 +12,7 @@ $logout_url = $base . 'controllers/AuthController.php?action=logout';
 require_once __DIR__ . '/../../models/EstablecimientoModel.php';
 require_once __DIR__ . '/../../models/DoctorModel.php';
 
-$role_label   = '🛡️ Administrador';
+$role_label   = 'Administrador';
 $role_class   = 'role-adm';
 $avatar_class = 'avatar-adm';
 

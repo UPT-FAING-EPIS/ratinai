@@ -8,7 +8,7 @@
  *   $user        – array con 'nombre', 'rol_codigo'
  *   $initials    – iniciales del usuario (get_initials())
  *   $logout_url  – URL de logout
- *   $role_label  – texto para la píldora de rol  (p.ej. '🛡️ Administrador')
+ *   $role_label  – texto para la píldora de rol  (p.ej. 'Administrador')
  *   $role_class  – clase CSS de la píldora       (p.ej. 'role-adm')
  *   $avatar_class– clase CSS del avatar          (p.ej. 'avatar-adm')
  *   $header_sub  – subtítulo bajo el nombre (establecimiento, 'Control Global', 'Médico Oftalmólogo', etc.)

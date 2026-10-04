@@ -147,7 +147,12 @@ class IntegracionController
                 $rutaLocal = (new ServicioAlmacenamientoInstitucionalLocal())->guardar(
                     (string) ($sincronizacion['codigo_paciente'] ?: 'SIN_CODIGO'),
                     (int) $sincronizacion['id_informe'],
-                    $contenidoPdf
+                    $contenidoPdf,
+                    [
+                        'medico' => (string) ($analisis['nombre_medico'] ?? 'Medico'),
+                        'carpeta' => (string) ($analisis['nombre_carpeta'] ?? 'Sin carpeta'),
+                        'ojo' => (string) ($analisis['ojo'] ?? ''),
+                    ]
                 );
                 $modeloInforme = new InformeClinicoModel();
                 $modeloInforme->registrarArchivo((int) $sincronizacion['id_informe'], $rutaLocal, hash('sha256', $contenidoPdf));
@@ -162,7 +167,12 @@ class IntegracionController
                 $idEstablecimiento,
                 (int) $sincronizacion['id_informe'],
                 (string) ($sincronizacion['codigo_paciente'] ?: 'SIN_CODIGO'),
-                $contenidoPdf
+                $contenidoPdf,
+                [
+                    'medico' => (string) ($analisis['nombre_medico'] ?? 'Medico'),
+                    'carpeta' => (string) ($analisis['nombre_carpeta'] ?? 'Sin carpeta'),
+                    'ojo' => (string) ($analisis['ojo'] ?? ''),
+                ]
             );
             if ($almacenamiento['estado'] !== 'completada') {
                 $this->responder(['success' => false, 'error' => 'El PDF se conservó localmente; la sincronización documental falló.'], 502);

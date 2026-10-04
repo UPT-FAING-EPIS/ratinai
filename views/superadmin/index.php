@@ -6,7 +6,7 @@ $usuario = current_user();
 $initials = get_initials($usuario['nombre']);
 $base = get_base_path();
 $logout_url = $base . 'controllers/AuthController.php?action=logout';
-$role_label = '⚡ Super Administrador'; $role_class = 'role-sad'; $avatar_class = 'avatar-sad';
+$role_label = 'Super Administrador'; $role_class = 'role-sad'; $avatar_class = 'avatar-sad';
 $header_sub = 'Control global'; $_page = 'index.php';
 $indicadores = ['establecimientos'=>0,'medicos'=>0,'administradores'=>0,'solicitudes'=>0,'analisis'=>0,'informes'=>0];
 $usuariosPorRol = $solicitudesPorEstado = $actividadMensual = $establecimientosActivos = $actividadReciente = [];

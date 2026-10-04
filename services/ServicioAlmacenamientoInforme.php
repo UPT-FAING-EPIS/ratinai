@@ -10,13 +10,24 @@ require_once __DIR__ . '/ServicioOAuthDocumental.php';
 /** Guarda una copia recuperable y sincroniza el PDF con el proveedor autorizado. */
 class ServicioAlmacenamientoInforme
 {
-    public function guardar(int $idEstablecimiento, int $idInforme, string $codigoPaciente, string $contenidoPdf): array
+    public function guardar(
+        int $idEstablecimiento,
+        int $idInforme,
+        string $codigoPaciente,
+        string $contenidoPdf,
+        array $rutaDocumental = []
+    ): array
     {
         $modeloInforme = new InformeClinicoModel();
         $modeloIntegracion = new IntegracionModel();
         $sincronizacionLocal = $modeloInforme->crearSincronizacionLocal($idInforme, $idEstablecimiento);
         try {
-            $rutaLocal = (new ServicioAlmacenamientoInstitucionalLocal())->guardar($codigoPaciente, $idInforme, $contenidoPdf);
+            $rutaLocal = (new ServicioAlmacenamientoInstitucionalLocal())->guardar(
+                $codigoPaciente,
+                $idInforme,
+                $contenidoPdf,
+                $rutaDocumental
+            );
             $modeloInforme->registrarArchivo($idInforme, $rutaLocal, hash('sha256', $contenidoPdf));
             $modeloInforme->completarSincronizacion((int) $sincronizacionLocal['id'], $rutaLocal);
         } catch (Throwable $error) {
@@ -39,7 +50,15 @@ class ServicioAlmacenamientoInforme
                 $autorizacion['tokens'] = $tokensVigentes;
                 $modeloIntegracion->actualizarConfiguracionCifrada($idEstablecimiento, $proveedor, $servicio->cifrar($autorizacion));
             }
-            $rutaRemota = $servicio->guardarPdf($proveedor, $tokensVigentes, $idEstablecimiento, $idInforme, $contenidoPdf);
+            $rutaRemota = $servicio->guardarPdf(
+                $proveedor,
+                $tokensVigentes,
+                $idEstablecimiento,
+                $idInforme,
+                $contenidoPdf,
+                $codigoPaciente,
+                $rutaDocumental
+            );
             $modeloInforme->completarSincronizacion((int) $sincronizacion['id'], $rutaRemota);
             $modeloIntegracion->registrarEstado($idEstablecimiento, true, 'Informe sincronizado con ' . $proveedor . '.');
             return ['estado' => 'completada', 'ruta' => $rutaRemota];

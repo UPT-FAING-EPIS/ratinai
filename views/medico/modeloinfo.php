@@ -8,7 +8,7 @@ $initials = get_initials($user['nombre']);
 $base = get_base_path();
 $logout_url = $base . 'controllers/AuthController.php?action=logout';
 
-$role_label   = '🩺 Médico';
+$role_label   = 'Médico';
 $role_class   = 'role-med';
 $avatar_class = 'avatar-green';
 $header_sub   = 'Médico Oftalmólogo';
@@ -58,10 +58,10 @@ $versionActiva = $servicioDisponible ? 'Informada por el servicio remoto en cada
             <div>
               <div class="card">
                 <div class="card-title">Categorías detectables</div>
-                <div class="metric-row"><span>🔴 Retinopatía Diabética</span><strong>Clase 1</strong></div>
-                <div class="metric-row"><span>🟠 Glaucoma</span><strong>Clase 2</strong></div>
-                <div class="metric-row"><span>🔵 Catarata</span><strong>Clase 3</strong></div>
-                <div class="metric-row"><span>🟢 Normal</span><strong>Clase 4</strong></div>
+                <div class="metric-row"><span><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><circle cx="5" cy="5" r="5" fill="#dc2626"/></svg> Retinopatía Diabética</span><strong>Clase 1</strong></div>
+                <div class="metric-row"><span><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><circle cx="5" cy="5" r="5" fill="#ea580c"/></svg> Glaucoma</span><strong>Clase 2</strong></div>
+                <div class="metric-row"><span><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><circle cx="5" cy="5" r="5" fill="#2563eb"/></svg> Catarata</span><strong>Clase 3</strong></div>
+                <div class="metric-row"><span><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><circle cx="5" cy="5" r="5" fill="#16a34a"/></svg> Normal</span><strong>Clase 4</strong></div>
               </div>
               <div class="card mt-8">
                 <div class="card-title">Limitaciones</div>

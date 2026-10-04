@@ -87,6 +87,7 @@ class AnalisisModel {
                    u.especialidad AS especialidad_medico,
                    u.establecimiento_id,
                    p.codigo_paciente, p.dni AS dni_paciente,
+                   c.nombre AS nombre_carpeta,
                    i.id AS id_informe, i.estado AS estado_informe, i.version AS version_informe,
                    i.texto_generado, i.texto_editado, i.fecha_aprobacion,
                    i.ruta_pdf, i.hash_pdf,
@@ -95,6 +96,7 @@ class AnalisisModel {
             FROM analisis_retinales a
             INNER JOIN usuarios u ON u.id = a.id_medico
             LEFT JOIN  pacientes p ON p.id = a.id_paciente
+            LEFT JOIN carpetas_paciente c ON c.id = a.id_carpeta
             LEFT JOIN informes_clinicos i ON i.id_analisis = a.id
             LEFT JOIN valoraciones_ia v ON v.id_analisis = a.id
             LEFT JOIN sincronizaciones_informes s ON s.id = (

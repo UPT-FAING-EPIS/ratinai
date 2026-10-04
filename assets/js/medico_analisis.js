@@ -2,7 +2,7 @@ document.addEventListener('DOMContentLoaded', () => {
     'use strict';
 
     const TAMANO_MAXIMO_IMAGEN = 10 * 1024 * 1024;
-    const RESOLUCION_MINIMA_ORIENTATIVA = 500;
+    const RESOLUCION_MINIMA_PROVISIONAL = 500;
     const DURACION_MENSAJE = 4500;
     const CANTIDAD_PASOS = 4;
     const TIPOS_IMAGEN_PERMITIDOS = ['image/jpeg', 'image/png'];
@@ -13,7 +13,10 @@ document.addEventListener('DOMContentLoaded', () => {
         vistaPrevia: document.getElementById('preview-image-element'),
         nombreArchivo: document.getElementById('file-name'),
         cambiarImagen: document.getElementById('change-image-btn'),
+        validar: document.getElementById('validate-btn'),
         analizar: document.getElementById('analyze-btn'),
+        seccionAnalisis: document.getElementById('analysis-section'),
+        estadoValidacionProvisional: document.getElementById('estado-validacion-provisional'),
         dni: document.getElementById('dni-input'),
         ojo: document.getElementById('ojo-input'),
         fechaCaptura: document.getElementById('fecha-captura-input'),
@@ -37,6 +40,9 @@ document.addEventListener('DOMContentLoaded', () => {
         informe: document.getElementById('informe-section'),
         textoInforme: document.getElementById('texto-informe'),
         estadoBorrador: document.getElementById('estado-borrador'),
+        errorBorrador: document.getElementById('error-borrador'),
+        errorBorradorTexto: document.getElementById('error-borrador-texto'),
+        generarBorrador: document.getElementById('btn-generar-borrador'),
         guardarBorrador: document.getElementById('btn-guardar-borrador'),
         aprobarInforme: document.getElementById('btn-aprobar-informe'),
         descargarPdf: document.getElementById('btn-pdf'),
@@ -44,7 +50,6 @@ document.addEventListener('DOMContentLoaded', () => {
         seccionCarpeta: document.getElementById('carpeta-section'),
         rejillaCarpetas: document.getElementById('folder-grid'),
         nuevaCarpeta: document.getElementById('btn-toggle-new-folder'),
-        quitarCarpeta: document.getElementById('btn-quitar-carpeta'),
         formularioCarpeta: document.getElementById('new-folder-form'),
         nombreCarpeta: document.getElementById('folder-name-input'),
         descripcionCarpeta: document.getElementById('folder-desc-input'),
@@ -58,6 +63,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let idCarpetaActual = null;
     let idAnalisisActual = null;
     let procesando = false;
+    let imagenValidada = false;
+    let dimensionesImagen = { ancho: 0, alto: 0 };
 
     elementos.fechaCaptura.value = obtenerFechaLocalActual();
     establecerPasoActual(1);
@@ -90,22 +97,27 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         archivoSeleccionado = archivo;
+        imagenValidada = false;
+        dimensionesImagen = { ancho: 0, alto: 0 };
         elementos.nombreArchivo.textContent = archivo.name;
         elementos.zonaCarga.classList.add('con-archivo');
         elementos.cambiarImagen.style.display = 'inline-flex';
+        elementos.estadoValidacionProvisional.style.display = 'none';
+        elementos.seccionAnalisis.style.display = 'none';
         const lector = new FileReader();
         lector.addEventListener('load', evento => {
             elementos.vistaPrevia.src = evento.target.result;
             const imagen = new Image();
             imagen.addEventListener('load', () => {
-                const resolucionBaja = imagen.width < RESOLUCION_MINIMA_ORIENTATIVA
-                    || imagen.height < RESOLUCION_MINIMA_ORIENTATIVA;
+                dimensionesImagen = { ancho: imagen.width, alto: imagen.height };
+                const resolucionBaja = imagen.width < RESOLUCION_MINIMA_PROVISIONAL
+                    || imagen.height < RESOLUCION_MINIMA_PROVISIONAL;
                 elementos.advertenciaCalidad.style.display = resolucionBaja ? 'flex' : 'none';
+                actualizarDisponibilidadAnalisis();
             });
             imagen.src = evento.target.result;
         });
         lector.readAsDataURL(archivo);
-        establecerPasoActual(2);
         actualizarDisponibilidadAnalisis();
     }
 
@@ -139,18 +151,35 @@ document.addEventListener('DOMContentLoaded', () => {
     elementos.ojo.addEventListener('change', actualizarDisponibilidadAnalisis);
 
     function actualizarDisponibilidadAnalisis() {
-        elementos.analizar.disabled = !SERVICIO_ANALISIS_DISPONIBLE
-            || procesando
-            || !archivoSeleccionado
-            || !idPacienteActual
-            || !elementos.ojo.value;
+        const identificacionCompleta = Boolean(archivoSeleccionado && idPacienteActual && elementos.ojo.value && idCarpetaActual);
+        elementos.validar.disabled = procesando || !identificacionCompleta || dimensionesImagen.ancho === 0;
+        elementos.analizar.disabled = !SERVICIO_ANALISIS_DISPONIBLE || procesando || !imagenValidada;
     }
+
+    elementos.validar.addEventListener('click', () => {
+        const cumpleResolucion = dimensionesImagen.ancho >= RESOLUCION_MINIMA_PROVISIONAL
+            && dimensionesImagen.alto >= RESOLUCION_MINIMA_PROVISIONAL;
+        if (!cumpleResolucion) {
+            imagenValidada = false;
+            elementos.advertenciaCalidad.style.display = 'flex';
+            mostrarMensaje('La imagen no supera la validación provisional de resolución.', 'danger');
+            actualizarDisponibilidadAnalisis();
+            return;
+        }
+        imagenValidada = true;
+        elementos.advertenciaCalidad.style.display = 'none';
+        elementos.estadoValidacionProvisional.style.display = 'block';
+        elementos.cambiarImagen.style.display = 'none';
+        elementos.seccionAnalisis.style.display = 'block';
+        establecerPasoActual(2);
+        actualizarDisponibilidadAnalisis();
+    });
 
     elementos.analizar.addEventListener('click', async () => {
         if (elementos.analizar.disabled) return;
         procesando = true;
         actualizarDisponibilidadAnalisis();
-        elementos.analizar.textContent = 'Validando con la CNN…';
+        elementos.analizar.textContent = 'Analizando con CNN…';
         establecerPasoActual(2);
 
         const formulario = new FormData();
@@ -237,6 +266,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function generarBorrador() {
+        elementos.informe.style.display = 'block';
+        elementos.errorBorrador.style.display = 'none';
         try {
             const respuesta = await enviarFormulario('controllers/AnalisisController.php?action=generar_borrador', {
                 id_analisis: idAnalisisActual,
@@ -247,9 +278,16 @@ document.addEventListener('DOMContentLoaded', () => {
             elementos.estadoBorrador.textContent = 'Borrador guardado en el servidor.';
             establecerPasoActual(4);
         } catch (error) {
+            elementos.errorBorradorTexto.textContent = error.message;
+            elementos.errorBorrador.style.display = 'block';
+            elementos.textoInforme.value = '';
+            elementos.estadoBorrador.textContent = 'No se generó ningún texto.';
+            establecerPasoActual(4);
             mostrarMensaje(error.message, 'danger');
         }
     }
+
+    elementos.generarBorrador.addEventListener('click', generarBorrador);
 
     document.querySelectorAll('[data-valoracion]').forEach(boton => {
         boton.addEventListener('click', async () => {
@@ -344,11 +382,18 @@ document.addEventListener('DOMContentLoaded', () => {
             const boton = document.createElement('button');
             boton.type = 'button';
             boton.className = 'carpeta';
-            boton.textContent = `📁 ${carpeta.nombre} · ${carpeta.total_analisis} análisis`;
+            boton.innerHTML = '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M2.5 5.5h5l1.5 2h8.5v8h-15z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg><span></span>';
+            boton.querySelector('span').textContent = `${carpeta.nombre} · ${carpeta.total_analisis} análisis`;
             boton.addEventListener('click', () => {
                 idCarpetaActual = Number(carpeta.id);
                 elementos.rejillaCarpetas.querySelectorAll('.carpeta').forEach(elemento => elemento.classList.remove('seleccionada'));
                 boton.classList.add('seleccionada');
+                imagenValidada = false;
+                elementos.estadoValidacionProvisional.style.display = 'none';
+                elementos.seccionAnalisis.style.display = 'none';
+                elementos.cambiarImagen.style.display = archivoSeleccionado ? 'inline-flex' : 'none';
+                establecerPasoActual(1);
+                actualizarDisponibilidadAnalisis();
             });
             elementos.rejillaCarpetas.appendChild(boton);
         });
@@ -360,10 +405,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     elementos.cancelarCarpeta.addEventListener('click', () => {
         elementos.formularioCarpeta.style.display = 'none';
-    });
-    elementos.quitarCarpeta.addEventListener('click', () => {
-        idCarpetaActual = null;
-        elementos.rejillaCarpetas.querySelectorAll('.carpeta').forEach(elemento => elemento.classList.remove('seleccionada'));
     });
     elementos.crearCarpeta.addEventListener('click', async () => {
         const nombre = elementos.nombreCarpeta.value.trim();
@@ -386,6 +427,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const nueva = [...elementos.rejillaCarpetas.querySelectorAll('.carpeta')]
                 .find(boton => boton.textContent.includes(respuesta.carpeta.nombre));
             nueva?.classList.add('seleccionada');
+            actualizarDisponibilidadAnalisis();
         } catch (error) {
             mostrarMensaje(error.message, 'danger');
         }
@@ -394,7 +436,8 @@ document.addEventListener('DOMContentLoaded', () => {
     async function enviarFormulario(ruta, valores) {
         const formulario = new FormData();
         Object.entries(valores).forEach(([clave, valor]) => formulario.append(clave, String(valor ?? '')));
-        const respuestaHttp = await fetch(BASE_URL + ruta, { method: 'POST', body: formulario });
+        const url = new URL(BASE_URL + ruta, window.location.href);
+        const respuestaHttp = await fetch(url, { method: 'POST', body: formulario });
         const respuesta = await leerJson(respuestaHttp);
         if (respuesta.expired) window.location.assign(BASE_URL + 'views/auth/login.php');
         return respuesta;
@@ -402,9 +445,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function leerJson(respuestaHttp) {
         try {
-            return await respuestaHttp.json();
+            const respuesta = await respuestaHttp.json();
+            if (!respuestaHttp.ok && !respuesta.error) respuesta.error = `El servidor respondió HTTP ${respuestaHttp.status}.`;
+            return respuesta;
         } catch (_) {
-            throw new Error('El servidor devolvió una respuesta inesperada.');
+            throw new Error(`El servidor devolvió una respuesta inesperada (HTTP ${respuestaHttp.status}).`);
         }
     }
 

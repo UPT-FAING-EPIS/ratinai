@@ -9,7 +9,7 @@ $base     = get_base_path();
 $est_id   = (int)($user['establecimiento_id'] ?? 0);
 $logout_url = $base . 'controllers/AuthController.php?action=logout';
 
-$role_label   = '🛡️ Administrador';
+$role_label   = 'Administrador';
 $role_class   = 'role-adm';
 $avatar_class = 'avatar-adm';
 
@@ -102,7 +102,7 @@ if (isset($_SESSION['solicitud_error'])) {
                 <input type="hidden" name="evidencia_2_b64"    id="evidencia_2_b64">
                 <input type="hidden" name="evidencia_2_nombre" id="evidencia_2_nombre">
 
-                <div class="form-section-title">🏥 Datos del Centro</div>
+                <div class="form-section-title">Datos del Centro</div>
 
                 <div class="form-group">
                     <label class="form-label" for="nombre_centro">Nombre del centro <span class="req">*</span></label>
@@ -130,11 +130,11 @@ if (isset($_SESSION['solicitud_error'])) {
                     <div class="tipo-selector">
                         <div class="tipo-option">
                             <input type="radio" id="tipo_publico" name="tipo" value="publico">
-                            <label for="tipo_publico"><span class="tipo-icon">🏛️</span>Público</label>
+                            <label for="tipo_publico"><span class="tipo-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m3 9 9-5 9 5M5 10v8m4-8v8m6-8v8m4-8v8M3 20h18" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Público</label>
                         </div>
                         <div class="tipo-option">
                             <input type="radio" id="tipo_privado" name="tipo" value="privado">
-                            <label for="tipo_privado"><span class="tipo-icon">🏥</span>Privado</label>
+                            <label for="tipo_privado"><span class="tipo-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 21V5h11v16M15 9h5v12M8 9h3M8 13h3M8 17h3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span>Privado</label>
                         </div>
                     </div>
                     <span class="form-error" id="err-tipo" style="display:none">Seleccione el tipo.</span>
@@ -147,7 +147,7 @@ if (isset($_SESSION['solicitud_error'])) {
                     <span class="form-error" id="err-ruc" style="display:none"></span>
                 </div>
 
-                <div class="form-section-title">👤 Datos del Titular / Dueño</div>
+                <div class="form-section-title">Datos del Titular / Dueño</div>
 
                 <div class="form-group">
                     <label class="form-label" for="dni_titular">DNI del titular <span class="req">*</span></label>
@@ -175,14 +175,14 @@ if (isset($_SESSION['solicitud_error'])) {
                     <span class="form-error" id="err-telefono" style="display:none">Ingrese un número válido.</span>
                 </div>
 
-                <div class="form-section-title">📎 Evidencias del Establecimiento</div>
+                <div class="form-section-title">Evidencias del Establecimiento</div>
 
                 <p class="form-hint" style="margin-bottom:12px;font-size:12px;color:var(--text2);">
                     Adjunte documentos o imágenes que acrediten la existencia del establecimiento (ej. licencia, fachada, etc.). <strong>Mínimo 1, máximo 2 archivos. Máx. 200 KB cada uno.</strong>
                 </p>
 
                 <div class="upload-area" id="upload-area" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)">
-                    <div class="upload-icon-wrap">📁</div>
+                    <div class="upload-icon-wrap"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 7h7l2 2h9v11H3z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M12 17v-5m0 0-2 2m2-2 2 2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
                     <h4>Arrastra aquí o haz clic para seleccionar</h4>
                     <p>JPG, PNG o PDF — máx. 200 KB por archivo</p>
                     <input type="file" id="file-input" accept=".jpg,.jpeg,.png,.pdf" multiple>

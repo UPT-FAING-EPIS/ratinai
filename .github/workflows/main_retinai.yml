@@ -121,6 +121,8 @@ jobs:
               codigo=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' "$base$ruta?revision=$GITHUB_SHA")
               if [ "$codigo" != "302" ]; then echo "$ruta respondió $codigo"; correcto=0; fi
             done
+            codigo_controlador=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --request POST "$base/controllers/AnalisisController.php?action=generar_borrador")
+            if [ "$codigo_controlador" != "401" ]; then echo "AnalisisController generar_borrador respondió $codigo_controlador"; correcto=0; fi
             for recurso in assets/js/ubicacion_establecimiento.js assets/css/auth/solicitud_registro.css; do
               hash_local=$(sha256sum "$recurso" | cut -d ' ' -f 1)
               hash_azure=$(curl --silent --show-error "$base/$recurso?revision=$GITHUB_SHA" | sha256sum | cut -d ' ' -f 1)

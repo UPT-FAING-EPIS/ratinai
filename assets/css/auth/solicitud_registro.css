@@ -90,6 +90,7 @@
   color: var(--text2);
 }
 .tipo-option label .tipo-icon { font-size: 20px; }
+.tipo-option label .tipo-icon svg { width:22px; height:22px; display:block; }
 .tipo-option input:checked + label {
   border-color: var(--accent);
   background: var(--accent2);
@@ -199,6 +200,7 @@
 }
 .upload-area.has-files { border-style: solid; border-color: #6EE7B7; background: var(--success2); }
 .upload-icon-wrap { font-size: 26px; margin-bottom: 6px; }
+.upload-icon-wrap svg { width:32px; height:32px; display:block; margin:0 auto; }
 .upload-area h4 { font-size: 13px; font-weight: 600; color: var(--text); margin: 0 0 4px; }
 .upload-area p  { font-size: 11px; color: var(--text3); margin: 0; }
 .upload-area input[type="file"] {
@@ -269,6 +271,7 @@
   margin: 0 auto 20px;
   font-size: 30px;
 }
+.success-icon svg { width:34px; height:34px; display:block; }
 .success-screen h2 { font-size: 18px; font-weight: 700; color: var(--text); margin-bottom: 10px; }
 .success-screen p  { font-size: 14px; color: var(--text2); line-height: 1.6; }
 .back-home-link {

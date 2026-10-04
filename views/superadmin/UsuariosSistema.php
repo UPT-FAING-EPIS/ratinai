@@ -7,7 +7,7 @@ $initials = get_initials($user['nombre']);
 $base = get_base_path();
 $logout_url = $base . 'controllers/AuthController.php?action=logout';
 
-$role_label   = '⚡ Super Administrador';
+$role_label   = 'Super Administrador';
 $role_class   = 'role-sad';
 $avatar_class = 'avatar-sad';
 $header_sub   = 'Control Global';
@@ -41,18 +41,8 @@ $rolClass = ['SAD' => 'badge-sad',   'ADM' => 'badge-adm', 'MED' => 'badge-med']
 <meta name="description" content="Listado de todos los usuarios registrados en la plataforma RetinAI.">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="<?= $base ?>assets/css/dashboard/dashboard.css">
+<link rel="stylesheet" href="<?= $base ?>assets/css/dashboard/paneles.css">
 <style>
-.filter-bar { display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; align-items:center; }
-.filter-bar input[type=search] {
-    padding:9px 14px; border:1.5px solid var(--border,#DDE3EC); border-radius:8px;
-    font-family:inherit; font-size:14px; outline:none; width:260px;
-    transition:border 0.15s;
-}
-.filter-bar input[type=search]:focus { border-color:var(--accent,#1A56DB); }
-.filter-bar select {
-    padding:9px 14px; border:1.5px solid var(--border,#DDE3EC); border-radius:8px;
-    font-family:inherit; font-size:14px; outline:none; background:#fff; cursor:pointer;
-}
 .user-count { margin-left:auto; font-size:13px; color:var(--text2,#4A5568); }
 </style>
 </head>
@@ -73,7 +63,7 @@ $rolClass = ['SAD' => 'badge-sad',   'ADM' => 'badge-adm', 'MED' => 'badge-med']
 
         <!-- ── Filtros ── -->
         <div class="filter-bar">
-            <input type="search" id="search-usuario" placeholder="🔍 Buscar por nombre o correo…" oninput="filtrarTabla()">
+            <label class="filter-search" aria-label="Buscar usuarios"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="m16.5 16.5 4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><input type="search" id="search-usuario" placeholder="Buscar por nombre o correo" oninput="filtrarTabla()"></label>
             <select id="filter-rol" onchange="filtrarTabla()">
                 <option value="">Todos los roles</option>
                 <option value="SAD">Super Admin</option>

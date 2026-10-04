@@ -212,6 +212,32 @@ class AnalisisController
         }
     }
 
+    /** Comprobación temporal de las consultas previas al borrador, sin devolver datos clínicos. */
+    public function diagnosticarBorrador(): void
+    {
+        if (!$this->validarSolicitudMedicaPost()) {
+            return;
+        }
+        $idAnalisis = (int) ($_POST['id_analisis'] ?? 0);
+        $idMedico = (int) $_SESSION['user_id'];
+        $etapa = 'analisis';
+        try {
+            $analisis = $this->model->obtenerPorId($idAnalisis, $idMedico);
+            if (!$this->analisisAptoParaInforme($analisis)) {
+                $this->responderJson(['success' => false, 'etapa' => $etapa, 'error' => 'Análisis no apto'], 422);
+                return;
+            }
+            $etapa = 'informe_existente';
+            $informe = $this->modeloInforme->obtenerPorAnalisis($idAnalisis, $idMedico);
+            $etapa = 'controles_previos';
+            $controles = $this->model->obtenerControlesPrevios($idAnalisis, $idMedico);
+            $this->responderJson(['success' => true, 'informe_existe' => $informe !== null, 'controles' => count($controles)]);
+        } catch (Throwable $error) {
+            error_log('RetinAI diagnosticarBorrador (' . $etapa . '): ' . $error->getMessage());
+            $this->responderJson(['success' => false, 'etapa' => $etapa, 'codigo' => (string) $error->getCode()], 500);
+        }
+    }
+
     public function guardarBorrador(): void
     {
         if (!$this->validarSolicitudMedicaPost()) {
@@ -632,6 +658,7 @@ if (isset($_GET['action'])) {
         case 'analizar': $controlador->analizar(); break;
         case 'registrar_final': $controlador->registrar_final(); break;
         case 'generar_borrador': $controlador->generarBorrador(); break;
+        case 'diagnosticar_borrador': $controlador->diagnosticarBorrador(); break;
         case 'guardar_borrador': $controlador->guardarBorrador(); break;
         case 'aprobar_informe': $controlador->aprobarInforme(); break;
         case 'valorar_resultado': $controlador->valorarResultado(); break;

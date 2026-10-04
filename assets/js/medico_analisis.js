@@ -56,6 +56,9 @@ document.addEventListener('DOMContentLoaded', () => {
         crearCarpeta: document.getElementById('btn-create-folder'),
         cancelarCarpeta: document.getElementById('btn-cancel-new-folder'),
         mensaje: document.getElementById('toast'),
+        rejillaCarga: document.getElementById('rejilla-carga'),
+        imagenResultado: document.getElementById('imagen-resultado'),
+        imagenResultadoImg: document.getElementById('imagen-resultado-img'),
     };
 
     let archivoSeleccionado = null;
@@ -64,6 +67,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let idAnalisisActual = null;
     let procesando = false;
     let imagenValidada = false;
+    let borradorGuardado = false;
     let dimensionesImagen = { ancho: 0, alto: 0 };
 
     elementos.fechaCaptura.value = obtenerFechaLocalActual();
@@ -190,14 +194,18 @@ document.addEventListener('DOMContentLoaded', () => {
         if (idCarpetaActual) formulario.append('id_carpeta', String(idCarpetaActual));
 
         try {
-            const respuestaHttp = await fetch(BASE_URL + 'controllers/AnalisisController.php?action=analizar', {
+            const respuestaHttp = await fetch(new URL(BASE_URL + 'controllers/AnalisisController.php?action=analizar', window.location.href), {
                 method: 'POST',
                 body: formulario,
             });
             const respuesta = await leerJson(respuestaHttp);
+            if (respuesta.expired) {
+                window.location.assign(BASE_URL + 'views/auth/login.php?expired=1');
+                return;
+            }
             if (!respuesta.success) throw new Error(respuesta.error || 'No se pudo completar el análisis.');
             idAnalisisActual = Number(respuesta.data.id_analisis);
-            mostrarResultado(respuesta.data);
+            await mostrarResultado(respuesta.data, respuesta.imagen_path);
         } catch (error) {
             mostrarMensaje(error.message, 'danger');
             establecerPasoActual(2);
@@ -208,7 +216,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    async function mostrarResultado(salida) {
+    async function mostrarResultado(salida, rutaImagen = null) {
         const validacion = salida.validacion || {};
         const validacionDisponible = validacion.es_retinografia !== null
             && validacion.es_retinografia !== undefined
@@ -250,6 +258,15 @@ document.addEventListener('DOMContentLoaded', () => {
         elementos.probabilidades.style.display = 'block';
         elementos.bloqueValoracion.style.display = 'block';
         mostrarProbabilidades(salida.probabilidades || {});
+        elementos.rejillaCarga.style.display = 'none';
+        const origenImagen = elementos.vistaPrevia.src || (rutaImagen
+            ? new URL(BASE_URL + rutaImagen, window.location.href).href
+            : '');
+        if (origenImagen) {
+            elementos.imagenResultadoImg.src = origenImagen;
+            elementos.imagenResultado.style.display = 'block';
+        }
+        elementos.resultado.scrollIntoView({ behavior: 'smooth', block: 'start' });
         await generarBorrador();
     }
 
@@ -268,12 +285,21 @@ document.addEventListener('DOMContentLoaded', () => {
     async function generarBorrador() {
         elementos.informe.style.display = 'block';
         elementos.errorBorrador.style.display = 'none';
+        elementos.generarBorrador.disabled = true;
+        borradorGuardado = false;
+        elementos.textoInforme.disabled = true;
+        elementos.guardarBorrador.disabled = true;
+        elementos.aprobarInforme.disabled = true;
         try {
             const respuesta = await enviarFormulario('controllers/AnalisisController.php?action=generar_borrador', {
                 id_analisis: idAnalisisActual,
             });
             if (!respuesta.success) throw new Error(respuesta.error || 'No se pudo generar el borrador.');
             elementos.textoInforme.value = respuesta.informe.texto_editado;
+            borradorGuardado = true;
+            elementos.textoInforme.disabled = false;
+            elementos.guardarBorrador.disabled = false;
+            elementos.aprobarInforme.disabled = false;
             elementos.informe.style.display = 'block';
             elementos.estadoBorrador.textContent = 'Borrador guardado en el servidor.';
             establecerPasoActual(4);
@@ -284,6 +310,8 @@ document.addEventListener('DOMContentLoaded', () => {
             elementos.estadoBorrador.textContent = 'No se generó ningún texto.';
             establecerPasoActual(4);
             mostrarMensaje(error.message, 'danger');
+        } finally {
+            elementos.generarBorrador.disabled = false;
         }
     }
 
@@ -321,6 +349,7 @@ document.addEventListener('DOMContentLoaded', () => {
     elementos.aprobarInforme.addEventListener('click', () => guardarBorrador(true));
 
     async function guardarBorrador(aprobar) {
+        if (!borradorGuardado || !idAnalisisActual) return;
         const texto = elementos.textoInforme.value.trim();
         if (!texto) {
             mostrarMensaje('El informe no puede quedar vacío.', 'danger');
@@ -439,7 +468,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const url = new URL(BASE_URL + ruta, window.location.href);
         const respuestaHttp = await fetch(url, { method: 'POST', body: formulario });
         const respuesta = await leerJson(respuestaHttp);
-        if (respuesta.expired) window.location.assign(BASE_URL + 'views/auth/login.php');
+        if (respuesta.expired) window.location.assign(BASE_URL + 'views/auth/login.php?expired=1');
         return respuesta;
     }
 
@@ -518,7 +547,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     catarata: analisis.probabilidad_catarata,
                 },
             };
-            await mostrarResultado(salida);
+            await mostrarResultado(salida, analisis.imagen_path);
             if (analisis.estado_informe === 'aprobado') {
                 elementos.textoInforme.value = analisis.texto_editado || '';
                 elementos.textoInforme.disabled = true;

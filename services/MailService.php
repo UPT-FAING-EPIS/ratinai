@@ -10,6 +10,11 @@ use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
 class MailService {
+    private static string $ultimoError = '';
+
+    public static function ultimoError(): string {
+        return self::$ultimoError;
+    }
     /**
      * Envía un correo electrónico con la contraseña temporal usando PHPMailer (SMTP).
      * 
@@ -269,10 +274,13 @@ class MailService {
      * @return bool
      */
     public static function sendVerificationCode(string $correo, string $nombre, string $codigo): bool {
+        self::$ultimoError = '';
         if (!filter_var($correo, FILTER_VALIDATE_EMAIL)) {
+            self::$ultimoError = 'El correo de destino no es válido.';
             return false;
         }
         if (SMTP_USER === 'tu_correo@gmail.com' || empty(SMTP_USER)) {
+            self::$ultimoError = 'El correo SMTP no está configurado.';
             return false;
         }
 
@@ -345,6 +353,8 @@ class MailService {
             $mail->send();
             return true;
         } catch (Exception $e) {
+            self::$ultimoError = 'El proveedor SMTP rechazó el envío: ' . $e->getMessage();
+            error_log('RetinAI SMTP verificación: ' . self::$ultimoError);
             return false;
         }
     }

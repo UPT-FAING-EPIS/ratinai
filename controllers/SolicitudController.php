@@ -76,7 +76,11 @@ function handleSendCode(): void
     if ($sent) {
         echo json_encode(['success' => true]);
     } else {
-        echo json_encode(['success' => false, 'message' => 'No se pudo enviar el correo de verificación.']);
+        $detalle = MailService::ultimoError();
+        echo json_encode([
+            'success' => false,
+            'message' => $detalle !== '' ? $detalle : 'No se pudo enviar el correo de verificación.',
+        ]);
     }
     exit;
 }

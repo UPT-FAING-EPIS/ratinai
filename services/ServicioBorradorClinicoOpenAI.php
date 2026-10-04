@@ -98,8 +98,14 @@ class ServicioBorradorClinicoOpenAI
         }
         $estructura = is_string($textoEstructurado) ? json_decode($textoEstructurado, true) : null;
         $narrativa = trim((string) ($estructura['narrativa'] ?? ''));
-        if ($narrativa === '' || mb_strlen($narrativa) > self::LONGITUD_MAXIMA_NARRATIVA || preg_match('/\d/u', $narrativa)) {
-            throw new RuntimeException('El borrador generado no pasó la validación clínica de formato.');
+        if ($narrativa === '') {
+            throw new RuntimeException('OpenAI no devolvió texto para el borrador.');
+        }
+        if (mb_strlen($narrativa) > self::LONGITUD_MAXIMA_NARRATIVA) {
+            throw new RuntimeException('OpenAI devolvió un borrador demasiado largo.');
+        }
+        if (preg_match('/\d/u', $narrativa)) {
+            throw new RuntimeException('OpenAI incluyó cifras no verificadas en el borrador.');
         }
 
         $hechosVerificables = (new ServicioBorradorClinicoLocal())->generar($analisis, $controlesPrevios);

@@ -39,27 +39,47 @@ class EstablecimientoController {
         $direccion = trim($_POST['direccion'] ?? '');
         $tipo      = trim($_POST['tipo']      ?? '');
         $ruc       = trim($_POST['ruc']       ?? '');
+        $latitudRaw = trim($_POST['latitud'] ?? '');
+        $longitudRaw = trim($_POST['longitud'] ?? '');
 
         if (empty($nombre)) {
             $_SESSION['est_error']   = 'El nombre del establecimiento es obligatorio.';
             $_SESSION['est_id_back'] = $id;
             $this->redirect("views/superadmin/detalles_establecimientos.php?id={$id}");
         }
+        if (($latitudRaw === '') !== ($longitudRaw === '')) {
+            $_SESSION['est_error'] = 'Registre ambas coordenadas o deje ambos campos vacíos.';
+            $this->redirect("views/superadmin/detalles_establecimientos.php?id={$id}");
+        }
+        $latitud = $longitud = null;
+        if ($latitudRaw !== '') {
+            if (!is_numeric($latitudRaw) || !is_numeric($longitudRaw)
+                || (float)$latitudRaw < -90 || (float)$latitudRaw > 90
+                || (float)$longitudRaw < -180 || (float)$longitudRaw > 180) {
+                $_SESSION['est_error'] = 'Ingrese coordenadas válidas: latitud entre -90 y 90 y longitud entre -180 y 180.';
+                $this->redirect("views/superadmin/detalles_establecimientos.php?id={$id}");
+            }
+            $latitud = (float) $latitudRaw;
+            $longitud = (float) $longitudRaw;
+        }
 
         try {
-            $this->model->update($id, $nombre, $direccion, $tipo, $ruc);
+            $this->model->update($id, $nombre, $direccion, $tipo, $ruc, $latitud, $longitud, true);
 
             // Notificar al titular del establecimiento
             $admins = $this->model->getAdminByEstablecimiento($id);
+            $notificados = 0;
             foreach ($admins as $adm) {
-                MailService::sendEstablecimientoActualizado(
+                if (MailService::sendEstablecimientoActualizado(
                     $adm['correo'],
                     $adm['nombre'],
                     $nombre
-                );
+                )) $notificados++;
             }
 
-            $_SESSION['est_success'] = 'Establecimiento actualizado correctamente.';
+            $_SESSION['est_success'] = $notificados > 0
+                ? "Establecimiento actualizado y notificación enviada a {$notificados} responsable(s)."
+                : 'Establecimiento actualizado. No se pudo enviar la notificación: revise la configuración SMTP y el correo del responsable.';
         } catch (Exception $e) {
             $_SESSION['est_error'] = 'Error al actualizar: ' . $e->getMessage();
         }

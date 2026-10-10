@@ -22,6 +22,8 @@ const SessionService = (() => {
     let _loginUrl    = '/views/auth/login.php';
     let _onExpire    = null;    // callback opcional (útil para tests)
     let _initialized = false;
+    let _countdownTimer = null;
+    let _expiresAt = null;
 
     // Eventos que reinician el contador de inactividad
     const ACTIVITY_EVENTS = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
@@ -34,6 +36,8 @@ const SessionService = (() => {
             clearTimeout(_timer);
         }
         _timer = setTimeout(_handleExpiration, _timeout);
+        _expiresAt = Date.now() + _timeout;
+        _renderCountdown();
     }
 
     /**
@@ -71,6 +75,8 @@ const SessionService = (() => {
             retinaiKeys.forEach(k => localStorage.removeItem(k));
         }
         _initialized = false;
+        if (_countdownTimer !== null) clearInterval(_countdownTimer);
+        _countdownTimer = null;
     }
 
     /**
@@ -86,6 +92,9 @@ const SessionService = (() => {
         _onExpire   = options.onExpire ?? null;
         _initialized = true;
 
+        if (_countdownTimer !== null) clearInterval(_countdownTimer);
+        _countdownTimer = setInterval(_renderCountdown, 1000);
+
         // Registrar listeners de actividad (sólo en el browser)
         if (typeof window !== 'undefined') {
             ACTIVITY_EVENTS.forEach(event => {
@@ -95,6 +104,13 @@ const SessionService = (() => {
 
         // Arrancar el timer
         resetTimer();
+    }
+
+    function _renderCountdown() {
+        const display = typeof document !== 'undefined' ? document.getElementById('session-countdown') : null;
+        if (!display || !_expiresAt) return;
+        const seconds = Math.max(0, Math.ceil((_expiresAt - Date.now()) / 1000));
+        display.textContent = String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(seconds % 60).padStart(2, '0');
     }
 
     /**

@@ -64,12 +64,16 @@ class DoctorModel {
     }
 
     public function deactivate($id, $est_ids) {
+        return $this->setActive($id, $est_ids, false);
+    }
+
+    public function setActive($id, $est_ids, $active) {
         if (!is_array($est_ids)) $est_ids = [$est_ids];
         if (empty($est_ids)) return false;
         $in = str_repeat('?,', count($est_ids) - 1) . '?';
-        $sql = "UPDATE usuarios SET activo=0 WHERE id=? AND establecimiento_id IN ($in) AND rol_codigo='MED'";
+        $sql = "UPDATE usuarios SET activo=? WHERE id=? AND establecimiento_id IN ($in) AND rol_codigo='MED'";
         $stmt = $this->db->prepare($sql);
-        return $stmt->execute(array_merge([$id], $est_ids));
+        return $stmt->execute(array_merge([(int) $active, $id], $est_ids));
     }
 
     public function findById($id, $est_ids) {
@@ -133,6 +137,34 @@ class DoctorModel {
                 WHERE u.rol_codigo='MED' AND u.activo=1
                   AND u.establecimiento_id IN ($in)
                 ORDER BY e.nombre, u.nombre";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($ids_array);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /** Todos los médicos administrables, incluidos los que ya no tienen acceso. */
+    public function getDoctorsByEstablishments($ids_array) {
+        if (empty($ids_array)) return [];
+        $in = str_repeat('?,', count($ids_array) - 1) . '?';
+        $sql = "SELECT u.id, u.nombre, u.correo, u.cmp, u.especialidad, u.ultimo_acceso,
+                       u.es_password_temporal, u.establecimiento_id, u.activo,
+                       e.nombre AS est_nombre
+                FROM usuarios u
+                LEFT JOIN establecimientos e ON e.id = u.establecimiento_id
+                WHERE u.rol_codigo='MED' AND u.establecimiento_id IN ($in)
+                ORDER BY u.activo DESC, e.nombre, u.nombre";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($ids_array);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getRecentDoctorsByEstablishments($ids_array, $limit = 5) {
+        if (empty($ids_array)) return [];
+        $in = str_repeat('?,', count($ids_array) - 1) . '?';
+        $sql = "SELECT u.nombre, u.especialidad, u.activo, e.nombre AS est_nombre
+                FROM usuarios u LEFT JOIN establecimientos e ON e.id = u.establecimiento_id
+                WHERE u.rol_codigo='MED' AND u.establecimiento_id IN ($in)
+                ORDER BY u.id DESC LIMIT " . max(1, (int) $limit);
         $stmt = $this->db->prepare($sql);
         $stmt->execute($ids_array);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);

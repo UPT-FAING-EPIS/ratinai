@@ -217,16 +217,6 @@ if (isset($_SESSION['solicitud_error'])) {
 <script src="<?= $base ?>assets/js/ubicacion_establecimiento.js"></script>
 <script>
 SessionService.init({ timeout: 300000, loginUrl: '<?= htmlspecialchars($base . "views/auth/login.php") ?>' });
-let remaining = 300;
-const cd = document.getElementById('session-countdown');
-if(cd) {
-    setInterval(() => {
-        const m = Math.floor(remaining / 60).toString().padStart(2, '0');
-        const s = (remaining % 60).toString().padStart(2, '0');
-        cd.textContent = m + ':' + s;
-        if (remaining > 0) remaining--;
-    }, 1000);
-}
 </script>
 </body>
 </html>

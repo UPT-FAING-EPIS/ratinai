@@ -25,6 +25,7 @@ try {
     // Establecimientos activos
     $establecimientos = $db->query(
         "SELECT e.id, e.nombre, e.direccion, e.ruc,
+         CASE WHEN e.id_usuario IS NULL THEN 'sin_responsable' ELSE 'activo' END AS estado,
          COUNT(u.id) AS medicos
          FROM establecimientos e
          LEFT JOIN usuarios u ON u.establecimiento_id=e.id AND u.rol_codigo='MED' AND u.activo=1
@@ -99,6 +100,8 @@ try {
 .info-block .label { font-size:10px; color:var(--text3); text-transform:uppercase; font-weight:700; }
 .evi-link { display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:600; color:var(--accent); text-decoration:none; margin-right:6px; background:#EFF6FF; padding:4px 8px; border-radius:4px; }
 .evi-link:hover { background:#DBEAFE; }
+.establishment-filters{display:grid;grid-template-columns:minmax(260px,1fr) 220px;gap:12px;padding:16px;margin-bottom:16px;border:1px solid var(--border,#dbe2ea);border-radius:12px;background:var(--surface,#fff)}
+.establishment-filters .filter-search{display:block;width:auto;max-width:none}.establishment-filters .filter-search input[type=search]{display:block;width:100%;height:40px;box-sizing:border-box;padding:9px 14px 9px 38px;border:1.5px solid var(--border,#dbe2ea);border-radius:8px;background:var(--surface2,#f7f9fc);color:var(--text,#0f1923);font:14px 'DM Sans',sans-serif;outline:none}.establishment-filters .filter-search input[type=search]:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(26,86,219,.1)}.establishment-filters select{width:100%;height:40px;padding:9px 14px;border:1.5px solid var(--border,#dbe2ea);border-radius:8px;background:var(--surface2,#f7f9fc);color:var(--text,#0f1923);font:14px 'DM Sans',sans-serif}.filter-empty{display:none;padding:26px;text-align:center;color:var(--text3)}@media(max-width:640px){.establishment-filters{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -122,8 +125,9 @@ try {
 
         <!-- ── Centros activos ── -->
         <div class="card">
-            <div class="filter-bar">
+            <div class="establishment-filters">
                 <label class="filter-search" aria-label="Buscar establecimientos"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="m16.5 16.5 4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><input id="filtro-establecimiento" type="search" placeholder="Buscar por nombre, RUC o dirección"></label>
+                <select id="filtro-estado" aria-label="Filtrar por estado"><option value="">Todos los estados</option><option value="activo">Activo</option><option value="sin_responsable">Sin responsable</option></select>
             </div>
             <?php if (empty($establecimientos)): ?>
             <p class="empty-msg">No hay establecimientos registrados.</p>
@@ -132,12 +136,12 @@ try {
                 <thead><tr><th>#</th><th>Nombre</th><th>Dirección</th><th>Médicos</th><th>Estado</th><th>Acción</th></tr></thead>
                 <tbody>
                 <?php foreach ($establecimientos as $e): ?>
-                <tr data-fila data-busqueda="<?= htmlspecialchars(mb_strtolower(($e['nombre'] ?? '') . ' ' . ($e['direccion'] ?? '') . ' ' . ($e['ruc'] ?? ''))) ?>">
+                <tr data-fila data-busqueda="<?= htmlspecialchars(mb_strtolower(($e['nombre'] ?? '') . ' ' . ($e['direccion'] ?? '') . ' ' . ($e['ruc'] ?? ''))) ?>" data-estado="<?= htmlspecialchars($e['estado']) ?>">
                     <td class="mono"><?= (int)$e['id'] ?></td>
                     <td><strong><?= htmlspecialchars($e['nombre']) ?></strong></td>
                     <td><?= htmlspecialchars($e['direccion'] ?? '—') ?></td>
                     <td><span class="badge badge-info"><?= (int)$e['medicos'] ?></span></td>
-                    <td><span class="badge badge-active">Activo</span></td>
+                    <td><span class="badge <?= $e['estado'] === 'activo' ? 'badge-active' : 'badge-warning' ?>"><?= $e['estado'] === 'activo' ? 'Activo' : 'Sin responsable' ?></span></td>
                     <td>
                         <a href="detalles_establecimientos.php?id=<?= $e['id'] ?>" class="btn-approve" style="text-decoration:none; padding:4px 8px; display:inline-block;">Ver/Editar</a>
                     </td>
@@ -145,6 +149,7 @@ try {
                 <?php endforeach; ?>
                 </tbody>
             </table>
+            <p class="filter-empty" id="establecimientos-vacio">No hay establecimientos que coincidan con los filtros.</p>
             <?php endif; ?>
         </div>
 
@@ -158,7 +163,17 @@ try {
         SessionService.init({ timeout: 300000, loginUrl: '<?= htmlspecialchars($base."views/auth/login.php") ?>' });
     }
 </script>
-<script>document.getElementById('filtro-establecimiento')?.addEventListener('input',()=>PanelesRetinAI.filtrarTabla('#tabla-establecimientos',[{selector:'#filtro-establecimiento',campo:'busqueda'}]));</script>
+<script>
+const applyEstablishmentFilters = () => {
+    const query = (document.getElementById('filtro-establecimiento')?.value || '').trim().toLocaleLowerCase('es');
+    const state = document.getElementById('filtro-estado')?.value || '';
+    const rows = document.querySelectorAll('#tabla-establecimientos tbody tr[data-fila]'); let visible = 0;
+    rows.forEach(row => { const match = (!query || row.dataset.busqueda.includes(query)) && (!state || row.dataset.estado === state); row.hidden = !match; if (match) visible++; });
+    const empty = document.getElementById('establecimientos-vacio'); if (empty) empty.style.display = rows.length && !visible ? 'block' : 'none';
+};
+document.getElementById('filtro-establecimiento')?.addEventListener('input', applyEstablishmentFilters);
+document.getElementById('filtro-estado')?.addEventListener('change', applyEstablishmentFilters);
+</script>
 <script src="<?= $base ?>assets/js/dashboard/establecimientos.js"></script>
 </body>
 </html>

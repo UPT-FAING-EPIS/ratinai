@@ -38,8 +38,8 @@ try {
     if (!empty($mis_establecimientos)) {
         $ids_est = array_map('intval', array_column($mis_establecimientos, 'id'));
 
-        // Médicos activos de todos sus establecimientos
-        $activos = $docModel->getActiveDoctorsByEstablishments($ids_est);
+        // La gestión incluye cuentas activas e inactivas para poder reactivarlas.
+        $activos = $docModel->getDoctorsByEstablishments($ids_est);
 
         // Badge del sidebar
         $cnt_pendientes = $docModel->countPendingByEstablishments($ids_est);
@@ -47,7 +47,7 @@ try {
         $activos = [];
         $cnt_pendientes = 0;
     }
-    $cnt_activos = count($activos);
+    $cnt_activos = count(array_filter($activos, static fn($doctor) => (int) $doctor['activo'] === 1));
 
 } catch (Exception $ex) {
     $mis_establecimientos = []; $est_nombre = ''; $activos = [];
@@ -80,6 +80,13 @@ if (isset($_GET['ok'])) {
 #tabla-medicos { min-width: 840px; }
 #tabla-medicos th:last-child, #tabla-medicos td:last-child { position: sticky; right: 0; background: var(--surface); box-shadow: -6px 0 10px rgba(15,23,42,.04); }
 #tabla-medicos tr:hover td:last-child { background: #F0F3F7; }
+.filters-bar { display:grid; grid-template-columns:minmax(220px,2fr) repeat(3,minmax(150px,1fr)); gap:12px; padding:16px; margin-bottom:16px; background:var(--surface,#fff); border:1px solid var(--border,#e2e8f0); border-radius:12px; }
+.filters-bar input,.filters-bar select { width:100%; box-sizing:border-box; min-height:40px; padding:0 12px; border:1px solid var(--border,#dbe2ea); border-radius:8px; background:var(--bg,#fff); color:var(--text,#1e293b); font:inherit; }
+.table-summary { font-size:13px; color:var(--text-muted,#64748b); margin:0 0 12px; }
+.btn-activate { padding:6px 12px; height:32px; border:1px solid #16a34a; border-radius:7px; background:#f0fdf4; color:#15803d; font-weight:600; cursor:pointer; }
+.empty-filter { display:none; padding:28px; text-align:center; color:var(--text-muted,#64748b); }
+@media(max-width:900px){.filters-bar{grid-template-columns:1fr 1fr}.filters-bar input{grid-column:1/-1}}
+@media(max-width:560px){.filters-bar{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -98,8 +105,8 @@ if (isset($_GET['ok'])) {
         <section class="content-section">
             <div class="section-top">
                 <div>
-                    <h1 class="page-title">Médicos activos</h1>
-                    <p class="page-sub">Gestione el acceso de los médicos de <?= htmlspecialchars($est_nombre) ?>.</p>
+                    <h1 class="page-title">Médicos del establecimiento</h1>
+                    <p class="page-sub">Consulte, filtre y gestione el acceso de todos los médicos de <?= htmlspecialchars($est_nombre) ?>.</p>
                 </div>
                 <a href="<?= $base ?>views/admin/create_doctor.php" class="btn-add-doctor" id="btn-agregar-medico">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -112,8 +119,17 @@ if (isset($_GET['ok'])) {
             </div>
 
             <div class="card full-width-card">
+                <div class="filters-bar" aria-label="Filtros de médicos">
+                    <input type="search" id="filter-search" placeholder="Buscar por nombre, correo o CMP" aria-label="Buscar médico">
+                    <select id="filter-specialty" aria-label="Filtrar por especialidad"><option value="">Todas las especialidades</option>
+                        <?php foreach (array_unique(array_filter(array_column($activos, 'especialidad'))) as $especialidad): ?><option value="<?= htmlspecialchars(mb_strtolower($especialidad)) ?>"><?= htmlspecialchars($especialidad) ?></option><?php endforeach; ?>
+                    </select>
+                    <?php if ($tiene_multi): ?><select id="filter-establishment" aria-label="Filtrar por establecimiento"><option value="">Todos los establecimientos</option><?php foreach ($mis_establecimientos as $establecimiento): ?><option value="<?= (int) $establecimiento['id'] ?>"><?= htmlspecialchars($establecimiento['nombre']) ?></option><?php endforeach; ?></select><?php endif; ?>
+                    <select id="filter-status" aria-label="Filtrar por estado"><option value="">Todos los estados</option><option value="active">Activo</option><option value="inactive">Inactivo</option><option value="temporary">Clave temporal</option></select>
+                </div>
+                <p class="table-summary" id="table-summary">Mostrando <?= count($activos) ?> médico(s), <?= $cnt_activos ?> activo(s).</p>
                 <?php if (empty($activos)): ?>
-                <p class="empty-msg">No hay médicos activos en este establecimiento.</p>
+                <p class="empty-msg">Aún no hay médicos registrados en este establecimiento.</p>
                 <?php else: ?>
                 <table class="data-table" id="tabla-medicos">
                     <thead>
@@ -129,7 +145,7 @@ if (isset($_GET['ok'])) {
                     </thead>
                     <tbody>
                     <?php foreach ($activos as $m): ?>
-                    <tr>
+                    <tr data-name="<?= htmlspecialchars(mb_strtolower(($m['nombre'] ?? '') . ' ' . ($m['correo'] ?? '') . ' ' . ($m['cmp'] ?? '')), ENT_QUOTES) ?>" data-specialty="<?= htmlspecialchars(mb_strtolower($m['especialidad'] ?? ''), ENT_QUOTES) ?>" data-establishment="<?= (int) $m['establecimiento_id'] ?>" data-status="<?= (int) $m['activo'] === 1 ? ($m['es_password_temporal'] ? 'active temporary' : 'active') : 'inactive' ?>">
                         <td>
                             <strong><?= htmlspecialchars($m['nombre']) ?></strong><br>
                             <span class="text-muted small"><?= htmlspecialchars($m['correo']) ?></span>
@@ -143,8 +159,8 @@ if (isset($_GET['ok'])) {
                             <?= $m['ultimo_acceso'] ? date('d M Y H:i', strtotime($m['ultimo_acceso'])) : '—' ?>
                         </td>
                         <td>
-                            <span class="badge badge-active">Activo</span>
-                            <?php if ($m['es_password_temporal']): ?>
+                            <span class="badge <?= (int)$m['activo'] === 1 ? 'badge-active' : 'badge-warning' ?>"><?= (int)$m['activo'] === 1 ? 'Activo' : 'Inactivo' ?></span>
+                            <?php if ((int)$m['activo'] === 1 && $m['es_password_temporal']): ?>
                                 <span class="badge badge-warning" style="margin-left:4px">Clave temporal</span>
                             <?php endif; ?>
                         </td>
@@ -156,9 +172,9 @@ if (isset($_GET['ok'])) {
                                 <button type="button" class="btn-action-icon" title="Resetear contraseña" onclick="openResetModal(<?= $m['id'] ?>)">
                                     <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                                 </button>
-                                <form method="POST" action="<?= $base ?>controllers/DoctorController.php?action=deactivate" style="margin:0;">
+                                <form method="POST" action="<?= $base ?>controllers/DoctorController.php?action=<?= (int)$m['activo'] === 1 ? 'deactivate' : 'activate' ?>" style="margin:0;" onsubmit="return confirm('<?= (int)$m['activo'] === 1 ? '¿Desactivar el acceso de este médico?' : '¿Activar el acceso de este médico?' ?>');">
                                     <input type="hidden" name="target_id" value="<?= $m['id'] ?>">
-                                    <button type="submit" class="btn btn-sm btn-danger-outline" style="padding:6px 12px; height:32px;">Desactivar</button>
+                                    <?php if ((int)$m['activo'] === 1): ?><button type="submit" class="btn btn-sm btn-danger-outline" style="padding:6px 12px; height:32px;">Desactivar</button><?php else: ?><button type="submit" class="btn-activate">Activar</button><?php endif; ?>
                                 </form>
                             </div>
                         </td>
@@ -166,6 +182,7 @@ if (isset($_GET['ok'])) {
                     <?php endforeach; ?>
                     </tbody>
                 </table>
+                <p class="empty-filter" id="empty-filter">No hay médicos que coincidan con los filtros seleccionados.</p>
                 <?php endif; ?>
             </div>
         </section>
@@ -301,14 +318,32 @@ document.getElementById('form-reset').addEventListener('submit', function(e) {
 });
 
 SessionService.init({ timeout: 300000, loginUrl: '<?= htmlspecialchars($base . "views/auth/login.php") ?>' });
-let remaining = 300;
-const cd = document.getElementById('session-countdown');
-setInterval(() => {
-    const m = Math.floor(remaining / 60).toString().padStart(2, '0');
-    const s = (remaining % 60).toString().padStart(2, '0');
-    cd.textContent = m + ':' + s;
-    if (remaining > 0) remaining--;
-}, 1000);
+
+const doctorRows = Array.from(document.querySelectorAll('#tabla-medicos tbody tr'));
+const searchFilter = document.getElementById('filter-search');
+const specialtyFilter = document.getElementById('filter-specialty');
+const establishmentFilter = document.getElementById('filter-establishment');
+const statusFilter = document.getElementById('filter-status');
+function applyDoctorFilters() {
+    const query = (searchFilter?.value || '').trim().toLowerCase();
+    const specialty = specialtyFilter?.value || '';
+    const establishment = establishmentFilter?.value || '';
+    const status = statusFilter?.value || '';
+    let visible = 0;
+    doctorRows.forEach(row => {
+        const matches = (!query || row.dataset.name.includes(query))
+            && (!specialty || row.dataset.specialty === specialty)
+            && (!establishment || row.dataset.establishment === establishment)
+            && (!status || row.dataset.status.split(' ').includes(status));
+        row.hidden = !matches;
+        if (matches) visible++;
+    });
+    const empty = document.getElementById('empty-filter');
+    if (empty) empty.style.display = doctorRows.length && !visible ? 'block' : 'none';
+    const summary = document.getElementById('table-summary');
+    if (summary) summary.textContent = `Mostrando ${visible} de ${doctorRows.length} médico(s).`;
+}
+[searchFilter, specialtyFilter, establishmentFilter, statusFilter].filter(Boolean).forEach(input => input.addEventListener(input.tagName === 'INPUT' ? 'input' : 'change', applyDoctorFilters));
 
 const flash = document.getElementById('flash-msg');
 if (flash) setTimeout(() => { flash.style.opacity = '0'; setTimeout(() => flash.remove(), 400); }, 3000);

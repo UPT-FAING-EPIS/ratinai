@@ -44,10 +44,12 @@ try {
     if (!empty($mis_establecimientos)) {
         $ids_est = array_map('intval', array_column($mis_establecimientos, 'id'));
         $cnt_pendientes = $docModel->countPendingByEstablishments($ids_est);
+        $ultimos_medicos = $docModel->getRecentDoctorsByEstablishments($ids_est);
     }
 } catch (Exception $ex) {
-    $mis_establecimientos = []; $est_nombre = ''; $header_sub = ''; $especialidades = []; $cnt_pendientes = 0;
+    $mis_establecimientos = []; $est_nombre = ''; $header_sub = ''; $especialidades = []; $cnt_pendientes = 0; $ultimos_medicos = [];
 }
+$ultimos_medicos = $ultimos_medicos ?? [];
 
 // Leer flash messages desde sesión
 $errors            = $_SESSION['flash_errors'] ?? [];
@@ -66,7 +68,8 @@ unset($_SESSION['flash_errors'], $_SESSION['flash_success'], $_SESSION['flash_te
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="<?= $base ?>assets/css/dashboard/dashboard.css">
 <style>
-.form-page-wrap{max-width:680px;margin:0 auto;padding:8px 0 40px}
+.form-page-wrap{max-width:100%;margin:0 auto;padding:8px 0 40px}
+.registration-layout{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(300px,.65fr);gap:24px;align-items:start}
 .form-card{background:var(--surface,#1e2235);border:1px solid var(--border,rgba(255,255,255,.07));border-radius:16px;padding:36px 40px}
 .form-card-header{display:flex;align-items:center;gap:14px;margin-bottom:28px;padding-bottom:20px;border-bottom:1px solid var(--border,rgba(255,255,255,.07))}
 .form-card-icon{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#1A56DB,#1e40af);display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 4px 12px rgba(26,86,219,.35)}
@@ -112,6 +115,7 @@ unset($_SESSION['flash_errors'], $_SESSION['flash_success'], $_SESSION['flash_te
 .combo-opt.nueva{color:#60a5fa;font-style:italic}
 .combo-opt.nueva:hover{background:rgba(26,86,219,.35)}
 .nueva-esp-field{display:none;margin-top:10px}
+.context-card{background:var(--surface,#1e2235);border:1px solid var(--border,rgba(255,255,255,.07));border-radius:16px;padding:22px;margin-bottom:18px}.context-card h2{font-size:15px;margin:0 0 5px;color:var(--text,#f1f5f9)}.context-card>p{font-size:12px;color:var(--text-muted,#94a3b8);margin:0 0 14px;line-height:1.45}.recent-doctor{padding:12px 0;border-top:1px solid var(--border,rgba(255,255,255,.07));display:flex;align-items:center;gap:10px}.recent-doctor:first-of-type{border-top:0}.recent-avatar{width:32px;height:32px;border-radius:50%;background:rgba(26,86,219,.2);color:#93c5fd;display:grid;place-items:center;font-size:12px;font-weight:700}.recent-doctor strong{font-size:13px;color:var(--text,#f1f5f9);display:block}.recent-doctor span{font-size:11px;color:var(--text-muted,#94a3b8)}.guide-step{display:flex;gap:11px;padding:11px 0;border-top:1px solid var(--border,rgba(255,255,255,.07))}.guide-step:first-of-type{border-top:0}.step-no{flex:0 0 22px;height:22px;border-radius:50%;display:grid;place-items:center;background:rgba(26,86,219,.18);color:#93c5fd;font-size:11px;font-weight:700}.guide-step b{font-size:12px;color:var(--text,#f1f5f9);display:block;margin-bottom:2px}.guide-step p{font-size:11px;color:var(--text-muted,#94a3b8);margin:0;line-height:1.4}@media(max-width:900px){.registration-layout{grid-template-columns:1fr}.context-column{display:grid;grid-template-columns:1fr 1fr;gap:18px}.context-card{margin:0}}@media(max-width:620px){.context-column{grid-template-columns:1fr}.form-card{padding:26px 20px}}
 </style>
 </head>
 <body>
@@ -134,6 +138,7 @@ unset($_SESSION['flash_errors'], $_SESSION['flash_success'], $_SESSION['flash_te
                 <span>Agregar Médico</span>
             </div>
 
+            <div class="registration-layout">
             <div class="form-card">
                 <div class="form-card-header">
                     <div class="form-card-icon">
@@ -282,6 +287,24 @@ unset($_SESSION['flash_errors'], $_SESSION['flash_success'], $_SESSION['flash_te
                 </form>
                 <?php endif; ?>
             </div>
+            <aside class="context-column" aria-label="Información de apoyo">
+                <section class="context-card">
+                    <h2>Últimos médicos registrados</h2>
+                    <p>Las cinco cuentas creadas más recientemente en sus establecimientos.</p>
+                    <?php if (empty($ultimos_medicos)): ?><p>Aún no hay médicos registrados.</p><?php else: foreach ($ultimos_medicos as $medico): ?>
+                    <div class="recent-doctor"><span class="recent-avatar"><?= htmlspecialchars(get_initials($medico['nombre'])) ?></span><div><strong><?= htmlspecialchars($medico['nombre']) ?></strong><span><?= htmlspecialchars($medico['especialidad'] ?: 'Sin especialidad') ?> · <?= (int)$medico['activo'] === 1 ? 'Activo' : 'Inactivo' ?></span></div></div>
+                    <?php endforeach; endif; ?>
+                </section>
+                <section class="context-card">
+                    <h2>Guía rápida de registro</h2>
+                    <p>Revise estos datos antes de enviar la invitación.</p>
+                    <div class="guide-step"><span class="step-no">1</span><div><b>Establecimiento destino</b><p>Define el centro al que quedará vinculado el médico.</p></div></div>
+                    <div class="guide-step"><span class="step-no">2</span><div><b>Identidad y correo</b><p>El correo será su usuario y recibirá las credenciales de primer acceso.</p></div></div>
+                    <div class="guide-step"><span class="step-no">3</span><div><b>CMP y especialidad</b><p>Validan su perfil profesional y facilitan la gestión posterior.</p></div></div>
+                    <div class="guide-step"><span class="step-no">4</span><div><b>Acceso seguro</b><p>La cuenta nace activa con una clave temporal que deberá cambiar en el primer ingreso.</p></div></div>
+                </section>
+            </aside>
+            </div>
         </div>
     </main>
 </div>
@@ -289,14 +312,6 @@ unset($_SESSION['flash_errors'], $_SESSION['flash_success'], $_SESSION['flash_te
 <script src="<?= $base ?>assets/js/session.service.js"></script>
 <script>
 SessionService.init({ timeout: 300000, loginUrl: '<?= htmlspecialchars($base . "views/auth/login.php") ?>' });
-let remaining = 300;
-const cd = document.getElementById('session-countdown');
-setInterval(() => {
-    const m = Math.floor(remaining / 60).toString().padStart(2, '0');
-    const s = (remaining % 60).toString().padStart(2, '0');
-    cd.textContent = m + ':' + s;
-    if (remaining > 0) remaining--;
-}, 1000);
 
 const display   = document.getElementById('combo-display');
 const dropdown  = document.getElementById('combo-dropdown');

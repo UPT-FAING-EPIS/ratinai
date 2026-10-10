@@ -173,16 +173,6 @@ if (isset($_SESSION['solicitud_success'])) {
 <script src="<?= $base ?>assets/js/session.service.js"></script>
 <script>
 SessionService.init({ timeout: 300000, loginUrl: '<?= htmlspecialchars($base . "views/auth/login.php") ?>' });
-let remaining = 300;
-const cd = document.getElementById('session-countdown');
-if(cd) {
-    setInterval(() => {
-        const m = Math.floor(remaining / 60).toString().padStart(2, '0');
-        const s = (remaining % 60).toString().padStart(2, '0');
-        cd.textContent = m + ':' + s;
-        if (remaining > 0) remaining--;
-    }, 1000);
-}
 const flash = document.getElementById('flash-msg');
 if (flash) setTimeout(() => { flash.style.opacity = '0'; setTimeout(() => flash.remove(), 400); }, 3000);
 </script>

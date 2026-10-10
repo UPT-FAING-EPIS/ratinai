@@ -26,6 +26,15 @@ class DoctorController {
         exit();
     }
 
+    private function establishmentIdsForAdmin(array $user): array {
+        require_once __DIR__ . '/../models/EstablecimientoModel.php';
+        $items = (new EstablecimientoModel())->getByOwnerId((int) ($user['id'] ?? 0));
+        $ids = array_map('intval', array_column($items, 'id'));
+        $fallback = (int) ($user['establecimiento_id'] ?? 0);
+        if (empty($ids) && $fallback > 0) $ids = [$fallback];
+        return $ids;
+    }
+
     public function createDoctor() {
         require_role('ADM');
         $user   = current_user();
@@ -124,12 +133,21 @@ class DoctorController {
     public function deactivate() {
         require_role('ADM');
         $user = current_user();
-        $est_id = (int)($user['establecimiento_id'] ?? 0);
+        $est_ids = $this->establishmentIdsForAdmin($user);
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $target_id = (int)($_POST['target_id'] ?? 0);
-            $this->model->deactivate($target_id, $est_id);
+            $this->model->setActive($target_id, $est_ids, false);
             $_SESSION['flash_success'] = "Acceso del médico desactivado exitosamente.";
+            $this->redirect('views/admin/doctor.php');
+        }
+    }
+
+    public function activate() {
+        require_role('ADM');
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $this->model->setActive((int) ($_POST['target_id'] ?? 0), $this->establishmentIdsForAdmin(current_user()), true);
+            $_SESSION['flash_success'] = 'Acceso del médico activado exitosamente.';
             $this->redirect('views/admin/doctor.php');
         }
     }
@@ -221,6 +239,7 @@ if (isset($_GET['action'])) {
     switch ($_GET['action']) {
         case 'create':     $controller->createDoctor(); break;
         case 'deactivate': $controller->deactivate(); break;
+        case 'activate':   $controller->activate(); break;
         case 'edit':       $controller->editDoctor(); break;
         case 'reset':      $controller->resetPassword(); break;
     }

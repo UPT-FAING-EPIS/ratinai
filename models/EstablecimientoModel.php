@@ -25,11 +25,18 @@ class EstablecimientoModel {
     /**
      * Actualiza los datos editables de un establecimiento.
      */
-    public function update(int $id, string $nombre, string $direccion, string $tipo, string $ruc): bool {
+    public function update(int $id, string $nombre, string $direccion, string $tipo, string $ruc, ?float $latitud = null, ?float $longitud = null, bool $updateCoordinates = false): bool {
+        // Conserva compatibilidad con integraciones existentes que actualizan sólo los cinco datos originales.
+        if (!$updateCoordinates) {
+            $stmt = $this->db->prepare(
+                "UPDATE establecimientos SET nombre = ?, direccion = ?, tipo = ?, ruc = ? WHERE id = ?"
+            );
+            return $stmt->execute([$nombre, $direccion, $tipo, $ruc, $id]);
+        }
         $stmt = $this->db->prepare(
-            "UPDATE establecimientos SET nombre = ?, direccion = ?, tipo = ?, ruc = ? WHERE id = ?"
+            "UPDATE establecimientos SET nombre = ?, direccion = ?, tipo = ?, ruc = ?, latitud = ?, longitud = ? WHERE id = ?"
         );
-        return $stmt->execute([$nombre, $direccion, $tipo, $ruc, $id]);
+        return $stmt->execute([$nombre, $direccion, $tipo, $ruc, $latitud, $longitud, $id]);
     }
 
     /**

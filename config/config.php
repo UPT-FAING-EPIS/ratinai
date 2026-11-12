@@ -70,6 +70,15 @@ function servicioAnalisisRemotoDisponible(): bool
 {
     $rutaCertificado = dirname(__DIR__) . '/certs/retinai-ai-ca.crt';
 
+    if (ANALYSIS_AI_ENABLED && ANALYSIS_PROVIDER === 'local') {
+        $url = (string) env_value('ANALYSIS_API_URL', '');
+        $partes = parse_url($url);
+        $host = strtolower((string) ($partes['host'] ?? ''));
+        return ($partes['scheme'] ?? '') === 'http'
+            && in_array($host, ['127.0.0.1', 'localhost', '::1'], true)
+            && trim((string) env_value('ANALYSIS_API_KEY', '')) !== '';
+    }
+
     return ANALYSIS_AI_ENABLED
         && ANALYSIS_PROVIDER === 'remoto'
         && trim((string) env_value('ANALYSIS_API_URL', '')) !== ''

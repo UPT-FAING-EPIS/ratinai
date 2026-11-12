@@ -16,7 +16,10 @@ document.addEventListener('DOMContentLoaded', () => {
         validar: document.getElementById('validate-btn'),
         analizar: document.getElementById('analyze-btn'),
         seccionAnalisis: document.getElementById('analysis-section'),
-        estadoValidacionProvisional: document.getElementById('estado-validacion-provisional'),
+        resultadoValidacionCnn: document.getElementById('resultado-validacion-cnn'),
+        mensajeValidacionCnn: document.getElementById('mensaje-validacion-cnn'),
+        validacionContenidoCnn: document.getElementById('validacion-contenido-cnn'),
+        validacionCalidadCnn: document.getElementById('validacion-calidad-cnn'),
         dni: document.getElementById('dni-input'),
         ojo: document.getElementById('ojo-input'),
         fechaCaptura: document.getElementById('fecha-captura-input'),
@@ -106,7 +109,11 @@ document.addEventListener('DOMContentLoaded', () => {
         elementos.nombreArchivo.textContent = archivo.name;
         elementos.zonaCarga.classList.add('con-archivo');
         elementos.cambiarImagen.style.display = 'inline-flex';
-        elementos.estadoValidacionProvisional.style.display = 'none';
+        elementos.resultadoValidacionCnn.style.display = 'none';
+        elementos.resultadoValidacionCnn.classList.remove('aprobada', 'rechazada');
+        elementos.mensajeValidacionCnn.textContent = 'Validando…';
+        elementos.validacionContenidoCnn.textContent = '—';
+        elementos.validacionCalidadCnn.textContent = '—';
         elementos.seccionAnalisis.style.display = 'none';
         const lector = new FileReader();
         lector.addEventListener('load', evento => {
@@ -155,28 +162,82 @@ document.addEventListener('DOMContentLoaded', () => {
     elementos.ojo.addEventListener('change', actualizarDisponibilidadAnalisis);
 
     function actualizarDisponibilidadAnalisis() {
-        const identificacionCompleta = Boolean(archivoSeleccionado && idPacienteActual && elementos.ojo.value && idCarpetaActual);
-        elementos.validar.disabled = procesando || !identificacionCompleta || dimensionesImagen.ancho === 0;
+        // La carpeta organiza el análisis cuando se selecciona, pero no es obligatoria.
+        const identificacionCompleta = Boolean(archivoSeleccionado && idPacienteActual && elementos.ojo.value);
+        elementos.validar.disabled = !SERVICIO_ANALISIS_DISPONIBLE
+            || procesando
+            || !identificacionCompleta
+            || dimensionesImagen.ancho === 0;
         elementos.analizar.disabled = !SERVICIO_ANALISIS_DISPONIBLE || procesando || !imagenValidada;
     }
 
-    elementos.validar.addEventListener('click', () => {
-        const cumpleResolucion = dimensionesImagen.ancho >= RESOLUCION_MINIMA_PROVISIONAL
-            && dimensionesImagen.alto >= RESOLUCION_MINIMA_PROVISIONAL;
-        if (!cumpleResolucion) {
-            imagenValidada = false;
-            elementos.advertenciaCalidad.style.display = 'flex';
-            mostrarMensaje('La imagen no supera la validación provisional de resolución.', 'danger');
-            actualizarDisponibilidadAnalisis();
-            return;
-        }
-        imagenValidada = true;
-        elementos.advertenciaCalidad.style.display = 'none';
-        elementos.estadoValidacionProvisional.style.display = 'block';
-        elementos.cambiarImagen.style.display = 'none';
-        elementos.seccionAnalisis.style.display = 'block';
-        establecerPasoActual(2);
+    elementos.validar.addEventListener('click', async () => {
+        if (elementos.validar.disabled || !archivoSeleccionado) return;
+
+        procesando = true;
+        imagenValidada = false;
+        elementos.seccionAnalisis.style.display = 'none';
+        elementos.resultadoValidacionCnn.style.display = 'block';
+        elementos.resultadoValidacionCnn.classList.remove('aprobada', 'rechazada');
+        elementos.mensajeValidacionCnn.textContent = 'Ejecutando filtros CNN de contenido y calidad…';
+        elementos.validacionContenidoCnn.textContent = 'Procesando';
+        elementos.validacionCalidadCnn.textContent = 'En espera';
+        elementos.validar.textContent = 'Validando con CNN…';
         actualizarDisponibilidadAnalisis();
+
+        const formulario = new FormData();
+        formulario.append('imagen', archivoSeleccionado);
+
+        try {
+            const respuestaHttp = await fetch(new URL(BASE_URL + 'controllers/AnalisisController.php?action=validar_imagen', window.location.href), {
+                method: 'POST',
+                body: formulario,
+            });
+            const respuesta = await leerJson(respuestaHttp);
+            if (respuesta.expired) {
+                window.location.assign(BASE_URL + 'views/auth/login.php?expired=1');
+                return;
+            }
+            if (!respuesta.success) throw new Error(respuesta.error || 'No se pudo validar la imagen.');
+
+            const validacion = respuesta.data?.validacion || {};
+            const esRetinografia = validacion.es_retinografia === true;
+            const esEvaluable = validacion.es_evaluable === true;
+            const probabilidadRetina = Number(validacion.probabilidad_retinografia);
+            const probabilidadCalidad = Number(validacion.probabilidad_calidad);
+            imagenValidada = esRetinografia && esEvaluable;
+
+            elementos.validacionContenidoCnn.textContent = esRetinografia
+                ? `Retinografía · ${probabilidadRetina.toFixed(1)}%`
+                : `No retinal · ${probabilidadRetina.toFixed(1)}%`;
+            elementos.validacionCalidadCnn.textContent = esEvaluable
+                ? `Evaluable · ${probabilidadCalidad.toFixed(1)}%`
+                : `No evaluable · ${probabilidadCalidad.toFixed(1)}%`;
+            elementos.resultadoValidacionCnn.classList.add(imagenValidada ? 'aprobada' : 'rechazada');
+
+            if (imagenValidada) {
+                elementos.mensajeValidacionCnn.textContent = 'Imagen aprobada por ambos filtros CNN.';
+                elementos.seccionAnalisis.style.display = 'block';
+                establecerPasoActual(2);
+                mostrarMensaje('Contenido retinal y calidad aprobados.', 'success');
+            } else {
+                elementos.mensajeValidacionCnn.textContent = validacion.motivo_rechazo
+                    || 'La imagen no superó los filtros CNN.';
+                establecerPasoActual(1);
+                mostrarMensaje(elementos.mensajeValidacionCnn.textContent, 'warning');
+            }
+        } catch (error) {
+            elementos.resultadoValidacionCnn.classList.add('rechazada');
+            elementos.mensajeValidacionCnn.textContent = error.message;
+            elementos.validacionContenidoCnn.textContent = 'No completado';
+            elementos.validacionCalidadCnn.textContent = 'No completado';
+            mostrarMensaje(error.message, 'danger');
+            establecerPasoActual(1);
+        } finally {
+            procesando = false;
+            elementos.validar.textContent = 'Validar contenido y calidad';
+            actualizarDisponibilidadAnalisis();
+        }
     });
 
     elementos.analizar.addEventListener('click', async () => {
@@ -254,7 +315,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         elementos.estadoResultado.classList.remove('rechazado');
         elementos.tituloResultado.textContent = formatearResultado(salida.resultado_principal);
-        elementos.detalleResultado.textContent = 'Salida original de la CNN. Requiere revisión médica.';
+        elementos.detalleResultado.textContent = salida.advertencia_modelo
+            || 'Salida original de la CNN. Requiere revisión médica.';
+        if (salida.uso_academico && salida.advertencia_modelo) {
+            mostrarMensaje(salida.advertencia_modelo, 'warning');
+        }
         elementos.probabilidades.style.display = 'block';
         elementos.bloqueValoracion.style.display = 'block';
         mostrarProbabilidades(salida.probabilidades || {});
@@ -418,7 +483,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 elementos.rejillaCarpetas.querySelectorAll('.carpeta').forEach(elemento => elemento.classList.remove('seleccionada'));
                 boton.classList.add('seleccionada');
                 imagenValidada = false;
-                elementos.estadoValidacionProvisional.style.display = 'none';
+                elementos.resultadoValidacionCnn.style.display = 'none';
+                elementos.resultadoValidacionCnn.classList.remove('aprobada', 'rechazada');
+                elementos.mensajeValidacionCnn.textContent = 'Validando…';
+                elementos.validacionContenidoCnn.textContent = '—';
+                elementos.validacionCalidadCnn.textContent = '—';
                 elementos.seccionAnalisis.style.display = 'none';
                 elementos.cambiarImagen.style.display = archivoSeleccionado ? 'inline-flex' : 'none';
                 establecerPasoActual(1);

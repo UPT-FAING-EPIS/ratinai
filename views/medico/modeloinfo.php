@@ -15,8 +15,10 @@ $header_sub   = 'Médico Oftalmólogo';
 
 $_page = 'modeloinfo.php';
 $servicioDisponible = servicioAnalisisRemotoDisponible();
-$proveedor = $servicioDisponible ? 'Servicio CNN remoto' : 'No configurado';
-$versionActiva = $servicioDisponible ? 'Informada por el servicio remoto en cada análisis' : 'Sin versión clínica activa';
+$proveedor = $servicioDisponible
+    ? (ANALYSIS_PROVIDER === 'local' ? 'CNN v2 local — demostración académica' : 'Servicio CNN remoto')
+    : 'No configurado';
+$versionActiva = $servicioDisponible ? 'cnn-v2-academico-2026-11-12' : 'Sin versión activa';
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -49,10 +51,12 @@ $versionActiva = $servicioDisponible ? 'Informada por el servicio remoto en cada
                 <div class="metric-row"><span>Proveedor</span><strong><?= htmlspecialchars($proveedor) ?></strong></div>
                 <div class="metric-row"><span>Versión</span><strong><?= htmlspecialchars($versionActiva) ?></strong></div>
                 <div class="metric-row"><span>Entrada</span><strong>JPG o PNG</strong></div>
-                <div class="metric-row"><span>Contenido retinal</span><strong>No evaluado por CNN v1</strong></div>
-                <div class="metric-row"><span>Calidad de captura</span><strong>No evaluada por CNN v1</strong></div>
-                <div class="metric-row"><span>Métricas clínicas verificadas</span><strong>Pendientes</strong></div>
-                <p class="text-muted" style="font-size:12px;margin-top:12px">No se publican cifras de precisión, sensibilidad o especificidad hasta contar con un conjunto de prueba separado por paciente y un protocolo documentado.</p>
+                <div class="metric-row"><span>Contenido retinal</span><strong>Filtro CNN activo</strong></div>
+                <div class="metric-row"><span>Calidad de captura</span><strong>Filtro CNN activo</strong></div>
+                <div class="metric-row"><span>Glaucoma — validación externa RIM-ONE</span><strong>57,1 % sensibilidad</strong></div>
+                <div class="metric-row"><span>Glaucoma — especificidad</span><strong>83,9 %</strong></div>
+                <div class="metric-row"><span>Glaucoma — AUC</span><strong>0,789</strong></div>
+                <p class="text-muted" style="font-size:12px;margin-top:12px">El clasificador de cuatro clases se validó externamente con 174 imágenes de RIM-ONE: detectó 32 de 56 glaucomas. Son métricas académicas, no aprobación clínica.</p>
               </div>
             </div>
             <div>
@@ -67,9 +71,9 @@ $versionActiva = $servicioDisponible ? 'Informada por el servicio remoto en cada
                 <div class="card-title">Limitaciones</div>
                 <div class="warning-banner" style="margin:0">
                   <svg width="14" height="14" viewBox="0 0 20 20" fill="none" style="flex-shrink:0"><circle cx="10" cy="10" r="9" stroke="#D97706" stroke-width="1.5"/><path d="M10 6v5M10 13h.01" stroke="#D97706" stroke-width="1.5" stroke-linecap="round"/></svg>
-                  <p>Este sistema ofrece apoyo referencial. La salida requiere revisión y conclusión del médico especialista. Cuando el servicio remoto no está configurado, el análisis permanece bloqueado.</p>
+                  <p>Prototipo académico con inferencia real. No está aprobado para diagnosticar ni para tomar decisiones sobre pacientes.</p>
                 </div>
-                <p class="text-muted" style="font-size:12px;margin-top:12px">La CNN v1 analiza archivos JPG o PNG válidos, pero no determina si la imagen muestra una retina ni si su calidad es suficiente. El médico debe revisar la captura. La comparación entre versiones distintas muestra una advertencia porque sus valores pueden no ser equivalentes.</p>
+                <p class="text-muted" style="font-size:12px;margin-top:12px">La CNN v2 ejecuta un filtro de contenido, un filtro de calidad y el clasificador de cuatro clases. Las fuentes tienen diferencias de cámara, color y encuadre; por eso los resultados pueden variar entre dominios y siempre requieren revisión.</p>
               </div>
             </div>
         </div>

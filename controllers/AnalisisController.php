@@ -39,6 +39,75 @@ class AnalisisController
         $this->modeloInforme = $modeloInforme ?? new InformeClinicoModel();
     }
 
+    /** Ejecuta solamente los filtros CNN de contenido y calidad. */
+    public function validarImagen(): void
+    {
+        if (!$this->esMetodo('POST')) {
+            $this->responderJson(['success' => false, 'error' => 'Método no permitido'], 405);
+            return;
+        }
+        if (!$this->sesionMedicaValida()) {
+            $this->responderJson([
+                'success' => false,
+                'error' => 'Su sesión ha expirado. Por favor inicie sesión nuevamente.',
+                'expired' => true,
+            ], 401);
+            return;
+        }
+        if ((string) env_value('ANALYSIS_CONTRACT_VERSION', 'v1') !== 'v2') {
+            $this->responderJson([
+                'success' => false,
+                'error' => 'La aplicación todavía no está configurada para el contrato CNN v2.',
+            ], 503);
+            return;
+        }
+        if (!servicioAnalisisRemotoDisponible()) {
+            $this->responderJson([
+                'success' => false,
+                'ai_disabled' => true,
+                'error' => 'El servicio CNN v2 no está configurado. No se realizará una validación simulada.',
+            ], 503);
+            return;
+        }
+
+        $archivo = $_FILES['imagen'] ?? null;
+        if (!is_array($archivo) || ($archivo['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+            $this->responderJson(['success' => false, 'error' => 'Error al subir la imagen'], 422);
+            return;
+        }
+        $extension = strtolower(pathinfo((string) ($archivo['name'] ?? ''), PATHINFO_EXTENSION));
+        if (!in_array($extension, ['jpg', 'jpeg', 'png'], true)) {
+            $this->responderJson(['success' => false, 'error' => 'Formato no permitido. Use JPG o PNG.'], 415);
+            return;
+        }
+        if ((int) ($archivo['size'] ?? 0) > self::TAMANO_MAXIMO_IMAGEN) {
+            $this->responderJson(['success' => false, 'error' => 'El archivo supera el máximo de 10 MB.'], 413);
+            return;
+        }
+
+        try {
+            $salida = $this->solicitarServicio(
+                (string) $archivo['tmp_name'],
+                (string) $archivo['name'],
+                '/api/validar'
+            );
+            $validacion = $this->normalizarValidacionModelo($salida);
+            $this->responderJson([
+                'success' => true,
+                'data' => [
+                    'modelo_version' => (string) $salida['modelo_version'],
+                    'uso_academico' => (bool) ($salida['uso_academico'] ?? false),
+                    'advertencia_modelo' => $salida['advertencia_modelo'] ?? null,
+                    'validacion' => $validacion,
+                    'tiempo_analisis' => (float) $salida['tiempo_analisis'],
+                ],
+            ]);
+        } catch (Throwable $error) {
+            error_log('RetinAI validar imagen: ' . $error->getMessage());
+            $this->responderJson(['success' => false, 'error' => $error->getMessage()], 422);
+        }
+    }
+
     public function analizar(): void
     {
         if (!$this->esMetodo('POST')) {
@@ -380,44 +449,59 @@ class AnalisisController
 
     private function solicitarAnalisis(string $rutaImagen, string $nombreOriginal): array
     {
+        return $this->solicitarServicio($rutaImagen, $nombreOriginal, '/api/analizar');
+    }
+
+    private function solicitarServicio(string $rutaImagen, string $nombreOriginal, string $endpoint): array
+    {
         $urlServicio = rtrim((string) env_value('ANALYSIS_API_URL', ''), '/');
         $claveServicio = (string) env_value('ANALYSIS_API_KEY', '');
         $rutaCertificado = __DIR__ . '/../certs/retinai-ai-ca.crt';
-        if ($urlServicio === '' || $claveServicio === '' || !is_readable($rutaCertificado)) {
+        $partesUrl = parse_url($urlServicio);
+        $host = strtolower((string) ($partesUrl['host'] ?? ''));
+        $servicioLocal = ANALYSIS_PROVIDER === 'local'
+            && ($partesUrl['scheme'] ?? '') === 'http'
+            && in_array($host, ['127.0.0.1', 'localhost', '::1'], true);
+        if ($urlServicio === '' || $claveServicio === '' || (!$servicioLocal && !is_readable($rutaCertificado))) {
             throw new RuntimeException('El servicio de análisis no está configurado. Contacte al administrador.');
         }
-        $conexion = curl_init($urlServicio . '/api/analizar');
+        $conexion = curl_init($urlServicio . $endpoint);
         curl_setopt_array($conexion, [
             CURLOPT_POST => true,
             CURLOPT_POSTFIELDS => ['file' => new CURLFile($rutaImagen, (string) mime_content_type($rutaImagen), $nombreOriginal)],
             CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CONNECTTIMEOUT => 5,
             CURLOPT_TIMEOUT => self::TIEMPO_MAXIMO_SERVICIO,
             CURLOPT_HTTPHEADER => ['X-API-Key: ' . $claveServicio],
-            CURLOPT_CAINFO => $rutaCertificado,
-            CURLOPT_SSL_VERIFYPEER => true,
-            CURLOPT_SSL_VERIFYHOST => 2,
         ]);
+        if (!$servicioLocal) {
+            curl_setopt_array($conexion, [
+                CURLOPT_CAINFO => $rutaCertificado,
+                CURLOPT_SSL_VERIFYPEER => true,
+                CURLOPT_SSL_VERIFYHOST => 2,
+            ]);
+        }
         $respuesta = curl_exec($conexion);
         $codigoHttp = curl_getinfo($conexion, CURLINFO_RESPONSE_CODE);
         $errorConexion = curl_error($conexion);
         curl_close($conexion);
+        $salida = is_string($respuesta) ? json_decode($respuesta, true) : null;
         if ($errorConexion !== '' || $respuesta === false || $codigoHttp !== 200) {
-            error_log('RetinAI CNN HTTP ' . $codigoHttp . ' transporte: ' . $errorConexion);
-            throw new RuntimeException('No se pudo completar el análisis con el servicio CNN (HTTP ' . $codigoHttp . ').');
+            $detalle = is_array($salida) ? trim((string) ($salida['detail'] ?? '')) : '';
+            error_log('RetinAI CNN HTTP ' . $codigoHttp . ' transporte: ' . $errorConexion . ' detalle: ' . $detalle);
+            throw new RuntimeException($detalle !== ''
+                ? 'El servicio CNN rechazó la solicitud: ' . $detalle
+                : 'No se pudo conectar con el servicio CNN (HTTP ' . $codigoHttp . ').');
         }
-        $salida = json_decode($respuesta, true);
         if (!is_array($salida)) {
             throw new RuntimeException('El servicio CNN devolvió una respuesta inválida.');
         }
         return $salida;
     }
 
-    private function normalizarSalidaModelo(array $salida): array
+    /** Valida y normaliza el contrato común de los filtros CNN v2. */
+    private function normalizarValidacionModelo(array $salida): array
     {
-        if ((string) env_value('ANALYSIS_CONTRACT_VERSION', 'v1') === 'v1') {
-            return $this->normalizarSalidaModeloV1($salida);
-        }
-
         $validacion = $salida['validacion'] ?? null;
         if (!is_array($validacion)
             || !array_key_exists('es_retinografia', $validacion)
@@ -426,24 +510,48 @@ class AnalisisController
             || !is_numeric($salida['tiempo_analisis'])
             || (float) $salida['tiempo_analisis'] < self::PROBABILIDAD_MINIMA
             || trim((string) ($salida['modelo_version'] ?? '')) === '') {
-            throw new RuntimeException('La versión del modelo no cumple el contrato de validación RF-10.');
-        }
-        $esRetinografia = filter_var($validacion['es_retinografia'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
-        $esEvaluable = filter_var($validacion['es_evaluable'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
-        if ($esRetinografia === null || $esEvaluable === null) {
-            throw new RuntimeException('El servicio CNN devolvió estados de validación inválidos.');
+            throw new RuntimeException('El servicio CNN v2 devolvió una validación incompleta.');
         }
 
-        $probabilidadRetinografia = $this->obtenerProbabilidadObligatoria(
-            $validacion,
-            'probabilidad_retinografia',
-            'retinografía'
-        );
-        $probabilidadCalidad = $this->obtenerProbabilidadObligatoria(
-            $validacion,
-            'probabilidad_calidad',
-            'calidad'
-        );
+        $esRetinografia = filter_var($validacion['es_retinografia'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+        $esEvaluable = filter_var($validacion['es_evaluable'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+        if ($esRetinografia === null || $esEvaluable === null || (!$esRetinografia && $esEvaluable)) {
+            throw new RuntimeException('El servicio CNN devolvió estados de validación incoherentes.');
+        }
+
+        $motivo = trim((string) ($validacion['motivo_rechazo'] ?? ''));
+        if ((!$esRetinografia || !$esEvaluable) && $motivo === '') {
+            throw new RuntimeException('El servicio CNN rechazó la imagen sin indicar el motivo.');
+        }
+
+        return [
+            'es_retinografia' => $esRetinografia,
+            'probabilidad_retinografia' => $this->obtenerProbabilidadObligatoria(
+                $validacion,
+                'probabilidad_retinografia',
+                'retinografía'
+            ),
+            'es_evaluable' => $esEvaluable,
+            'probabilidad_calidad' => $this->obtenerProbabilidadObligatoria(
+                $validacion,
+                'probabilidad_calidad',
+                'calidad'
+            ),
+            'motivo_rechazo' => $esRetinografia && $esEvaluable ? null : $motivo,
+        ];
+    }
+
+    private function normalizarSalidaModelo(array $salida): array
+    {
+        if ((string) env_value('ANALYSIS_CONTRACT_VERSION', 'v1') === 'v1') {
+            return $this->normalizarSalidaModeloV1($salida);
+        }
+
+        $validacion = $this->normalizarValidacionModelo($salida);
+        $esRetinografia = $validacion['es_retinografia'];
+        $esEvaluable = $validacion['es_evaluable'];
+        $probabilidadRetinografia = $validacion['probabilidad_retinografia'];
+        $probabilidadCalidad = $validacion['probabilidad_calidad'];
         $aceptada = $esRetinografia && $esEvaluable;
 
         $resultadoPrincipal = null;
@@ -482,8 +590,6 @@ class AnalisisController
             if ($alertaAnomalia === null) {
                 throw new RuntimeException('El servicio CNN devolvió una alerta de anomalía inválida.');
             }
-        } elseif (trim((string) ($validacion['motivo_rechazo'] ?? '')) === '') {
-            throw new RuntimeException('El servicio CNN rechazó la imagen sin indicar el motivo.');
         }
 
         return [
@@ -492,7 +598,7 @@ class AnalisisController
             'probabilidad_retinografia' => $probabilidadRetinografia,
             'es_evaluable' => $esEvaluable ? 1 : 0,
             'probabilidad_calidad' => $probabilidadCalidad,
-            'motivo_rechazo' => $aceptada ? null : trim((string) $validacion['motivo_rechazo']),
+            'motivo_rechazo' => $aceptada ? null : $validacion['motivo_rechazo'],
             'resultado_principal' => $resultadoPrincipal,
             'probabilidad_principal' => $probabilidadPrincipal,
             'probabilidad_normal' => $probabilidadesClinicas['normal'],
@@ -631,6 +737,7 @@ class AnalisisController
 if (isset($_GET['action'])) {
     $controlador = new AnalisisController();
     switch ($_GET['action']) {
+        case 'validar_imagen': $controlador->validarImagen(); break;
         case 'analizar': $controlador->analizar(); break;
         case 'registrar_final': $controlador->registrar_final(); break;
         case 'generar_borrador': $controlador->generarBorrador(); break;

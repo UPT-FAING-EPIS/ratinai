@@ -38,4 +38,22 @@ class SolicitudModel {
             "SELECT COUNT(*) FROM solicitudes_establecimiento WHERE estado='pendiente'"
         )->fetchColumn();
     }
+
+    /** Recupera el expediente con los datos del usuario que lo presentó. */
+    public function obtenerDetalleConSolicitante(int $id): ?array {
+        $consulta = $this->db->prepare('SELECT s.*, u.nombre AS nombre_solicitante, u.correo AS correo_solicitante FROM solicitudes_establecimiento s LEFT JOIN usuarios u ON u.id=s.id_usuario_solicitante WHERE s.id=? LIMIT 1');
+        $consulta->execute([$id]);
+        return $consulta->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
+    /** Listado compacto usado en la administración de establecimientos. */
+    public function listarParaAdministracion(): array {
+        return $this->db->query("SELECT id, nombre_centro, direccion, tipo, ruc, dni_titular, nombres_titular, apellidos_titular, telefono, correo_contacto, evidencia_1, evidencia_1_nombre, evidencia_2, evidencia_2_nombre, estado, fecha_solicitud FROM solicitudes_establecimiento ORDER BY FIELD(estado,'pendiente','aprobado','rechazado'), fecha_solicitud DESC")->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function contarPendientesPorSolicitante(int $idUsuario): int {
+        $consulta = $this->db->prepare("SELECT COUNT(*) FROM solicitudes_establecimiento WHERE estado='pendiente' AND id_usuario_solicitante=?");
+        $consulta->execute([$idUsuario]);
+        return (int)$consulta->fetchColumn();
+    }
 }

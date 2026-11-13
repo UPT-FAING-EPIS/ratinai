@@ -366,7 +366,11 @@ document.addEventListener('DOMContentLoaded', () => {
             elementos.guardarBorrador.disabled = false;
             elementos.aprobarInforme.disabled = false;
             elementos.informe.style.display = 'block';
-            elementos.estadoBorrador.textContent = 'Borrador guardado en el servidor.';
+            elementos.estadoBorrador.textContent = respuesta.advertencia_borrador
+                || 'Borrador guardado en el servidor.';
+            if (respuesta.advertencia_borrador) {
+                mostrarMensaje(respuesta.advertencia_borrador, 'warning');
+            }
             establecerPasoActual(4);
         } catch (error) {
             elementos.errorBorradorTexto.textContent = error.message;

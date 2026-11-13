@@ -1832,3 +1832,5 @@ body {
   color: var(--text3, #8897AB);
   line-height: 1.5;
 }
+.logo-marca-retinai { background: transparent; border: 0; padding: 0; }
+.logo-marca-retinai__imagen { height: 28px; width: auto; display: block; border-radius: 4px; }

@@ -8,6 +8,14 @@ class InformeClinicoModel
 {
     private PDO $conexion;
 
+    /** Cantidad de informes aprobados por el médico. */
+    public function contarAprobadosMedico(int $idMedico): int
+    {
+        $consulta = $this->conexion->prepare("SELECT COUNT(*) FROM informes_clinicos WHERE id_aprobador=? AND estado='aprobado'");
+        $consulta->execute([$idMedico]);
+        return (int) $consulta->fetchColumn();
+    }
+
     public function __construct(?PDO $conexion = null)
     {
         $this->conexion = $conexion ?? (new Database())->getConnection();

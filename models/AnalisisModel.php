@@ -211,7 +211,9 @@ class AnalisisModel {
     }
 
     /**
-     * Devuelve controles anteriores del mismo paciente y ojo para construir un borrador trazable.
+     * Devuelve controles anteriores del mismo paciente, carpeta y ojo.
+     * MySQL <=> permite considerar comparables dos análisis sin carpeta, sin mezclar
+     * un análisis sin carpeta con uno que sí pertenece a una carpeta.
      */
     public function obtenerControlesPrevios(int $idAnalisis, int $idMedico, int $limite = 5): array
     {
@@ -224,16 +226,25 @@ class AnalisisModel {
              FROM analisis_retinales actual
              INNER JOIN analisis_retinales previo
                 ON previo.id_paciente = actual.id_paciente
+               AND previo.id_carpeta <=> actual.id_carpeta
                AND previo.ojo = actual.ojo
                AND previo.id <> actual.id
-               AND previo.fecha_analisis < actual.fecha_analisis
+               AND (
+                    COALESCE(previo.fecha_captura, previo.fecha_analisis)
+                        < COALESCE(actual.fecha_captura, actual.fecha_analisis)
+                    OR (
+                        COALESCE(previo.fecha_captura, previo.fecha_analisis)
+                            = COALESCE(actual.fecha_captura, actual.fecha_analisis)
+                        AND previo.id < actual.id
+                    )
+               )
              WHERE actual.id = :id_analisis
                AND actual.id_medico = :id_medico
                AND previo.id_medico = :id_medico_previo
                AND (previo.es_retinografia = 1 OR previo.es_retinografia IS NULL)
                AND (previo.es_evaluable = 1 OR previo.es_evaluable IS NULL)
                AND previo.resultado_principal IS NOT NULL
-             ORDER BY previo.fecha_analisis DESC
+             ORDER BY COALESCE(previo.fecha_captura, previo.fecha_analisis) DESC, previo.id DESC
              LIMIT :limite'
         );
         $consulta->bindValue(':id_analisis', $idAnalisis, PDO::PARAM_INT);
@@ -248,7 +259,7 @@ class AnalisisModel {
     public function compararControles(int $idAnalisisPrimero, int $idAnalisisSegundo, int $idMedico): ?array
     {
         $consulta = $this->db->prepare(
-            'SELECT a.id, a.id_paciente, a.ojo, a.fecha_analisis, a.fecha_captura,
+            'SELECT a.id, a.id_paciente, a.id_carpeta, a.ojo, a.fecha_analisis, a.fecha_captura,
                     a.version_modelo, a.resultado_principal, a.probabilidad_principal,
                     a.probabilidad_normal, a.probabilidad_diabetes,
                     a.probabilidad_glaucoma, a.probabilidad_catarata, a.imagen_path
@@ -271,7 +282,8 @@ class AnalisisModel {
         }
 
         if ((int) $controles[0]['id_paciente'] !== (int) $controles[1]['id_paciente']
-            || $controles[0]['ojo'] !== $controles[1]['ojo']) {
+            || $controles[0]['ojo'] !== $controles[1]['ojo']
+            || !$this->mismaCarpeta($controles[0]['id_carpeta'], $controles[1]['id_carpeta'])) {
             return null;
         }
 
@@ -279,6 +291,15 @@ class AnalisisModel {
             'controles' => $controles,
             'versiones_diferentes' => $controles[0]['version_modelo'] !== $controles[1]['version_modelo'],
         ];
+    }
+
+    private function mismaCarpeta($primera, $segunda): bool
+    {
+        if ($primera === null || $segunda === null) {
+            return $primera === null && $segunda === null;
+        }
+
+        return (int) $primera === (int) $segunda;
     }
 
     public function actualizarDiagnostico(int $idAnalisis, int $idMedico, ?string $diagnostico): bool

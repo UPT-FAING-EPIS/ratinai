@@ -1,11 +1,81 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../models/DoctorModel.php';
+require_once __DIR__ . '/../models/MaestroModel.php';
+require_once __DIR__ . '/EstablecimientoController.php';
 require_once __DIR__ . '/../services/MailService.php';
 require_once __DIR__ . '/../config/session_guard.php';
 require_once __DIR__ . '/../utils/PasswordHelper.php';
 
 class DoctorController {
+    /** Colecciones usadas por el listado de médicos de un administrador. */
+    public static function datosListado(int $idAdministrador, int $idEstablecimiento): array {
+        $establecimientos = EstablecimientoController::establecimientosAdministrador($idAdministrador, $idEstablecimiento);
+        $ids = array_map('intval', array_column($establecimientos, 'id'));
+        $modelo = new DoctorModel();
+        $activos = $ids ? $modelo->getDoctorsByEstablishments($ids) : [];
+        return [
+            'mis_establecimientos' => $establecimientos,
+            'activos' => $activos,
+            'cnt_pendientes' => $ids ? $modelo->countPendingByEstablishments($ids) : 0,
+            'cnt_activos' => count(array_filter($activos, static fn($doctor) => (int) $doctor['activo'] === 1)),
+            'tiene_multi' => count($establecimientos) > 1,
+            'est_nombre' => $establecimientos[0]['nombre'] ?? 'Mi Establecimiento',
+        ];
+    }
+
+    /** Catálogos y médicos recientes del formulario de creación. */
+    public static function datosCreacion(int $idAdministrador, int $idEstablecimiento): array {
+        $establecimientos = EstablecimientoController::establecimientosAdministrador($idAdministrador, $idEstablecimiento);
+        $ids = array_map('intval', array_column($establecimientos, 'id'));
+        $modelo = new DoctorModel();
+        return [
+            'mis_establecimientos' => $establecimientos,
+            'est_nombre' => $establecimientos[0]['nombre'] ?? 'Mi Establecimiento',
+            'especialidades' => (new MaestroModel())->getEspecialidades(),
+            'cnt_pendientes' => $ids ? $modelo->countPendingByEstablishments($ids) : 0,
+            'ultimos_medicos' => $ids ? $modelo->getRecentDoctorsByEstablishments($ids) : [],
+        ];
+    }
+
+    /** Solicitudes de médicos dentro de los establecimientos del administrador. */
+    public static function datosSolicitudes(int $idAdministrador, int $idEstablecimiento): array {
+        $establecimientos = EstablecimientoController::establecimientosAdministrador($idAdministrador, $idEstablecimiento);
+        $ids = array_map('intval', array_column($establecimientos, 'id'));
+        return [
+            'mis_establecimientos' => $establecimientos,
+            'est_nombre' => $establecimientos[0]['nombre'] ?? 'Mi Establecimiento',
+            'pendientes' => $ids ? (new DoctorModel())->getPendingDoctorsByEstablishments($ids) : [],
+        ];
+    }
+    /** Datos de solicitudes y usuarios mostrados en los paneles. */
+    public static function contarSolicitudesPendientes(int $idEstablecimiento): int {
+        return (new DoctorModel())->contarPendientes($idEstablecimiento);
+    }
+
+    public static function listarUsuariosSistema(): array {
+        return (new DoctorModel())->listarUsuariosSistema();
+    }
+
+    public static function resolverSolicitudMedico(int $idMedico, array $ids, bool $aprobar): void {
+        (new DoctorModel())->resolverSolicitud($idMedico, $ids, $aprobar);
+    }
+
+    /** Procesa una solicitud usando solamente los centros del administrador autenticado. */
+    public static function procesarSolicitud(int $idAdministrador, int $idEstablecimiento, int $idMedico, string $accion): string {
+        $establecimientos = EstablecimientoController::establecimientosAdministrador($idAdministrador, $idEstablecimiento);
+        $ids = array_map('intval', array_column($establecimientos, 'id'));
+        if (!$ids) return '';
+        if ($accion === 'aprobar') {
+            self::resolverSolicitudMedico($idMedico, $ids, true);
+            return 'Médico aprobado exitosamente.';
+        }
+        if ($accion === 'rechazar') {
+            self::resolverSolicitudMedico($idMedico, $ids, false);
+            return 'Solicitud rechazada.';
+        }
+        return '';
+    }
     private $model;
 
     public function __construct() {
@@ -234,7 +304,7 @@ class DoctorController {
 }
 
 // Router
-if (isset($_GET['action'])) {
+if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === realpath(__FILE__) && isset($_GET['action'])) {
     $controller = new DoctorController();
     switch ($_GET['action']) {
         case 'create':     $controller->createDoctor(); break;

@@ -17,6 +17,31 @@ require_once __DIR__ . '/../services/ServicioOAuthDocumental.php';
 
 class IntegracionController
 {
+    /** Configuración y sincronizaciones de un centro autorizado para este administrador. */
+    public static function datosAdministrador(int $idAdministrador, int $idAsignado, int $idSolicitado): array
+    {
+        $establecimientos = (new EstablecimientoModel())->getByOwnerId($idAdministrador);
+        if ($establecimientos === [] && $idAsignado > 0) {
+            $asignado = (new EstablecimientoModel())->getById($idAsignado);
+            if ($asignado) $establecimientos[] = $asignado;
+        }
+        $ids = array_map('intval', array_column($establecimientos, 'id'));
+        $seleccionado = in_array($idSolicitado, $ids, true) ? $idSolicitado : (int)($ids[0] ?? 0);
+        $modelo = new IntegracionModel();
+        return [
+            'establecimientos' => $establecimientos,
+            'idSeleccionado' => $seleccionado,
+            'configuracion' => $seleccionado ? $modelo->obtenerConfiguracion($seleccionado) : null,
+            'sincronizaciones' => $seleccionado ? $modelo->listarSincronizaciones($seleccionado) : [],
+        ];
+    }
+    /** Lectura agregada de valoraciones y almacenamiento para el superadministrador. */
+    public static function datosCalidadModelo(): array
+    {
+        $modelo = new IntegracionModel();
+        return ['calidad' => $modelo->obtenerCalidadModelo(),
+            'integraciones' => $modelo->obtenerResumenGlobal()];
+    }
     private const VIGENCIA_ESTADO_OAUTH = 600;
     private IntegracionModel $modelo;
 
@@ -225,7 +250,7 @@ class IntegracionController
     }
 }
 
-if (isset($_GET['action'])) {
+if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === realpath(__FILE__) && isset($_GET['action'])) {
     $controlador = new IntegracionController();
     if ($_GET['action'] === 'iniciar') $controlador->iniciarAutorizacion();
     if ($_GET['action'] === 'probar') $controlador->probar();

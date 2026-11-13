@@ -1,0 +1,123 @@
+/* Estilos de medico/pacientes.php. */
+.paciente {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin: 10px 0;
+    overflow: hidden;
+}
+
+.paciente-cabecera {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 15px;
+    padding: 15px;
+    cursor: pointer;
+    background: var(--surface);
+}
+
+.paciente-cabecera:hover {
+    background: var(--surface2);
+}
+
+.paciente-cabecera h3 {
+    font-size: 14px;
+    margin: 0 0 4px;
+}
+
+.paciente-resumen {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+}
+
+.paciente-detalle {
+    display: none;
+    padding: 0 15px 15px;
+}
+
+.barra-comparacion {
+    position: sticky;
+    bottom: 14px;
+    z-index: 8;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 15px;
+    border: 1px solid var(--accent);
+    border-radius: 10px;
+    background: var(--surface);
+    box-shadow: 0 8px 26px rgba(15, 23, 42, 0.16);
+}
+
+.comparacion {
+    display: none;
+    margin-top: 16px;
+}
+
+.comparacion-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.control {
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    padding: 13px;
+}
+
+.probabilidad-comparada {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 5px;
+    padding: 5px 0;
+    border-bottom: 1px dashed var(--border);
+}
+
+.advertencia-version {
+    padding: 10px;
+    border-radius: 8px;
+    background: #fff8e6;
+    color: #784c00;
+    margin-bottom: 12px;
+}
+
+@media (max-width: 720px) {
+
+    .paciente-cabecera,
+    .barra-comparacion {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .comparacion-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Presentación anteriormente declarada en atributos de la vista. */
+.ajuste-visualizacion-flex-gap-8px-flex-wrap-wrap {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.ajuste-flex-1-min-width-220px {
+    flex: 1;
+    min-width: 220px;
+}
+
+.ajuste-tamano-texto-12px-margen-superior-7px {
+    font-size: 12px;
+    margin-top: 7px;
+}
+
+.ajuste-tamano-texto-12px {
+    font-size: 12px;
+}
+
+.oculto-inicialmente {
+    display: none;
+}

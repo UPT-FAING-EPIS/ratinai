@@ -1,19 +1,313 @@
 <?php
-require_once __DIR__ . '/../../config/session_guard.php';require_once __DIR__ . '/../../models/AnalisisModel.php';require_once __DIR__ . '/../../models/InformeClinicoModel.php';require_role('MED');
-$usuario=current_user();$initials=get_initials($usuario['nombre']);$base=get_base_path();$logout_url=$base.'controllers/AuthController.php?action=logout';$role_label='Médico';$role_class='role-med';$avatar_class='avatar-green';$header_sub='Médico Oftalmólogo';$_page='dashboard.php';
-$modeloAnalisis=new AnalisisModel();$modeloInforme=new InformeClinicoModel();$idMedico=(int)$usuario['id'];$kpis=$modeloAnalisis->getKPIsMedico($idMedico);$distribucion=$modeloAnalisis->getDistribucionResultados($idMedico);$actividad=$modeloAnalisis->getActividadUltimos7Dias($idMedico);$recientes=$modeloAnalisis->getAnalisisRecientes($idMedico,8);$criticos=$modeloAnalisis->getCasosCriticosRecientes($idMedico,8);$pendientes=$modeloInforme->obtenerPendientesMedico($idMedico);
-$borradores=array_values(array_filter($pendientes,static fn($fila)=>empty($fila['estado_informe'])||$fila['estado_informe']==='borrador'));$valoraciones=array_values(array_filter($pendientes,static fn($fila)=>in_array($fila['estado_valoracion'],['sin_evaluar','evaluar_despues'],true)));
-$informesAprobados=0;try{$conexion=(new Database())->getConnection();$consulta=$conexion->prepare("SELECT COUNT(*) FROM informes_clinicos WHERE id_aprobador=? AND estado='aprobado'");$consulta->execute([$idMedico]);$informesAprobados=(int)$consulta->fetchColumn();}catch(Throwable $error){error_log('No se pudo contar informes médicos: '.$error->getMessage());}
-$datosDistribucion=array_map(static fn($fila)=>[$fila['resultado_principal']??'Sin resultado',(int)$fila['total']],$distribucion);$datosActividad=array_map(static fn($fila)=>[$fila['fecha'],(int)$fila['total']],$actividad);$datosRecientes=array_map(static fn($fila)=>[$fila['fecha_analisis'],$fila['dni']??'', $fila['resultado_principal']??'',(int)$fila['alerta_anomalia']],$recientes);
+require_once __DIR__ . "/../../config/session_guard.php";
+require_once __DIR__ . "/../../controllers/AnalisisController.php";
+require_role("MED");
+$usuario = current_user();
+$initials = get_initials($usuario["nombre"]);
+$base = get_base_path();
+$logout_url = $base . "controllers/AuthController.php?action=logout";
+$role_label = "Médico";
+$role_class = "role-med";
+$avatar_class = "avatar-green";
+$header_sub = "Médico Oftalmólogo";
+$_page = "dashboard.php";
+$idMedico = (int) $usuario["id"];
+// El controlador reúne los indicadores, controles y tareas del médico.
+["kpis" => $kpis, "distribucion" => $distribucion,
+    "actividad" => $actividad, "recientes" => $recientes,
+    "criticos" => $criticos, "pendientes" => $pendientes,
+    "informesAprobados" => $informesAprobados] = AnalisisController::datosPanelMedico($idMedico);
+$borradores = array_values(
+    array_filter(
+        $pendientes,
+        static fn($fila) => empty($fila["estado_informe"]) ||
+            $fila["estado_informe"] === "borrador",
+    ),
+);
+$valoraciones = array_values(
+    array_filter(
+        $pendientes,
+        static fn($fila) => in_array(
+            $fila["estado_valoracion"],
+            ["sin_evaluar", "evaluar_despues"],
+            true,
+        ),
+    ),
+);
+$datosDistribucion = array_map(
+    static fn($fila) => [
+        $fila["resultado_principal"] ?? "Sin resultado",
+        (int) $fila["total"],
+    ],
+    $distribucion,
+);
+$datosActividad = array_map(
+    static fn($fila) => [$fila["fecha"], (int) $fila["total"]],
+    $actividad,
+);
+$datosRecientes = array_map(
+    static fn($fila) => [
+        $fila["fecha_analisis"],
+        $fila["dni"] ?? "",
+        $fila["resultado_principal"] ?? "",
+        (int) $fila["alerta_anomalia"],
+    ],
+    $recientes,
+);
 ?>
-<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>RetinAI — Dashboard médico</title><link rel="stylesheet" href="<?= $base ?>assets/css/dashboard/dashboard.css"><link rel="stylesheet" href="<?= $base ?>assets/css/dashboard/paneles.css"></head><body><?php require_once __DIR__.'/../shared/header.php'; ?><div class="app-shell"><?php require_once __DIR__.'/../shared/sidebar.php'; ?><main class="main-content">
-<header class="panel-cabecera"><div><h1 class="page-title">Dashboard médico</h1><p class="page-sub">Actividad clínica y tareas de <?= htmlspecialchars($usuario['nombre']) ?>.</p></div><div class="panel-acciones"><button class="boton-informacion" data-ayuda="ayuda-medico" aria-label="Información">i</button><button class="boton-exportar" onclick='PanelesRetinAI.descargarCsv("mis_analisis_recientes.csv",["Fecha","DNI","Resultado","Alerta"],<?= json_encode($datosRecientes,JSON_HEX_APOS|JSON_HEX_QUOT) ?>)'>Descargar actividad</button></div></header>
-<div class="panel-kpis"><?php foreach([['Pacientes atendidos',(int)($kpis['total_pacientes']??0)],['Análisis realizados',(int)($kpis['total_analisis']??0)],['Alertas clínicas',(int)($kpis['total_alertas']??0)],['Borradores',count($borradores)],['Valoraciones pendientes',count($valoraciones)],['Informes aprobados',$informesAprobados]] as $indicador): ?><article class="panel-kpi"><span class="panel-kpi__etiqueta"><?= htmlspecialchars($indicador[0]) ?></span><strong class="panel-kpi__valor"><?= (int)$indicador[1] ?></strong></article><?php endforeach; ?></div>
-<div class="panel-rejilla">
-<section class="panel-tarjeta panel-ancho-6"><div class="panel-titulo"><h2>Distribución de resultados</h2><button class="boton-exportar" onclick='PanelesRetinAI.descargarCsv("mis_resultados.csv",["Resultado","Total"],<?= json_encode($datosDistribucion,JSON_HEX_APOS|JSON_HEX_QUOT) ?>)'>CSV</button></div><div class="panel-grafico"><canvas id="grafico-resultados"></canvas></div></section>
-<section class="panel-tarjeta panel-ancho-6"><div class="panel-titulo"><h2>Actividad de los últimos 7 días</h2><button class="boton-exportar" onclick='PanelesRetinAI.descargarCsv("mi_actividad_semanal.csv",["Fecha","Análisis"],<?= json_encode($datosActividad,JSON_HEX_APOS|JSON_HEX_QUOT) ?>)'>CSV</button></div><div class="panel-grafico"><canvas id="grafico-actividad"></canvas></div></section>
-<section class="panel-tarjeta panel-ancho-7"><div class="panel-titulo"><h2>Análisis recientes</h2><a class="btn btn-ghost btn-sm" href="pacientes.php">Ver historial</a></div><div class="table-responsive"><table class="data-table"><thead><tr><th>Fecha</th><th>Paciente</th><th>Resultado</th><th>Estado</th></tr></thead><tbody><?php if($recientes===[]): ?><tr><td colspan="4" class="estado-vacio">Sin análisis registrados.</td></tr><?php endif; ?><?php foreach($recientes as $fila): ?><tr><td><?= htmlspecialchars(date('d/m/Y H:i',strtotime($fila['fecha_analisis']))) ?></td><td><?= htmlspecialchars($fila['dni']??'Sin DNI') ?></td><td><?= htmlspecialchars($fila['resultado_principal']??'Sin resultado') ?></td><td><span class="etiqueta-estado <?= (int)$fila['alerta_anomalia']===1?'etiqueta-rechazado':'etiqueta-aprobado' ?>"><?= (int)$fila['alerta_anomalia']===1?'Alerta':'Sin alerta' ?></span></td></tr><?php endforeach; ?></tbody></table></div></section>
-<section class="panel-tarjeta panel-ancho-5"><div class="panel-titulo"><h2>Tareas clínicas</h2></div><div class="panel-lista"><a class="panel-lista__fila" href="pacientes.php?filtro=borradores"><span><span class="panel-lista__principal">Borradores pendientes</span><span class="panel-lista__secundario">Requieren revisión o aprobación</span></span><strong class="panel-lista__valor"><?= count($borradores) ?></strong></a><a class="panel-lista__fila" href="pacientes.php?filtro=valoracion"><span><span class="panel-lista__principal">Valoraciones pendientes</span><span class="panel-lista__secundario">Retroalimentación opcional</span></span><strong class="panel-lista__valor"><?= count($valoraciones) ?></strong></a><a class="panel-lista__fila" href="seguimiento.php"><span><span class="panel-lista__principal">Alertas recientes</span><span class="panel-lista__secundario">Casos en seguimiento</span></span><strong class="panel-lista__valor"><?= count($criticos) ?></strong></a></div></section>
-<section class="panel-tarjeta panel-ancho-12"><div class="panel-titulo"><h2>Alertas prioritarias recientes</h2><a class="btn btn-ghost btn-sm" href="seguimiento.php">Abrir seguimiento</a></div><div class="table-responsive"><table class="data-table"><thead><tr><th>Fecha</th><th>Paciente</th><th>Resultado</th><th>Probabilidad principal</th></tr></thead><tbody><?php if($criticos===[]): ?><tr><td colspan="4" class="estado-vacio">No hay alertas prioritarias.</td></tr><?php endif; ?><?php foreach($criticos as $fila): ?><tr><td><?= htmlspecialchars(date('d/m/Y H:i',strtotime($fila['fecha_analisis']))) ?></td><td><?= htmlspecialchars($fila['dni']??'Sin DNI') ?></td><td><?= htmlspecialchars($fila['resultado_principal']??'Sin resultado') ?></td><td><?= htmlspecialchars(number_format((float)$fila['probabilidad_principal'],1)) ?>%</td></tr><?php endforeach; ?></tbody></table></div></section>
-</div><aside class="ayuda-flotante" id="ayuda-medico">Los datos corresponden únicamente a sus pacientes y análisis. Las alertas muestran resultados referenciales que requieren valoración clínica.</aside>
-</main></div><script src="https://cdn.jsdelivr.net/npm/chart.js"></script><script src="<?= $base ?>assets/js/paneles.js"></script><script>const distribucion=<?= json_encode($distribucion,JSON_UNESCAPED_UNICODE) ?>,actividad=<?= json_encode($actividad,JSON_UNESCAPED_UNICODE) ?>,opciones={responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}}};new Chart(document.getElementById('grafico-resultados'),{type:'doughnut',data:{labels:distribucion.map(f=>f.resultado_principal||'Sin resultado'),datasets:[{data:distribucion.map(f=>Number(f.total)),backgroundColor:['#2563eb','#10b981','#f59e0b','#ef4444','#64748b']}]},options:opciones});new Chart(document.getElementById('grafico-actividad'),{type:'line',data:{labels:actividad.map(f=>f.fecha),datasets:[{label:'Análisis',data:actividad.map(f=>Number(f.total)),borderColor:'#2563eb',backgroundColor:'rgba(37,99,235,.12)',fill:true,tension:.3}]},options:opciones});</script></body></html>
+<!doctype html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>RetinAI — Dashboard médico</title>
+    <link rel="stylesheet" href="<?= $base ?>assets/css/dashboard/dashboard.css">
+    <link rel="stylesheet" href="<?= $base ?>assets/css/dashboard/paneles.css">
+</head>
+
+<body>
+    <?php require_once __DIR__ . "/../shared/header.php"; ?>
+    <div class="app-shell">
+        <?php require_once __DIR__ . "/../shared/sidebar.php"; ?>
+        <main class="main-content">
+            <header class="panel-cabecera">
+                <div>
+                    <h1 class="page-title">Dashboard médico</h1>
+                    <p class="page-sub">Actividad clínica y tareas de <?= htmlspecialchars(
+    $usuario["nombre"],
+) ?>.</p>
+                </div>
+                <div class="panel-acciones">
+                    <button class="boton-informacion" data-ayuda="ayuda-medico"
+                        aria-label="Información">i</button>
+                    <button class="boton-exportar" onclick='PanelesRetinAI.descargarCsv("mis_analisis_recientes.csv",["Fecha","DNI","Resultado","Alerta"],<?= json_encode(
+    $datosRecientes,
+    JSON_HEX_APOS | JSON_HEX_QUOT,
+) ?>)'>Descargar actividad</button>
+                </div>
+            </header>
+            <div class="panel-kpis"><?php foreach (
+    [
+        ["Pacientes atendidos", (int) ($kpis["total_pacientes"] ?? 0)],
+        ["Análisis realizados", (int) ($kpis["total_analisis"] ?? 0)],
+        ["Alertas clínicas", (int) ($kpis["total_alertas"] ?? 0)],
+        ["Borradores", count($borradores)],
+        ["Valoraciones pendientes", count($valoraciones)],
+        ["Informes aprobados", $informesAprobados],
+    ]
+    as $indicador
+): ?><article class="panel-kpi">
+                    <span class="panel-kpi__etiqueta"><?= htmlspecialchars(
+    $indicador[0],
+) ?></span>
+                    <strong class="panel-kpi__valor"><?= (int) $indicador[1] ?></strong>
+                </article><?php endforeach; ?></div>
+            <div class="panel-rejilla">
+                <!-- Los gráficos resumen resultados y actividad reciente del médico. -->
+                <section class="panel-tarjeta panel-ancho-6">
+                    <div class="panel-titulo">
+                        <h2>Distribución de resultados</h2>
+                        <button class="boton-exportar" onclick='PanelesRetinAI.descargarCsv("mis_resultados.csv",["Resultado","Total"],<?= json_encode(
+    $datosDistribucion,
+    JSON_HEX_APOS | JSON_HEX_QUOT,
+) ?>)'>CSV</button>
+                    </div>
+                    <div class="panel-grafico">
+                        <canvas id="grafico-resultados"></canvas>
+                    </div>
+                </section>
+                <section class="panel-tarjeta panel-ancho-6">
+                    <div class="panel-titulo">
+                        <h2>Actividad de los últimos 7 días</h2>
+                        <button class="boton-exportar" onclick='PanelesRetinAI.descargarCsv("mi_actividad_semanal.csv",["Fecha","Análisis"],<?= json_encode(
+    $datosActividad,
+    JSON_HEX_APOS | JSON_HEX_QUOT,
+) ?>)'>CSV</button>
+                    </div>
+                    <div class="panel-grafico">
+                        <canvas id="grafico-actividad"></canvas>
+                    </div>
+                </section>
+                <section class="panel-tarjeta panel-ancho-7">
+                    <div class="panel-titulo">
+                        <h2>Análisis recientes</h2>
+                        <a class="btn btn-ghost btn-sm" href="pacientes.php">Ver
+                            historial</a>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Paciente</th>
+                                    <th>Resultado</th>
+                                    <th>Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody><?php
+if (
+    $recientes === []
+): ?><tr>
+                                    <td colspan="4" class="estado-vacio">Sin análisis registrados.</td>
+                                </tr><?php endif;
+foreach ($recientes as $fila): ?><tr>
+                                    <td><?= htmlspecialchars(
+    date("d/m/Y H:i", strtotime($fila["fecha_analisis"])),
+) ?></td>
+                                    <td><?= htmlspecialchars(
+    $fila["dni"] ?? "Sin DNI",
+) ?></td>
+                                    <td><?= htmlspecialchars(
+    $fila["resultado_principal"] ?? "Sin resultado",
+) ?></td>
+                                    <td>
+                                        <span class="etiqueta-estado <?= (int) $fila["alerta_anomalia"] ===
+1
+    ? "etiqueta-rechazado"
+    : "etiqueta-aprobado" ?>"><?= (int) $fila["alerta_anomalia"] === 1
+    ? "Alerta"
+    : "Sin alerta" ?></span>
+                                    </td>
+                                </tr><?php endforeach;
+?></tbody>
+                        </table>
+                    </div>
+                </section>
+                <section class="panel-tarjeta panel-ancho-5">
+                    <div class="panel-titulo">
+                        <h2>Tareas clínicas</h2>
+                    </div>
+                    <div class="panel-lista">
+                        <a class="panel-lista__fila"
+                            href="pacientes.php?filtro=borradores">
+                            <span>
+                                <span class="panel-lista__principal">Borradores
+                                    pendientes</span>
+                                <span class="panel-lista__secundario">Requieren revisión o
+                                    aprobación</span>
+                            </span>
+                            <strong class="panel-lista__valor"><?= count(
+    $borradores,
+) ?></strong>
+                        </a>
+                        <a class="panel-lista__fila" href="pacientes.php?filtro=valoracion">
+                            <span>
+                                <span
+                                    class="panel-lista__principal">Valoraciones pendientes</span>
+                                <span
+                                    class="panel-lista__secundario">Retroalimentación opcional</span>
+                            </span>
+                            <strong
+                                class="panel-lista__valor"><?= count(
+    $valoraciones,
+) ?></strong>
+                        </a>
+                        <a class="panel-lista__fila" href="seguimiento.php">
+                            <span>
+                                <span class="panel-lista__principal">Alertas
+                                    recientes</span>
+                                <span class="panel-lista__secundario">Casos en
+                                    seguimiento</span>
+                            </span>
+                            <strong class="panel-lista__valor"><?= count(
+    $criticos,
+) ?></strong>
+                        </a>
+                    </div>
+                </section>
+                <section class="panel-tarjeta panel-ancho-12">
+                    <div class="panel-titulo">
+                        <h2>Alertas prioritarias recientes</h2>
+                        <a class="btn btn-ghost btn-sm"
+                            href="seguimiento.php">Abrir seguimiento</a>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Paciente</th>
+                                    <th>Resultado</th>
+                                    <th>Probabilidad principal</th>
+                                </tr>
+                            </thead>
+                            <tbody><?php
+if (
+    $criticos === []
+): ?><tr>
+                                    <td colspan="4" class="estado-vacio">No hay alertas prioritarias.</td>
+                                </tr><?php endif;
+foreach ($criticos as $fila): ?><tr>
+                                    <td><?= htmlspecialchars(
+    date("d/m/Y H:i", strtotime($fila["fecha_analisis"])),
+) ?></td>
+                                    <td><?= htmlspecialchars(
+    $fila["dni"] ?? "Sin DNI",
+) ?></td>
+                                    <td><?= htmlspecialchars(
+    $fila["resultado_principal"] ?? "Sin resultado",
+) ?></td>
+                                    <td><?= htmlspecialchars(
+    number_format((float) $fila["probabilidad_principal"], 1),
+) ?>%</td>
+                                </tr><?php endforeach;
+?></tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+            <aside class="ayuda-flotante" id="ayuda-medico">Los datos corresponden únicamente a sus pacientes y
+                análisis. Las alertas muestran resultados referenciales que requieren valoración clínica.</aside>
+        </main>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="<?= $base ?>assets/js/paneles.js"></script>
+    <script>
+        const distribucion = <?= json_encode(
+    $distribucion,
+    JSON_UNESCAPED_UNICODE,
+) ?>,
+            actividad = <?= json_encode(
+    $actividad,
+    JSON_UNESCAPED_UNICODE,
+) ?>,
+            opciones = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            };
+        new Chart(document.getElementById('grafico-resultados'), {
+            type: 'doughnut',
+            data: {
+                labels: distribucion.map(f => f.resultado_principal || 'Sin resultado'),
+                datasets: [{
+                    data: distribucion.map(f => Number(f.total)),
+                    backgroundColor: ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#64748b']
+                }]
+            },
+            options: opciones
+        });
+        new Chart(document.getElementById('grafico-actividad'), {
+            type: 'line',
+            data: {
+                labels: actividad.map(f => f.fecha),
+                datasets: [{
+                    label: 'Análisis',
+                    data: actividad.map(f => Number(f.total)),
+                    borderColor: '#2563eb',
+                    backgroundColor: 'rgba(37,99,235,.12)',
+                    fill: true,
+                    tension: .3
+                }]
+            },
+            options: opciones
+        });
+    </script>
+</body>
+
+</html>

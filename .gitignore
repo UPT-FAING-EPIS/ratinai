@@ -5,6 +5,8 @@ phpunit.phar
 tests/coverage/
 .env
 ai_service/model/
+ai_service/modelo_v2/
+ai_service/data/
 __pycache__/
 *.pyc
 cypress/screenshots/

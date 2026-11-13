@@ -1,58 +1,41 @@
 <?php
-require_once __DIR__ . '/../../config/session_guard.php';
-require_once __DIR__ . '/../../config/config.php';
-require_role('SAD');
+require_once __DIR__ . "/../../config/session_guard.php";
+require_once __DIR__ . "/../../config/config.php";
+require_once __DIR__ . "/../../controllers/EstablecimientoController.php";
+require_once __DIR__ . "/../../controllers/SolicitudController.php";
+require_role("SAD");
 $user = current_user();
-$initials = get_initials($user['nombre']);
+$initials = get_initials($user["nombre"]);
 $base = get_base_path();
-$logout_url = $base . 'controllers/AuthController.php?action=logout';
+$logout_url = $base . "controllers/AuthController.php?action=logout";
 
-$role_label   = 'Super Administrador';
-$role_class   = 'role-sad';
-$avatar_class = 'avatar-sad';
-$header_sub   = 'Control Global';
+$role_label = "Super Administrador";
+$role_class = "role-sad";
+$avatar_class = "avatar-sad";
+$header_sub = "Control Global";
 
-$msg_success = '';
-$msg_error   = '';
-if (isset($_SESSION['solicitud_msg'])) {
-    $msg_success = $_SESSION['solicitud_msg'];
-    unset($_SESSION['solicitud_msg']);
+$msg_success = "";
+$msg_error = "";
+if (isset($_SESSION["solicitud_msg"])) {
+    $msg_success = $_SESSION["solicitud_msg"];
+    unset($_SESSION["solicitud_msg"]);
 }
 
 try {
-    $db = (new Database())->getConnection();
-
-    // Establecimientos activos
-    $establecimientos = $db->query(
-        "SELECT e.id, e.nombre, e.direccion, e.ruc,
-         CASE WHEN e.id_usuario IS NULL THEN 'sin_responsable' ELSE 'activo' END AS estado,
-         COUNT(u.id) AS medicos
-         FROM establecimientos e
-         LEFT JOIN usuarios u ON u.establecimiento_id=e.id AND u.rol_codigo='MED' AND u.activo=1
-         GROUP BY e.id ORDER BY e.nombre"
-    )->fetchAll(PDO::FETCH_ASSOC);
+    // La lectura de centros y solicitudes se resuelve en sus componentes de dominio.
+    $establecimientos = EstablecimientoController::listarConMedicos();
 
     // Solicitudes pendientes de registro
     $solicitudes = [];
     $cnt_solicitudes_pendientes = 0;
     try {
-        $solicitudes = $db->query(
-            "SELECT id, nombre_centro, direccion, tipo, ruc,
-                    dni_titular, nombres_titular, apellidos_titular, telefono, correo_contacto,
-                    evidencia_1, evidencia_1_nombre, evidencia_2, evidencia_2_nombre,
-                    estado, fecha_solicitud
-             FROM solicitudes_establecimiento
-             ORDER BY FIELD(estado,'pendiente','aprobado','rechazado'), fecha_solicitud DESC"
-        )->fetchAll(PDO::FETCH_ASSOC);
-        $cnt_solicitudes_pendientes = $db->query(
-            "SELECT COUNT(*) FROM solicitudes_establecimiento WHERE estado='pendiente'"
-        )->fetchColumn();
-    } catch(Exception $e) {
+        ["solicitudes" => $solicitudes, "pendientes" => $cnt_solicitudes_pendientes] =
+            datosSolicitudesAdministracion();
+    } catch (Exception $e) {
         $solicitudes = [];
         $cnt_solicitudes_pendientes = 0;
     }
-
-} catch(Exception $ex) {
+} catch (Exception $ex) {
     $establecimientos = [];
     $solicitudes = [];
     $cnt_solicitudes_pendientes = 0;
@@ -60,120 +43,151 @@ try {
 ?>
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>RetinAI — Establecimientos</title>
-<meta name="description" content="Gestión de centros oftalmológicos registrados en RetinAI.">
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="<?= $base ?>assets/css/dashboard/dashboard.css">
-<link rel="stylesheet" href="<?= $base ?>assets/css/dashboard/paneles.css">
-<style>
-.tabs-bar { display:flex; gap:4px; margin-bottom:24px; border-bottom:2px solid var(--border,#e5e9f0); padding-bottom:0; }
-.tab-btn {
-    padding:10px 20px; background:none; border:none; border-bottom:2px solid transparent;
-    font-family:inherit; font-size:14px; font-weight:600; color:var(--text2,#4A5568);
-    cursor:pointer; margin-bottom:-2px; transition:all 0.18s; display:flex; align-items:center; gap:6px;
-}
-.tab-btn.active { color:var(--accent,#1A56DB); border-bottom-color:var(--accent,#1A56DB); }
-.tab-btn:hover:not(.active) { color:var(--text,#0F1923); background:var(--surface2,#F0F3F7); border-radius:6px 6px 0 0; }
-.tab-panel { display:none; }
-.tab-panel.active { display:block; }
-.badge-pending  { background:#FEF3C7; color:#92400E; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; }
-.badge-approved { background:#D1FAE5; color:#065F46; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; }
-.badge-rejected { background:#FEE2E2; color:#991B1B; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; }
-.badge-tipo     { background:#EFF6FF; color:#1E40AF; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600; }
-.action-btns    { display:flex; gap:6px; }
-.btn-approve, .btn-reject {
-    padding:5px 12px; border:none; border-radius:6px; font-size:12px;
-    font-weight:600; cursor:pointer; font-family:inherit; transition:all 0.18s;
-}
-.btn-approve { background:#059669; color:#fff; }
-.btn-approve:hover { background:#047857; }
-.btn-reject  { background:#DC2626; color:#fff; }
-.btn-reject:hover  { background:#B91C1C; }
-.alert-flash { padding:12px 16px; border-radius:8px; margin-bottom:20px; font-size:14px; font-weight:500;
-    background:#D1FAE5; border:1px solid #6EE7B7; color:#065F46; animation:fadeUp .3s ease; }
-@keyframes fadeUp { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
-.counter-badge { background:#EF4444; color:#fff; font-size:11px; font-weight:700;
-    padding:2px 7px; border-radius:10px; }
-.info-block { display:flex; flex-direction:column; gap:2px; font-size:12px; }
-.info-block .label { font-size:10px; color:var(--text3); text-transform:uppercase; font-weight:700; }
-.evi-link { display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:600; color:var(--accent); text-decoration:none; margin-right:6px; background:#EFF6FF; padding:4px 8px; border-radius:4px; }
-.evi-link:hover { background:#DBEAFE; }
-.establishment-filters{display:grid;grid-template-columns:minmax(260px,1fr) 220px;gap:12px;padding:16px;margin-bottom:16px;border:1px solid var(--border,#dbe2ea);border-radius:12px;background:var(--surface,#fff)}
-.establishment-filters .filter-search{display:block;width:auto;max-width:none}.establishment-filters .filter-search input[type=search]{display:block;width:100%;height:40px;box-sizing:border-box;padding:9px 14px 9px 38px;border:1.5px solid var(--border,#dbe2ea);border-radius:8px;background:var(--surface2,#f7f9fc);color:var(--text,#0f1923);font:14px 'DM Sans',sans-serif;outline:none}.establishment-filters .filter-search input[type=search]:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(26,86,219,.1)}.establishment-filters select{width:100%;height:40px;padding:9px 14px;border:1.5px solid var(--border,#dbe2ea);border-radius:8px;background:var(--surface2,#f7f9fc);color:var(--text,#0f1923);font:14px 'DM Sans',sans-serif}.filter-empty{display:none;padding:26px;text-align:center;color:var(--text3)}@media(max-width:640px){.establishment-filters{grid-template-columns:1fr}}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <title>RetinAI — Establecimientos</title>
+    <meta name="description" content="Gestión de centros oftalmológicos registrados en RetinAI.">
+    <link
+        href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="<?= $base ?>assets/css/dashboard/dashboard.css">
+    <link rel="stylesheet" href="<?= $base ?>assets/css/dashboard/paneles.css">
+
+    <link rel="stylesheet" href="<?= $base ?>assets/css/views/superadmin/Establecimientos.css">
 </head>
+
 <body>
 
-<?php require_once __DIR__ . '/../shared/header.php'; ?>
+    <?php require_once __DIR__ . "/../shared/header.php"; ?>
 
-<div class="app-shell">
+    <div class="app-shell">
 
-    <?php require_once __DIR__ . '/../shared/sidebar.php'; ?>
+        <?php require_once __DIR__ . "/../shared/sidebar.php"; ?>
 
-    <main class="main-content">
+        <main class="main-content">
 
-        <?php if ($msg_success): ?>
-        <div class="alert-flash"><?= htmlspecialchars($msg_success) ?></div>
-        <?php endif; ?>
-
-        <div class="section-header">
-            <h1 class="page-title">Establecimientos</h1>
-            <p class="page-sub">Gestión de centros oftalmológicos en la plataforma.</p>
-        </div>
-
-        <!-- ── Centros activos ── -->
-        <div class="card">
-            <div class="establishment-filters">
-                <label class="filter-search" aria-label="Buscar establecimientos"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="m16.5 16.5 4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><input id="filtro-establecimiento" type="search" placeholder="Buscar por nombre, RUC o dirección"></label>
-                <select id="filtro-estado" aria-label="Filtrar por estado"><option value="">Todos los estados</option><option value="activo">Activo</option><option value="sin_responsable">Sin responsable</option></select>
-            </div>
-            <?php if (empty($establecimientos)): ?>
-            <p class="empty-msg">No hay establecimientos registrados.</p>
-            <?php else: ?>
-            <table class="data-table" id="tabla-establecimientos">
-                <thead><tr><th>#</th><th>Nombre</th><th>Dirección</th><th>Médicos</th><th>Estado</th><th>Acción</th></tr></thead>
-                <tbody>
-                <?php foreach ($establecimientos as $e): ?>
-                <tr data-fila data-busqueda="<?= htmlspecialchars(mb_strtolower(($e['nombre'] ?? '') . ' ' . ($e['direccion'] ?? '') . ' ' . ($e['ruc'] ?? ''))) ?>" data-estado="<?= htmlspecialchars($e['estado']) ?>">
-                    <td class="mono"><?= (int)$e['id'] ?></td>
-                    <td><strong><?= htmlspecialchars($e['nombre']) ?></strong></td>
-                    <td><?= htmlspecialchars($e['direccion'] ?? '—') ?></td>
-                    <td><span class="badge badge-info"><?= (int)$e['medicos'] ?></span></td>
-                    <td><span class="badge <?= $e['estado'] === 'activo' ? 'badge-active' : 'badge-warning' ?>"><?= $e['estado'] === 'activo' ? 'Activo' : 'Sin responsable' ?></span></td>
-                    <td>
-                        <a href="detalles_establecimientos.php?id=<?= $e['id'] ?>" class="btn-approve" style="text-decoration:none; padding:4px 8px; display:inline-block;">Ver/Editar</a>
-                    </td>
-                </tr>
-                <?php endforeach; ?>
-                </tbody>
-            </table>
-            <p class="filter-empty" id="establecimientos-vacio">No hay establecimientos que coincidan con los filtros.</p>
+            <?php if ($msg_success): ?>
+            <div class="alert-flash"><?= htmlspecialchars($msg_success) ?></div>
             <?php endif; ?>
-        </div>
 
-    </main>
-</div>
+            <div class="section-header">
+                <h1 class="page-title">Establecimientos</h1>
+                <p class="page-sub">Gestión de centros oftalmológicos en la plataforma.</p>
+            </div>
 
-<script src="<?= $base ?>assets/js/session.service.js"></script>
-<script src="<?= $base ?>assets/js/paneles.js"></script>
-<script>
-    if (typeof SessionService !== 'undefined') {
-        SessionService.init({ timeout: 300000, loginUrl: '<?= htmlspecialchars($base."views/auth/login.php") ?>' });
-    }
-</script>
-<script>
-const applyEstablishmentFilters = () => {
-    const query = (document.getElementById('filtro-establecimiento')?.value || '').trim().toLocaleLowerCase('es');
-    const state = document.getElementById('filtro-estado')?.value || '';
-    const rows = document.querySelectorAll('#tabla-establecimientos tbody tr[data-fila]'); let visible = 0;
-    rows.forEach(row => { const match = (!query || row.dataset.busqueda.includes(query)) && (!state || row.dataset.estado === state); row.hidden = !match; if (match) visible++; });
-    const empty = document.getElementById('establecimientos-vacio'); if (empty) empty.style.display = rows.length && !visible ? 'block' : 'none';
-};
-document.getElementById('filtro-establecimiento')?.addEventListener('input', applyEstablishmentFilters);
-document.getElementById('filtro-estado')?.addEventListener('change', applyEstablishmentFilters);
-</script>
-<script src="<?= $base ?>assets/js/dashboard/establecimientos.js"></script>
+            <!-- ── Centros activos ── -->
+            <div class="card">
+                <div class="establishment-filters">
+                    <label class="filter-search" aria-label="Buscar establecimientos">
+                        <svg viewBox="0 0 24 24"
+                            fill="none" aria-hidden="true">
+                            <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2" />
+                            <path d="m16.5 16.5 4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                        </svg>
+                        <input id="filtro-establecimiento" type="search"
+                            placeholder="Buscar por nombre, RUC o dirección">
+                    </label>
+                    <select id="filtro-estado" aria-label="Filtrar por estado">
+                        <option value="">Todos los estados</option>
+                        <option value="activo">Activo</option>
+                        <option value="sin_responsable">Sin responsable</option>
+                    </select>
+                </div>
+                <?php if (empty($establecimientos)): ?>
+                <p class="empty-msg">No hay establecimientos registrados.</p>
+                <?php else: ?>
+                <table class="data-table" id="tabla-establecimientos">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Nombre</th>
+                            <th>Dirección</th>
+                            <th>Médicos</th>
+                            <th>Estado</th>
+                            <th>Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($establecimientos as $e): ?>
+                        <tr data-fila data-busqueda="<?= htmlspecialchars(
+                    mb_strtolower(
+                        ($e["nombre"] ?? "") .
+                            " " .
+                            ($e["direccion"] ?? "") .
+                            " " .
+                            ($e["ruc"] ?? ""),
+                    ),
+                ) ?>" data-estado="<?= htmlspecialchars($e["estado"]) ?>">
+                            <td class="mono"><?= (int) $e["id"] ?></td>
+                            <td>
+                                <strong><?= htmlspecialchars(
+                        $e["nombre"],
+                    ) ?></strong>
+                            </td>
+                            <td><?= htmlspecialchars($e["direccion"] ?? "—") ?></td>
+                            <td>
+                                <span class="badge badge-info"><?= (int) $e[
+                        "medicos"
+                    ] ?></span>
+                            </td>
+                            <td>
+                                <span class="badge <?= $e["estado"] === "activo"
+                        ? "badge-active"
+                        : "badge-warning" ?>"><?= $e["estado"] === "activo"
+    ? "Activo"
+    : "Sin responsable" ?></span>
+                            </td>
+                            <td>
+                                <a href="detalles_establecimientos.php?id=<?= $e[
+                            "id"
+                        ] ?>" class="btn-approve enlace-editar-establecimiento">Ver/Editar</a>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+                <p class="filter-empty" id="establecimientos-vacio">No hay establecimientos que coincidan con los
+                    filtros.</p>
+                <?php endif; ?>
+            </div>
+
+        </main>
+    </div>
+
+    <script src="<?= $base ?>assets/js/session.service.js"></script>
+    <script src="<?= $base ?>assets/js/paneles.js"></script>
+    <script>
+        if (typeof SessionService !== 'undefined') {
+            SessionService.init({
+                timeout: 300000,
+                loginUrl: '<?= htmlspecialchars(
+            $base . "views/auth/login.php",
+        ) ?>'
+            });
+        }
+    </script>
+    <script>
+        const applyEstablishmentFilters = () => {
+            const query = (document.getElementById('filtro-establecimiento')?.value || '').trim().toLocaleLowerCase(
+                'es');
+            const state = document.getElementById('filtro-estado')?.value || '';
+            const rows = document.querySelectorAll('#tabla-establecimientos tbody tr[data-fila]');
+            let visible = 0;
+            rows.forEach(row => {
+                const match = (!query || row.dataset.busqueda.includes(query)) && (!state || row.dataset
+                    .estado === state);
+                row.hidden = !match;
+                if (match) visible++;
+            });
+            const empty = document.getElementById('establecimientos-vacio');
+            if (empty) empty.style.display = rows.length && !visible ? 'block' : 'none';
+        };
+        document.getElementById('filtro-establecimiento')?.addEventListener('input', applyEstablishmentFilters);
+        document.getElementById('filtro-estado')?.addEventListener('change', applyEstablishmentFilters);
+    </script>
+    <script src="<?= $base ?>assets/js/dashboard/establecimientos.js"></script>
 </body>
+
 </html>

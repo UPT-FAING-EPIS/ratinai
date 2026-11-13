@@ -32,15 +32,21 @@ class ServicioBorradorClinicoOpenAI
                 return [
                     'resultado_cnn' => (string) $control['resultado_principal'],
                     'probabilidad_principal' => (float) $control['probabilidad_principal'],
+                    'probabilidades_cnn' => [
+                        'normal' => (float) $control['probabilidad_normal'],
+                        'diabetes' => (float) $control['probabilidad_diabetes'],
+                        'glaucoma' => (float) $control['probabilidad_glaucoma'],
+                        'catarata' => (float) $control['probabilidad_catarata'],
+                    ],
                 ];
-            }, array_slice($controlesPrevios, 0, 3)),
+            }, array_slice($controlesPrevios, 0, 5)),
         ];
         $contenidoSolicitud = [
-            'model' => (string) env_value('REPORT_AI_MODEL', 'gpt-5.6-terra'),
+            'model' => (string) env_value('REPORT_AI_MODEL', 'gpt-6-luna'),
             'store' => false,
             'reasoning' => ['effort' => 'none'],
             'max_output_tokens' => 450,
-            'instructions' => 'Eres un asistente de redacción clínica. Escribe en español un único párrafo referencial para revisión por un médico oftalmólogo. No diagnostiques, no prescribas, no atribuyas validación de retinografía o calidad al modelo CNN actual. No incluyas dígitos, números escritos, porcentajes, versiones ni datos identificables: la aplicación añade los hechos exactos por separado. No infieras progresión entre controles.',
+            'instructions' => 'Eres un asistente de redacción clínica. Escribe en español un único párrafo referencial para revisión por un médico oftalmólogo. Resume de manera prudente las diferencias entre la salida actual y los controles previos, que la aplicación ya restringió al mismo paciente, carpeta y ojo. No diagnostiques, no prescribas, no atribuyas validación de retinografía o calidad al modelo CNN actual. No incluyas dígitos, números escritos, porcentajes, versiones ni datos identificables: la aplicación añade los hechos exactos por separado. Describe diferencias, pero no infieras progresión, mejoría o deterioro.',
             'input' => json_encode($hechos, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
             'text' => [
                 'format' => [

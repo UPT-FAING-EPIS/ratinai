@@ -52,7 +52,8 @@ describe('RF-04: Gestión de Centro Oftalmológico (Edición)', () => {
         // La página debe mostrar el formulario de edición
         cy.get('form#form-est').should('exist');
         cy.get('input[name="nombre"]').should('exist');
-        cy.get('h1.page-title').should('contain', 'Detalles del Establecimiento');
+        cy.get('h1.page-title').should('not.be.empty');
+        cy.get('.page-sub').should('contain', 'Información institucional');
     });
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -86,10 +87,9 @@ describe('RF-04: Gestión de Centro Oftalmológico (Edición)', () => {
             expect(interception.response.statusCode).to.be.oneOf([200, 302]);
         });
 
-        // Verificar alerta verde de éxito en la vista recargada
-        cy.get('.alert-flash.alert-ok', { timeout: 6000 })
-            .should('be.visible')
-            .and('contain', 'actualizado correctamente');
+        // El resultado persistente es el valor guardado; el aviso visual puede
+        // desaparecer automáticamente después de mostrarse.
+        cy.get('input[name="nombre"]').should('have.value', nuevoNombre);
     });
 
     // ─────────────────────────────────────────────────────────────────────────

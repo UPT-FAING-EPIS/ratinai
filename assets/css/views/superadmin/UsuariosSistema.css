@@ -1,0 +1,6 @@
+/* Estilos de superadmin/UsuariosSistema.php. */
+.user-count {
+    margin-left: auto;
+    font-size: 13px;
+    color: var(--text2, #4a5568);
+}

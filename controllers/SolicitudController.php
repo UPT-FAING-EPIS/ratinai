@@ -8,13 +8,57 @@
 require_once __DIR__ . '/../config/session_guard.php';
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../services/MailService.php';
+require_once __DIR__ . '/../models/SolicitudModel.php';
+
+/** Consultas de lectura del expediente usadas por las vistas administrativas. */
+function datosDetalleSolicitud(int $id): ?array {
+    return (new SolicitudModel())->obtenerDetalleConSolicitante($id);
+}
+
+function datosListadoSolicitudes(): array {
+    $modelo = new SolicitudModel();
+    return [
+        'solicitudes' => $modelo->getAllSolicitudesConOrigen(),
+        'pendientes' => $modelo->countPendientes(),
+    ];
+}
+
+/** Solicitudes que acompanan el listado global de centros. */
+function datosSolicitudesAdministracion(): array {
+    $modelo = new SolicitudModel();
+    return [
+        'solicitudes' => $modelo->listarParaAdministracion(),
+        'pendientes' => $modelo->countPendientes(),
+    ];
+}
+
+function contarSolicitudesPendientes(): int {
+    return (new SolicitudModel())->countPendientes();
+}
+
+function datosEstablecimientosAdministrador(string $correo, int $idAdministrador, int $idAsignado): array {
+    require_once __DIR__ . '/../models/EstablecimientoModel.php';
+    require_once __DIR__ . '/../models/DoctorModel.php';
+    $establecimientos = (new EstablecimientoModel())->getByOwnerId($idAdministrador);
+    $solicitudes = (new SolicitudModel())->getSolicitudesByContactEmailOrOwner($correo, $idAdministrador);
+    $ids = array_map('intval', array_column($establecimientos, 'id'));
+    if (!$ids && $idAsignado > 0) $ids = [$idAsignado];
+    return [
+        'mis_establecimientos' => $establecimientos,
+        'solicitudes' => $solicitudes,
+        'cnt_pendientes' => $ids ? (new DoctorModel())->countPendingByEstablishments($ids) : 0,
+    ];
+}
 
 const TAMANO_MAXIMO_EVIDENCIA_BYTES = 204800;
 const LONGITUD_MAXIMA_NOMBRE_EVIDENCIA = 255;
 
 if (session_status() === PHP_SESSION_NONE) session_start();
 
-$action = $_POST['action'] ?? $_GET['action'] ?? '';
+// El despachador solo actúa cuando se solicita este archivo como endpoint.
+// Así las vistas pueden reutilizar sus consultas de lectura sin redirección.
+if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === realpath(__FILE__)) {
+    $action = $_POST['action'] ?? $_GET['action'] ?? '';
 
 switch ($action) {
 
@@ -49,6 +93,7 @@ switch ($action) {
     default:
         header('Location: ../index.php');
         exit;
+}
 }
 
 // ────────────────────────────────────────────────────────────────────────────

@@ -67,14 +67,14 @@ describe('RF-03: Gestionar Médicos Activos', () => {
         });
     });
 
-    it('Debe desactivar a un médico por POST de formulario', () => {
-        // Encontrar un médico de prueba y capturar su nombre para verificar que desaparece
+    it('Debe cambiar el acceso de un médico por POST de formulario', () => {
+        // El registro puede estar activo o inactivo por ejecuciones anteriores.
+        // Se prueba la acción disponible en la misma fila.
         cy.contains('table#tabla-medicos tbody tr', 'cypress_doc_').first().then(($row) => {
-            const nombreMedico = $row.find('td').first().find('strong').text().trim();
-
             cy.wrap($row).within(() => {
-                // Si la desactivación es por un form submit tradicional
-                cy.get('form[action*="action=deactivate"] button').click();
+                cy.get('form[action*="DoctorController.php?action="] button')
+                    .should('have.length', 1)
+                    .click();
             });
 
             // La página cargará de nuevo por el POST 302 Redirection

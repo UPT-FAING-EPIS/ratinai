@@ -1,0 +1,14 @@
+/* Estilos de superadmin/calidad_modelo.php. */
+.numero {
+    font-weight: 700;
+    font-size: 16px;
+}
+
+.porcentaje {
+    font-weight: 700;
+    color: var(--accent);
+}
+
+.table-responsive {
+    overflow: auto;
+}

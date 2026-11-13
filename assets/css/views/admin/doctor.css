@@ -1,0 +1,160 @@
+/* Estilos de admin/doctor.php. */
+.section-top {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.btn-add-doctor {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #1a56db 0%, #1e40af 100%);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 10px;
+    text-decoration: none;
+    border: none;
+    cursor: pointer;
+    transition:
+        transform 0.15s,
+        box-shadow 0.15s;
+    box-shadow: 0 4px 14px rgba(26, 86, 219, 0.35);
+    white-space: nowrap;
+}
+
+.btn-add-doctor:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(26, 86, 219, 0.45);
+}
+
+.btn-add-doctor svg {
+    flex-shrink: 0;
+}
+
+.full-width-card {
+    overflow-x: auto;
+}
+
+#tabla-medicos {
+    min-width: 840px;
+}
+
+#tabla-medicos th:last-child,
+#tabla-medicos td:last-child {
+    position: sticky;
+    right: 0;
+    background: var(--surface);
+    box-shadow: -6px 0 10px rgba(15, 23, 42, 0.04);
+}
+
+#tabla-medicos tr:hover td:last-child {
+    background: #f0f3f7;
+}
+
+.filters-bar {
+    display: grid;
+    grid-template-columns: minmax(220px, 2fr) repeat(3, minmax(150px, 1fr));
+    gap: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+    background: var(--surface, #fff);
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 12px;
+}
+
+.filters-bar input,
+.filters-bar select {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 40px;
+    padding: 0 12px;
+    border: 1px solid var(--border, #dbe2ea);
+    border-radius: 8px;
+    background: var(--bg, #fff);
+    color: var(--text, #1e293b);
+    font: inherit;
+}
+
+.table-summary {
+    font-size: 13px;
+    color: var(--text-muted, #64748b);
+    margin: 0 0 12px;
+}
+
+.btn-activate {
+    padding: 6px 12px;
+    height: 32px;
+    border: 1px solid #16a34a;
+    border-radius: 7px;
+    background: #f0fdf4;
+    color: #15803d;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.empty-filter {
+    display: none;
+    padding: 28px;
+    text-align: center;
+    color: var(--text-muted, #64748b);
+}
+
+@media (max-width: 900px) {
+    .filters-bar {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .filters-bar input {
+        grid-column: 1/-1;
+    }
+}
+
+@media (max-width: 560px) {
+    .filters-bar {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Presentación anteriormente declarada en atributos de la vista. */
+.ajuste-margen-izquierdo-4px {
+    margin-left: 4px;
+}
+
+.ajuste-padding-6px-12px-height-32px {
+    padding: 6px 12px;
+    height: 32px;
+}
+
+.ajuste-alineacion-texto-center-ancho-maximo-350px {
+    text-align: center;
+    max-width: 350px;
+}
+
+.ajuste-margin-0-auto-16px {
+    margin: 0 auto 16px;
+}
+
+.ajuste-margen-inferior-8px-tamano-texto-16px {
+    margin-bottom: 8px;
+    font-size: 16px;
+}
+
+.ajuste-tamano-texto-13px-color-color-margen-inferior-24px {
+    font-size: 13px;
+    color: #64748b;
+    margin-bottom: 24px;
+}
+
+.ajuste-fondo-color {
+    background: #1A56DB;
+}
+
+.formulario-accion-medico {
+    margin: 0;
+}

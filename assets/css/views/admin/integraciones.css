@@ -1,0 +1,62 @@
+/* Estilos de admin/integraciones.php. */
+.estado-integracion {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin: 16px 0;
+}
+
+.estado-integracion>div {
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+}
+
+.estado-integracion span {
+    display: block;
+    font-size: 10px;
+    color: var(--text3);
+    text-transform: uppercase;
+}
+
+.estado-integracion strong {
+    font-size: 14px;
+}
+
+.estado-completada {
+    color: var(--success);
+}
+
+.estado-fallida {
+    color: var(--danger);
+}
+
+.estado-pendiente {
+    color: var(--warning);
+}
+
+.acciones {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 14px 0;
+}
+
+@media (max-width: 700px) {
+    .estado-integracion {
+        grid-template-columns: 1fr;
+    }
+
+    .table-responsive {
+        overflow: auto;
+    }
+}
+
+/* Presentación anteriormente declarada en atributos de la vista. */
+.ajuste-tamano-texto-12px {
+    font-size: 12px;
+}
+
+.oculto-inicialmente {
+    display: none;
+}

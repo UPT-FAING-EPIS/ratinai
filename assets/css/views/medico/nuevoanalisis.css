@@ -1,0 +1,341 @@
+/* Estilos de medico/nuevoanalisis.php. */
+.flujo-pasos {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin: 0 0 20px;
+    padding: 0;
+    list-style: none;
+}
+
+.flujo-paso {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 11px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+    color: var(--text3);
+    font-size: 12px;
+}
+
+.flujo-paso strong {
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--surface2);
+    color: var(--text2);
+}
+
+.flujo-paso.activo {
+    border: 2px solid var(--accent);
+    color: var(--accent);
+    background: var(--accent2);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16);
+}
+
+.flujo-paso.activo strong,
+.flujo-paso.completo strong {
+    background: var(--accent);
+    color: #fff;
+}
+
+.flujo-paso.completo {
+    border-color: var(--accent);
+    color: var(--text2);
+}
+
+.flujo-paso.completo strong {
+    font-size: 0;
+}
+
+.flujo-paso.completo strong::before {
+    content: "";
+    width: 13px;
+    height: 13px;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='m3 8 3 3 7-7' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;
+}
+
+.rejilla-carga {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(420px, 1fr);
+    gap: 18px;
+    align-items: start;
+}
+
+.pila {
+    display: grid;
+    gap: 16px;
+}
+
+.campos-dobles {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.campo-ayuda {
+    font-size: 11px;
+    color: var(--text3);
+    margin-top: 5px;
+}
+
+.zona-carga {
+    display: grid;
+    place-items: center;
+    min-height: 300px;
+    border: 2px dashed var(--border2);
+    border-radius: 12px;
+    background: var(--surface2);
+    cursor: pointer;
+    overflow: hidden;
+    text-align: center;
+}
+
+.zona-carga.con-archivo {
+    background: #0f172a;
+    border-style: solid;
+}
+
+.zona-carga img {
+    display: none;
+    width: 100%;
+    height: 340px;
+    object-fit: contain;
+}
+
+.zona-carga.con-archivo img {
+    display: block;
+}
+
+.zona-carga.con-archivo .indicacion-carga {
+    display: none;
+}
+
+.acciones {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 14px;
+}
+
+.tarjeta-oculta {
+    display: none;
+}
+
+.carpetas {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 8px;
+}
+
+.carpeta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    cursor: pointer;
+    text-align: left;
+}
+
+.carpeta svg {
+    width: 17px;
+    height: 17px;
+    color: var(--accent);
+    flex: none;
+}
+
+.carpeta.seleccionada {
+    border-color: var(--accent);
+    background: var(--accent2);
+}
+
+.validacion-cnn {
+    display: none;
+    margin-top: 12px;
+    padding: 12px;
+    border-radius: 9px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    font-size: 12px;
+}
+
+.validacion-cnn.aprobada {
+    border-color: #86efac;
+    background: #f0fdf4;
+    color: #166534;
+}
+
+.validacion-cnn.rechazada {
+    border-color: #fecaca;
+    background: #fff3f3;
+    color: #991b1b;
+}
+
+.validacion-cnn-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.validacion-cnn-dato {
+    padding: 8px;
+    border: 1px solid currentColor;
+    border-radius: 7px;
+}
+
+.validacion-cnn-dato span {
+    display: block;
+    font-size: 10px;
+    text-transform: uppercase;
+    opacity: 0.75;
+}
+
+.rejilla-resultado {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(420px, 1fr);
+    gap: 18px;
+    align-items: start;
+    margin-top: 18px;
+}
+
+.imagen-resultado {
+    grid-column: 1/-1;
+}
+
+.imagen-resultado img {
+    display: block;
+    width: 100%;
+    max-height: 520px;
+    object-fit: contain;
+    background: #0f172a;
+    border-radius: 10px;
+}
+
+.resultado-estado {
+    padding: 14px;
+    border-radius: 10px;
+    background: #eef4ff;
+    border-left: 4px solid var(--accent);
+}
+
+.resultado-estado.rechazado {
+    background: #fff3f3;
+    border-color: var(--danger);
+}
+
+.validacion-imagen {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin: 14px 0;
+}
+
+.dato-validacion {
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.dato-validacion span {
+    display: block;
+    font-size: 10px;
+    color: var(--text3);
+    text-transform: uppercase;
+}
+
+.barra-resultado {
+    margin: 11px 0;
+}
+
+.barra-resultado>div:first-child {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    margin-bottom: 5px;
+}
+
+.pista {
+    height: 7px;
+    background: var(--surface2);
+    border-radius: 99px;
+    overflow: hidden;
+}
+
+.relleno {
+    height: 100%;
+    width: 0;
+    background: var(--accent);
+}
+
+.opciones-valoracion {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.opcion-valoracion {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    padding: 9px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.opcion-valoracion.seleccionada {
+    border-color: var(--accent);
+    background: var(--accent2);
+    color: var(--accent);
+}
+
+.estado-guardado {
+    font-size: 11px;
+    color: var(--text3);
+    margin-top: 7px;
+}
+
+@media (max-width: 1050px) {
+
+    .rejilla-carga,
+    .rejilla-resultado {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 650px) {
+
+    .flujo-pasos,
+    .campos-dobles,
+    .validacion-imagen,
+    .validacion-cnn-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .zona-carga img {
+        height: 250px;
+    }
+}
+
+/* Presentación anteriormente declarada en atributos de la vista. */
+.ajuste-margen-superior-12px {
+    margin-top: 12px;
+}
+
+.oculto-inicialmente {
+    display: none;
+}
+
+.ajuste-margen-superior-16px {
+    margin-top: 16px;
+}
+
+.ajuste-margen-superior-10px {
+    margin-top: 10px;
+}

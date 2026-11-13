@@ -7,6 +7,49 @@ require_once __DIR__ . '/../config/session_guard.php';
 class EstablecimientoController {
     private EstablecimientoModel $model;
 
+    /** Entrega datos listos para los paneles sin consultas desde la vista. */
+    public static function datosPanelGlobal(): array {
+        return (new EstablecimientoModel())->obtenerPanelGlobal();
+    }
+
+    public static function listarConMedicos(): array {
+        return (new EstablecimientoModel())->listarConMedicos();
+    }
+
+    public static function metricasDetalle(int $id): array {
+        return (new EstablecimientoModel())->obtenerMetricasDetalle($id);
+    }
+
+    public static function datosPanelAdministrador(int $idAdministrador, ?int $idEstablecimiento): array {
+        $modelo = new EstablecimientoModel();
+        $establecimientos = self::establecimientosAdministrador($idAdministrador, $idEstablecimiento);
+        $ids = array_values(array_unique(array_map('intval', array_column($establecimientos, 'id'))));
+        return $modelo->obtenerPanelAdministrador($ids, $idAdministrador);
+    }
+
+    /** Conserva la asociación histórica por establecimiento_id cuando no hay propietario asignado. */
+    public static function establecimientosAdministrador(int $idAdministrador, ?int $idEstablecimiento): array {
+        $modelo = new EstablecimientoModel();
+        $establecimientos = $modelo->getByOwnerId($idAdministrador);
+        if ($establecimientos === [] && $idEstablecimiento) {
+            $establecimiento = $modelo->getById($idEstablecimiento);
+            if ($establecimiento) $establecimientos[] = $establecimiento;
+        }
+        return $establecimientos;
+    }
+
+    public static function detalleEstablecimiento(int $id): array {
+        $modelo = new EstablecimientoModel();
+        $establecimiento = $modelo->getById($id);
+        if (!$establecimiento) return ['establecimiento' => null];
+        return [
+            'establecimiento' => $establecimiento,
+            'admins' => $modelo->getAdminByEstablecimiento($id),
+            'medicos' => $modelo->getMedicosByEstablecimiento($id),
+            'metricas' => $modelo->obtenerMetricasDetalle($id),
+        ];
+    }
+
     public function __construct() {
         $this->model = new EstablecimientoModel();
     }
@@ -89,7 +132,8 @@ class EstablecimientoController {
 }
 
 // ── Router ────────────────────────────────────────────────────────────────────
-if (isset($_GET['action']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
+if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === realpath(__FILE__)
+    && isset($_GET['action']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $controller = new EstablecimientoController();
     switch ($_GET['action']) {
         case 'update': $controller->updateEstablecimiento(); break;

@@ -1,0 +1,101 @@
+/* Estilos de medico/seguimiento.php. */
+.critical-summary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.summary-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+}
+
+.summary-value {
+    font-family: "DM Mono", monospace;
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--danger);
+}
+
+.summary-label {
+    font-size: 12px;
+    color: var(--text3);
+}
+
+.critical-list {
+    display: grid;
+    gap: 12px;
+}
+
+.critical-case {
+    border: 1px solid #fecaca;
+    border-left: 4px solid var(--danger);
+    border-radius: var(--radius);
+    background: #fff7f7;
+    padding: 16px;
+}
+
+.critical-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.critical-main {
+    min-width: 0;
+}
+
+.critical-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 6px;
+}
+
+.critical-meta {
+    font-size: 13px;
+    color: var(--text2);
+}
+
+.critical-score {
+    font-family: "DM Mono", monospace;
+    font-weight: 700;
+    color: var(--danger);
+}
+
+.critical-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.diagnosis-note {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed #fecaca;
+    font-size: 12px;
+    color: var(--text2);
+}
+
+@media (max-width: 900px) {
+    .critical-summary {
+        grid-template-columns: 1fr;
+    }
+
+    .critical-row {
+        flex-direction: column;
+    }
+}
+
+/* Presentación anteriormente declarada en atributos de la vista. */
+.ajuste-margen-izquierdo-auto {
+    margin-left: auto;
+}
+
+.oculto-inicialmente {
+    display: none;
+}

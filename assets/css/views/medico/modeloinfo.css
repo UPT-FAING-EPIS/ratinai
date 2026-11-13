@@ -1,0 +1,23 @@
+/* Estilos de medico/modeloinfo.php. */
+
+/* Presentación anteriormente declarada en atributos de la vista. */
+.ajuste-gap-20px {
+    gap: 20px;
+}
+
+.ajuste-margen-inferior-14px {
+    margin-bottom: 14px;
+}
+
+.ajuste-tamano-texto-12px-margen-superior-12px {
+    font-size: 12px;
+    margin-top: 12px;
+}
+
+.ajuste-margin-0 {
+    margin: 0;
+}
+
+.ajuste-reduccion-flex-0 {
+    flex-shrink: 0;
+}

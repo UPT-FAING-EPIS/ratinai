@@ -1,273 +1,347 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 $success_msg = null;
-$error_msg   = null;
+$error_msg = null;
 
-if (isset($_SESSION['solicitud_success'])) {
-    $success_msg = $_SESSION['solicitud_success'];
-    unset($_SESSION['solicitud_success']);
+if (isset($_SESSION["solicitud_success"])) {
+    $success_msg = $_SESSION["solicitud_success"];
+    unset($_SESSION["solicitud_success"]);
 }
-if (isset($_SESSION['solicitud_error'])) {
-    $error_msg = $_SESSION['solicitud_error'];
-    unset($_SESSION['solicitud_error']);
+if (isset($_SESSION["solicitud_error"])) {
+    $error_msg = $_SESSION["solicitud_error"];
+    unset($_SESSION["solicitud_error"]);
 }
 ?>
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RetinAI — Registrar Centro Oftalmológico</title>
-    <meta name="description" content="Solicite el registro de su centro oftalmológico en RetinAI. Complete el formulario con los datos del establecimiento y del titular.">
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <meta name="description"
+        content="Solicite el registro de su centro oftalmológico en RetinAI. Complete el formulario con los datos del establecimiento y del titular.">
+    <link
+        href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=DM+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="../../assets/css/auth/login.css">
     <link rel="stylesheet" href="../../assets/css/auth/solicitud_registro.css">
+    <link rel="stylesheet" href="../../assets/css/views/auth/solicitud_registro.css">
 </head>
+
 <body class="pagina-solicitud">
 
-<div class="auth-wrap">
-    <div class="auth-card">
+    <div class="auth-wrap">
+        <div class="auth-card">
 
-        <header class="solicitud-cabecera">
-            <a class="solicitud-marca" href="../../index.php" aria-label="RetinAI — Volver al inicio">
-                <svg viewBox="0 0 48 32" fill="none" aria-hidden="true"><path d="M2 16S10 3 24 3s22 13 22 13-8 13-22 13S2 16 2 16Z" stroke="currentColor" stroke-width="2.7"/><circle cx="24" cy="16" r="10" stroke="currentColor" stroke-width="2.7"/><circle cx="24" cy="16" r="4" fill="currentColor"/></svg>
-                <span>Retin<span>AI</span></span>
-            </a>
-            <div>
-                <p class="solicitud-etiqueta">REGISTRO DE ESTABLECIMIENTOS</p>
-                <h1>Solicita el registro de tu centro</h1>
-                <p>Completa los datos del centro y del titular. Después podrás ubicarlo en el mapa y adjuntar sus evidencias.</p>
+            <header class="solicitud-cabecera">
+                <a class="solicitud-marca" href="../../index.php" aria-label="RetinAI — Volver al inicio">
+                    <svg viewBox="0 0 48 32" fill="none" aria-hidden="true">
+                        <path d="M2 16S10 3 24 3s22 13 22 13-8 13-22 13S2 16 2 16Z" stroke="currentColor"
+                            stroke-width="2.7" />
+                        <circle cx="24" cy="16" r="10" stroke="currentColor" stroke-width="2.7" />
+                        <circle cx="24" cy="16" r="4" fill="currentColor" />
+                    </svg>
+                    <span>Retin<span>AI</span>
+                    </span>
+                </a>
+                <div>
+                    <p class="solicitud-etiqueta">REGISTRO DE ESTABLECIMIENTOS</p>
+                    <h1>Solicita el registro de tu centro</h1>
+                    <p>Completa los datos del centro y del titular. Después podrás ubicarlo en el mapa y adjuntar sus
+                        evidencias.</p>
+                </div>
+            </header>
+
+            <?php if ($success_msg): ?>
+            <!-- ── Pantalla de éxito ── -->
+            <div class="success-screen">
+                <div class="success-icon">
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" />
+                        <path d="m7 12 3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round" />
+                    </svg>
+                </div>
+                <h2>¡Solicitud enviada!</h2>
+                <p><?= htmlspecialchars($success_msg) ?></p>
+                <a href="../../index.php" class="back-home-link">
+                    <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+                        <path d="M15 10H5M10 5l-5 5 5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+                            stroke-linejoin="round" />
+                    </svg>
+                    Volver al inicio
+                </a>
             </div>
-        </header>
 
-        <?php if ($success_msg): ?>
-        <!-- ── Pantalla de éxito ── -->
-        <div class="success-screen">
-            <div class="success-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><path d="m7 12 3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-            <h2>¡Solicitud enviada!</h2>
-            <p><?= htmlspecialchars($success_msg) ?></p>
-            <a href="../../index.php" class="back-home-link">
-                <svg width="14" height="14" viewBox="0 0 20 20" fill="none"><path d="M15 10H5M10 5l-5 5 5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                Volver al inicio
-            </a>
-        </div>
+            <?php else: ?>
 
-        <?php else: ?>
+            <?php if ($error_msg): ?>
+            <div class="alert-box alert-danger" id="server-error-box" role="alert">
+                <svg width="16" height="16" viewBox="0 0 20 20" fill="none" class="ajuste-reduccion-flex-0-margen-superior-1px">
+                    <circle cx="10" cy="10" r="9" stroke="#DC2626" stroke-width="1.5" />
+                    <path d="M10 6v5M10 13h.01" stroke="#DC2626" stroke-width="1.5" stroke-linecap="round" />
+                </svg>
+                <p><?= htmlspecialchars($error_msg) ?></p>
+            </div>
+            <?php endif; ?>
 
-        <?php if ($error_msg): ?>
-        <div class="alert-box alert-danger" id="server-error-box" role="alert">
-            <svg width="16" height="16" viewBox="0 0 20 20" fill="none" style="flex-shrink:0;margin-top:1px">
-                <circle cx="10" cy="10" r="9" stroke="#DC2626" stroke-width="1.5"/>
-                <path d="M10 6v5M10 13h.01" stroke="#DC2626" stroke-width="1.5" stroke-linecap="round"/>
-            </svg>
-            <p><?= htmlspecialchars($error_msg) ?></p>
-        </div>
-        <?php endif; ?>
+            <!-- ═══════════════════════════════════════ FORMULARIO ═══════════════════════════════════════ -->
+            <form action="../../controllers/SolicitudController.php" method="POST" id="form-solicitud"
+                enctype="multipart/form-data" novalidate>
+                <input type="hidden" name="action" value="solicitar">
+                <!-- Evidencias en base64 (llenadas por JS) -->
+                <input type="hidden" name="evidencia_1_b64" id="evidencia_1_b64">
+                <input type="hidden" name="evidencia_1_nombre" id="evidencia_1_nombre">
+                <input type="hidden" name="evidencia_2_b64" id="evidencia_2_b64">
+                <input type="hidden" name="evidencia_2_nombre" id="evidencia_2_nombre">
 
-        <!-- ═══════════════════════════════════════ FORMULARIO ═══════════════════════════════════════ -->
-        <form
-            action="../../controllers/SolicitudController.php"
-            method="POST"
-            id="form-solicitud"
-            enctype="multipart/form-data"
-            novalidate
-        >
-            <input type="hidden" name="action" value="solicitar">
-            <!-- Evidencias en base64 (llenadas por JS) -->
-            <input type="hidden" name="evidencia_1_b64"    id="evidencia_1_b64">
-            <input type="hidden" name="evidencia_1_nombre" id="evidencia_1_nombre">
-            <input type="hidden" name="evidencia_2_b64"    id="evidencia_2_b64">
-            <input type="hidden" name="evidencia_2_nombre" id="evidencia_2_nombre">
+                <div class="solicitud-grid">
+                    <section class="solicitud-datos" aria-label="Datos del establecimiento y del titular">
 
-            <div class="solicitud-grid">
-            <section class="solicitud-datos" aria-label="Datos del establecimiento y del titular">
-
-            <!-- ──────────────────────────────────────
+                        <!-- ──────────────────────────────────────
                  SECCIÓN 1: Datos del Centro
             ────────────────────────────────────── -->
-            <div class="form-section-title">Datos del Centro</div>
+                        <div class="form-section-title">Datos del Centro</div>
 
-            <div class="form-group">
-                <label class="form-label" for="nombre_centro">Nombre del centro <span class="req">*</span></label>
-                <input class="form-input" type="text" id="nombre_centro" name="nombre_centro"
-                    placeholder="Ej. Clínica Visión Tacna" maxlength="100" required>
-                <span class="form-error" id="err-nombre" style="display:none">Campo obligatorio.</span>
-            </div>
+                        <div class="form-group">
+                            <label class="form-label" for="nombre_centro">Nombre del centro <span
+                                    class="req">*</span>
+                            </label>
+                            <input class="form-input" type="text" id="nombre_centro" name="nombre_centro"
+                                placeholder="Ej. Clínica Visión Tacna" maxlength="100" required>
+                            <span class="form-error oculto-inicialmente" id="err-nombre">Campo obligatorio.</span>
+                        </div>
 
-            <div class="form-group">
-                <label class="form-label" for="direccion">Dirección <span class="req">*</span></label>
-                <input class="form-input" type="text" id="direccion" name="direccion"
-                    placeholder="Ej. Av. Bolognesi 245, Tacna" maxlength="200" required>
-                <span class="form-error" id="err-direccion" style="display:none">Campo obligatorio.</span>
-            </div>
+                        <div class="form-group">
+                            <label class="form-label" for="direccion">Dirección <span class="req">*</span>
+                            </label>
+                            <input class="form-input" type="text" id="direccion" name="direccion"
+                                placeholder="Ej. Av. Bolognesi 245, Tacna" maxlength="200" required>
+                            <span class="form-error oculto-inicialmente" id="err-direccion">Campo obligatorio.</span>
+                        </div>
 
-            <div class="form-group">
-                <label class="form-label">Tipo de establecimiento <span class="req">*</span></label>
-                <div class="tipo-selector">
-                    <div class="tipo-option">
-                        <input type="radio" id="tipo_publico" name="tipo" value="publico">
-                        <label for="tipo_publico">
-                            <span class="tipo-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m3 9 9-5 9 5M5 10v8m4-8v8m6-8v8m4-8v8M3 20h18" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Público
-                        </label>
-                    </div>
-                    <div class="tipo-option">
-                        <input type="radio" id="tipo_privado" name="tipo" value="privado">
-                        <label for="tipo_privado">
-                            <span class="tipo-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 21V5h11v16M15 9h5v12M8 9h3M8 13h3M8 17h3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span>Privado
-                        </label>
-                    </div>
-                </div>
-                <span class="form-error" id="err-tipo" style="display:none">Seleccione el tipo.</span>
-            </div>
+                        <div class="form-group">
+                            <label class="form-label">Tipo de establecimiento <span class="req">*</span>
+                            </label>
+                            <div class="tipo-selector">
+                                <div class="tipo-option">
+                                    <input type="radio" id="tipo_publico" name="tipo" value="publico">
+                                    <label for="tipo_publico">
+                                        <span class="tipo-icon">
+                                            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                                <path d="m3 9 9-5 9 5M5 10v8m4-8v8m6-8v8m4-8v8M3 20h18"
+                                                    stroke="currentColor" stroke-width="1.7" stroke-linecap="round"
+                                                    stroke-linejoin="round" />
+                                            </svg>
+                                        </span>Público
+                                    </label>
+                                </div>
+                                <div class="tipo-option">
+                                    <input type="radio" id="tipo_privado" name="tipo" value="privado">
+                                    <label for="tipo_privado">
+                                        <span class="tipo-icon">
+                                            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                                <path d="M4 21V5h11v16M15 9h5v12M8 9h3M8 13h3M8 17h3"
+                                                    stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+                                            </svg>
+                                        </span>Privado
+                                    </label>
+                                </div>
+                            </div>
+                            <span class="form-error oculto-inicialmente" id="err-tipo">Seleccione el tipo.</span>
+                        </div>
 
-            <div class="form-group">
-                <label class="form-label" for="ruc">RUC del establecimiento <span class="req">*</span></label>
-                <input class="form-input" type="text" id="ruc" name="ruc"
-                    placeholder="00000000000" maxlength="11" inputmode="numeric" autocomplete="off" required>
-                <span class="form-hint">Exactamente 11 dígitos.</span>
-                <span class="form-error" id="err-ruc" style="display:none"></span>
-            </div>
+                        <div class="form-group">
+                            <label class="form-label" for="ruc">RUC del establecimiento <span
+                                    class="req">*</span>
+                            </label>
+                            <input class="form-input" type="text" id="ruc" name="ruc" placeholder="00000000000"
+                                maxlength="11" inputmode="numeric" autocomplete="off" required>
+                            <span class="form-hint">Exactamente 11 dígitos.</span>
+                            <span class="form-error oculto-inicialmente" id="err-ruc"></span>
+                        </div>
 
-            <!-- ──────────────────────────────────────
+                        <!-- ──────────────────────────────────────
                  SECCIÓN 2: Datos del Titular
             ────────────────────────────────────── -->
-            <div class="form-section-title">Datos del Titular / Dueño</div>
+                        <div class="form-section-title">Datos del Titular / Dueño</div>
 
-            <div class="form-group">
-                <label class="form-label" for="dni_titular">DNI del titular <span class="req">*</span></label>
-                <input class="form-input" type="text" id="dni_titular" name="dni_titular"
-                    placeholder="00000000" maxlength="8" inputmode="numeric" autocomplete="off" required>
-                <span class="form-hint">8 dígitos.</span>
-                <span class="form-error" id="err-dni" style="display:none"></span>
-            </div>
+                        <div class="form-group">
+                            <label class="form-label" for="dni_titular">DNI del titular <span
+                                    class="req">*</span>
+                            </label>
+                            <input class="form-input" type="text" id="dni_titular" name="dni_titular"
+                                placeholder="00000000" maxlength="8" inputmode="numeric" autocomplete="off" required>
+                            <span class="form-hint">8 dígitos.</span>
+                            <span class="form-error oculto-inicialmente" id="err-dni"></span>
+                        </div>
 
-            <div class="form-row">
-                <div class="form-group">
-                    <label class="form-label" for="nombres_titular">Nombres <span class="req">*</span></label>
-                    <input class="form-input" type="text" id="nombres_titular" name="nombres_titular"
-                        placeholder="Ej. Juan Carlos" maxlength="100" required>
-                    <span class="form-error" id="err-nombres" style="display:none">Campo obligatorio.</span>
-                </div>
-                <div class="form-group">
-                    <label class="form-label" for="apellidos_titular">Apellidos <span class="req">*</span></label>
-                    <input class="form-input" type="text" id="apellidos_titular" name="apellidos_titular"
-                        placeholder="Ej. Pérez García" maxlength="100" required>
-                    <span class="form-error" id="err-apellidos" style="display:none">Campo obligatorio.</span>
-                </div>
-            </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label" for="nombres_titular">Nombres <span
+                                        class="req">*</span>
+                                </label>
+                                <input class="form-input" type="text" id="nombres_titular" name="nombres_titular"
+                                    placeholder="Ej. Juan Carlos" maxlength="100" required>
+                                <span class="form-error oculto-inicialmente" id="err-nombres">Campo obligatorio.</span>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="apellidos_titular">Apellidos <span
+                                        class="req">*</span>
+                                </label>
+                                <input class="form-input" type="text" id="apellidos_titular" name="apellidos_titular"
+                                    placeholder="Ej. Pérez García" maxlength="100" required>
+                                <span class="form-error oculto-inicialmente" id="err-apellidos">Campo obligatorio.</span>
+                            </div>
+                        </div>
 
-            <div class="form-group">
-                <label class="form-label" for="telefono">Número telefónico <span class="req">*</span></label>
-                <input class="form-input" type="tel" id="telefono" name="telefono"
-                    placeholder="Ej. 952 345 678" maxlength="15" required>
-                <span class="form-error" id="err-telefono" style="display:none">Ingrese un número válido.</span>
-            </div>
+                        <div class="form-group">
+                            <label class="form-label" for="telefono">Número telefónico <span
+                                    class="req">*</span>
+                            </label>
+                            <input class="form-input" type="tel" id="telefono" name="telefono"
+                                placeholder="Ej. 952 345 678" maxlength="15" required>
+                            <span class="form-error oculto-inicialmente" id="err-telefono">Ingrese un número
+                                válido.</span>
+                        </div>
 
-            <!-- ──────────────────────────────────────
+                        <!-- ──────────────────────────────────────
                  SECCIÓN 3: Verificación de correo
             ────────────────────────────────────── -->
-            <div class="form-section-title">Correo y Verificación</div>
+                        <div class="form-section-title">Correo y Verificación</div>
 
-            <p class="form-hint" style="margin-bottom:14px;font-size:12px;color:var(--text2);">
-                El correo ingresado será usado para crear su cuenta de acceso a RetinAI una vez aprobada la solicitud.
-            </p>
+                        <p class="form-hint ajuste-margen-inferior-14px-tamano-texto-12px-color-text2">
+                            El correo ingresado será usado para crear su cuenta de acceso a RetinAI una vez aprobada la
+                            solicitud.
+                        </p>
 
-            <div class="form-group">
-                <label class="form-label" for="correo_contacto">Correo electrónico <span class="req">*</span></label>
-                <div class="verify-row">
-                    <div class="form-group">
-                        <input class="form-input" type="email" id="correo_contacto" name="correo_contacto"
-                            placeholder="contacto@micentro.pe" maxlength="100" required autocomplete="email">
-                    </div>
-                    <button type="button" class="btn-send-code" id="btn-send-code">
-                        Enviar código
-                    </button>
-                </div>
-                <span class="form-error" id="err-correo" style="display:none"></span>
-            </div>
+                        <div class="form-group">
+                            <label class="form-label" for="correo_contacto">Correo electrónico <span
+                                    class="req">*</span>
+                            </label>
+                            <div class="verify-row">
+                                <div class="form-group">
+                                    <input class="form-input" type="email" id="correo_contacto" name="correo_contacto"
+                                        placeholder="contacto@micentro.pe" maxlength="100" required
+                                        autocomplete="email">
+                                </div>
+                                <button type="button" class="btn-send-code" id="btn-send-code">
+                                    Enviar código
+                                </button>
+                            </div>
+                            <span class="form-error oculto-inicialmente" id="err-correo"></span>
+                        </div>
 
-            <div class="code-sent-msg" id="code-sent-msg">
-                <svg width="14" height="14" viewBox="0 0 20 20" fill="none"><path d="M16 4l-10 10-4-4" stroke="#059669" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                <span id="code-sent-text">Código enviado.</span>
-                <span class="code-resend-link disabled" id="resend-link">Reenviar (<span id="resend-cd">60</span>s)</span>
-            </div>
+                        <div class="code-sent-msg" id="code-sent-msg">
+                            <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+                                <path d="M16 4l-10 10-4-4" stroke="#059669" stroke-width="1.8" stroke-linecap="round"
+                                    stroke-linejoin="round" />
+                            </svg>
+                            <span id="code-sent-text">Código enviado.</span>
+                            <span class="code-resend-link disabled" id="resend-link">Reenviar (<span
+                                    id="resend-cd">60</span>s)</span>
+                        </div>
 
-            <div class="code-input-wrap" id="code-input-wrap">
-                <div class="form-group">
-                    <label class="form-label" for="codigo_verificacion">Código de verificación <span class="req">*</span></label>
-                    <input class="form-input code-input" type="text" id="codigo_verificacion" name="codigo_verificacion"
-                        placeholder="000000" maxlength="6" inputmode="numeric" autocomplete="one-time-code">
-                    <div class="countdown-text">Expira en <span id="expire-cd">10:00</span></div>
-                    <span class="form-error" id="err-codigo" style="display:none"></span>
-                </div>
-            </div>
+                        <div class="code-input-wrap" id="code-input-wrap">
+                            <div class="form-group">
+                                <label class="form-label" for="codigo_verificacion">Código de verificación <span
+                                        class="req">*</span>
+                                </label>
+                                <input class="form-input code-input" type="text" id="codigo_verificacion"
+                                    name="codigo_verificacion" placeholder="000000" maxlength="6" inputmode="numeric"
+                                    autocomplete="one-time-code">
+                                <div class="countdown-text">Expira en <span id="expire-cd">10:00</span>
+                                </div>
+                                <span class="form-error oculto-inicialmente" id="err-codigo"></span>
+                            </div>
+                        </div>
 
-            </section>
-            <aside class="solicitud-complementos" aria-label="Ubicación y evidencias">
-                <div class="form-section-title">Ubicación del centro</div>
-                <p class="form-hint">Busca la dirección que escribiste o marca el punto exacto sobre el mapa. La ubicación es opcional.</p>
-                <input type="hidden" id="latitud" name="latitud">
-                <input type="hidden" id="longitud" name="longitud">
-                <div class="mapa-acciones">
-                    <button class="btn btn-primary" type="button" id="buscar-en-mapa">Buscar dirección</button>
-                    <button class="btn btn-secondary" type="button" id="obtener-ubicacion">Usar mi ubicación</button>
-                </div>
-                <div id="mapa-establecimiento" role="application" aria-label="Mapa interactivo para marcar el establecimiento"></div>
-                <p class="form-hint" id="estado-ubicacion" role="status">Haz clic en el mapa para marcar el centro. También puedes continuar solo con la dirección escrita.</p>
+                    </section>
+                    <aside class="solicitud-complementos" aria-label="Ubicación y evidencias">
+                        <div class="form-section-title">Ubicación del centro</div>
+                        <p class="form-hint">Busca la dirección que escribiste o marca el punto exacto sobre el mapa. La
+                            ubicación es opcional.</p>
+                        <input type="hidden" id="latitud" name="latitud">
+                        <input type="hidden" id="longitud" name="longitud">
+                        <div class="mapa-acciones">
+                            <button class="btn btn-primary" type="button" id="buscar-en-mapa">Buscar dirección</button>
+                            <button class="btn btn-secondary" type="button" id="obtener-ubicacion">Usar mi
+                                ubicación</button>
+                        </div>
+                        <div id="mapa-establecimiento" role="application"
+                            aria-label="Mapa interactivo para marcar el establecimiento"></div>
+                        <p class="form-hint" id="estado-ubicacion" role="status">Haz clic en el mapa para marcar el
+                            centro. También puedes continuar solo con la dirección escrita.</p>
 
-            <!-- ──────────────────────────────────────
+                        <!-- ──────────────────────────────────────
                  SECCIÓN 4: Evidencias
             ────────────────────────────────────── -->
-            <div class="form-section-title">Evidencias del Establecimiento</div>
+                        <div class="form-section-title">Evidencias del Establecimiento</div>
 
-            <p class="form-hint" style="margin-bottom:12px;font-size:12px;color:var(--text2);">
-                Adjunte documentos o imágenes que acrediten la existencia del establecimiento (ej. licencia, fachada, etc.). <strong>Mínimo 1, máximo 2 archivos. Máx. 200 KB cada uno.</strong>
-            </p>
+                        <p class="form-hint ajuste-margen-inferior-12px-tamano-texto-12px-color-text2">
+                            Adjunte documentos o imágenes que acrediten la existencia del establecimiento (ej. licencia,
+                            fachada, etc.). <strong>Mínimo 1, máximo 2 archivos. Máx. 200 KB cada uno.</strong>
+                        </p>
 
-            <div class="upload-area" id="upload-area" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)">
-                <div class="upload-icon-wrap"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 7h7l2 2h9v11H3z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M12 17v-5m0 0-2 2m2-2 2 2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-                <h4>Arrastra aquí o haz clic para seleccionar</h4>
-                <p>JPG, PNG o PDF — máx. 200 KB por archivo</p>
-                <input type="file" id="file-input" accept=".jpg,.jpeg,.png,.pdf" multiple>
-            </div>
-            <span class="form-error-upload" id="err-upload" style="display:none"></span>
+                        <div class="upload-area" id="upload-area" ondragover="handleDragOver(event)"
+                            ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)">
+                            <div class="upload-icon-wrap">
+                                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                    <path d="M3 7h7l2 2h9v11H3z" stroke="currentColor" stroke-width="1.7"
+                                        stroke-linejoin="round" />
+                                    <path d="M12 17v-5m0 0-2 2m2-2 2 2" stroke="currentColor" stroke-width="1.7"
+                                        stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
+                            </div>
+                            <h4>Arrastra aquí o haz clic para seleccionar</h4>
+                            <p>JPG, PNG o PDF — máx. 200 KB por archivo</p>
+                            <input type="file" id="file-input" accept=".jpg,.jpeg,.png,.pdf" multiple>
+                        </div>
+                        <span class="form-error-upload oculto-inicialmente" id="err-upload"></span>
 
-            <div class="upload-previews" id="upload-previews"></div>
-            </aside>
-            </div>
+                        <div class="upload-previews" id="upload-previews"></div>
+                    </aside>
+                </div>
 
-            <!-- ──────────────────────────────────────
+                <!-- ──────────────────────────────────────
                  ERROR GLOBAL y SUBMIT
             ────────────────────────────────────── -->
-            <div id="client-error-box" class="alert-box alert-danger" style="display:none;margin-top:16px;" role="alert">
-                <svg width="16" height="16" viewBox="0 0 20 20" fill="none" style="flex-shrink:0;margin-top:1px">
-                    <circle cx="10" cy="10" r="9" stroke="#DC2626" stroke-width="1.5"/>
-                    <path d="M10 6v5M10 13h.01" stroke="#DC2626" stroke-width="1.5" stroke-linecap="round"/>
-                </svg>
-                <p id="client-error-msg"></p>
-            </div>
+                <div id="client-error-box" class="alert-box alert-danger ajuste-visualizacion-none-margen-superior-16px" role="alert">
+                    <svg width="16" height="16" viewBox="0 0 20 20" fill="none" class="ajuste-reduccion-flex-0-margen-superior-1px">
+                        <circle cx="10" cy="10" r="9" stroke="#DC2626" stroke-width="1.5" />
+                        <path d="M10 6v5M10 13h.01" stroke="#DC2626" stroke-width="1.5" stroke-linecap="round" />
+                    </svg>
+                    <p id="client-error-msg"></p>
+                </div>
 
-            <button type="submit" class="btn btn-primary btn-full" id="submit-btn" style="margin-top:12px;">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                    <path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-                Enviar solicitud
-            </button>
-        </form>
+                <button type="submit" class="btn btn-primary btn-full ajuste-margen-superior-12px" id="submit-btn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                        <path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z" stroke="white" stroke-width="1.8"
+                            stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    Enviar solicitud
+                </button>
+            </form>
 
-        <div class="divider"></div>
-        <p class="auth-footer-text">
-            ¿Ya tiene cuenta? <a href="login.php">Ingresar a la plataforma</a>
-        </p>
+            <div class="divider"></div>
+            <p class="auth-footer-text">
+                ¿Ya tiene cuenta? <a href="login.php">Ingresar a la plataforma</a>
+            </p>
 
-        <?php endif; ?>
+            <?php endif; ?>
+        </div>
     </div>
-</div>
 
-<script src="../../assets/js/auth/solicitud_registro.js"></script>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-<script src="../../assets/js/ubicacion_establecimiento.js"></script>
+    <script src="../../assets/js/auth/solicitud_registro.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="../../assets/js/ubicacion_establecimiento.js"></script>
 </body>
+
 </html>

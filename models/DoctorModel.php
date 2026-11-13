@@ -8,6 +8,25 @@ class DoctorModel {
         $this->db = (new Database())->getConnection();
     }
 
+    /** Cuenta solicitudes médicas inactivas del establecimiento actual. */
+    public function contarPendientes(int $idEstablecimiento): int {
+        $consulta = $this->db->prepare("SELECT COUNT(*) FROM usuarios WHERE rol_codigo='MED' AND activo=0 AND establecimiento_id=?");
+        $consulta->execute([$idEstablecimiento]);
+        return (int)$consulta->fetchColumn();
+    }
+
+    /** Activa o rechaza una solicitud dentro de los centros administrados. */
+    public function resolverSolicitud(int $idMedico, array $idsEstablecimientos, bool $aprobar): void {
+        if ($idsEstablecimientos === []) return;
+        $marcadores = implode(',', array_fill(0, count($idsEstablecimientos), '?'));
+        $consulta = $this->db->prepare("UPDATE usuarios SET activo=? WHERE id=? AND establecimiento_id IN ($marcadores) AND rol_codigo='MED'");
+        $consulta->execute(array_merge([(int)$aprobar, $idMedico], $idsEstablecimientos));
+    }
+
+    public function listarUsuariosSistema(): array {
+        return $this->db->query('SELECT u.id,u.nombre,u.correo,u.rol_codigo,u.activo,u.ultimo_acceso,e.nombre AS establecimiento FROM usuarios u LEFT JOIN establecimientos e ON e.id=u.establecimiento_id ORDER BY u.rol_codigo,u.nombre')->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     public function existsByEmail($correo, $exclude_id = null) {
         $sql = "SELECT id FROM usuarios WHERE correo = :correo";
         $params = [':correo' => $correo];

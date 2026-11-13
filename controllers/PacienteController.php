@@ -5,6 +5,10 @@ require_once __DIR__ . '/../models/CarpetaModel.php';
 require_once __DIR__ . '/../config/session_guard.php';
 
 class PacienteController {
+    /** Historial reciente visible para el médico autenticado. */
+    public static function pacientesConAnalisis(int $idMedico): array {
+        return (new PacienteModel())->listarPacientesConAnalisisMedico($idMedico);
+    }
     private $model;
 
     public function __construct() {
@@ -200,7 +204,7 @@ class PacienteController {
     }
 }
 
-if (isset($_GET['action'])) {
+if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === realpath(__FILE__) && isset($_GET['action'])) {
     $controller = new PacienteController();
     switch ($_GET['action']) {
         case 'buscar_registrar': $controller->buscar_registrar(); break;

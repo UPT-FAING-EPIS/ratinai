@@ -1,0 +1,51 @@
+/* Estilos de auth/register.php. */
+
+/* Presentación anteriormente declarada en atributos de la vista. */
+.ajuste-ancho-maximo-500px {
+    max-width: 500px;
+}
+
+.ajuste-fondo-transparent-box-shadow-none-padding-0-ancho-auto-height-auto {
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+    width: auto;
+    height: auto;
+    margin-bottom: 12px;
+}
+
+.ajuste-height-48px-border-radius-8px-visualizacion-block {
+    height: 48px;
+    border-radius: 8px;
+    display: block;
+}
+
+.oculto-inicialmente {
+    display: none;
+}
+
+.ajuste-reduccion-flex-0-margen-superior-1px {
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+.ajuste-alineacion-texto-center-tamano-texto-13px-color-text3-margen-superior-12px {
+    text-align: center;
+    font-size: 13px;
+    color: var(--text3);
+    margin-top: 12px;
+}
+
+.ajuste-color-accent-font-weight-600-text-decoration-none {
+    color: var(--accent);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.ajuste-margen-superior-20px {
+    margin-top: 20px;
+}
+
+.ajuste-margen-inferior-20px {
+    margin-bottom: 20px;
+}

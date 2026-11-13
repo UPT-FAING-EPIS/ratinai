@@ -19,6 +19,33 @@ require_once __DIR__ . '/../services/ServicioAlmacenamientoInforme.php';
 
 class AnalisisController
 {
+    /** Reúne la actividad clínica y las tareas pendientes del panel médico. */
+    public static function datosPanelMedico(int $idMedico): array
+    {
+        $analisis = new AnalisisModel();
+        $informes = new InformeClinicoModel();
+        $pendientes = $informes->obtenerPendientesMedico($idMedico);
+        $aprobados = 0;
+        try {
+            $aprobados = $informes->contarAprobadosMedico($idMedico);
+        } catch (Throwable $error) {
+            error_log('No se pudo contar informes médicos: ' . $error->getMessage());
+        }
+        return [
+            'kpis' => $analisis->getKPIsMedico($idMedico),
+            'distribucion' => $analisis->getDistribucionResultados($idMedico),
+            'actividad' => $analisis->getActividadUltimos7Dias($idMedico),
+            'recientes' => $analisis->getAnalisisRecientes($idMedico, 8),
+            'criticos' => $analisis->getCasosCriticosRecientes($idMedico, 8),
+            'pendientes' => $pendientes,
+            'informesAprobados' => $aprobados,
+        ];
+    }
+
+    public static function casosParaSeguimiento(int $idMedico): array
+    {
+        return (new AnalisisModel())->getSeguimientoCasosCriticos($idMedico, 50);
+    }
     private const TAMANO_MAXIMO_IMAGEN = 10485760;
     private const TIEMPO_MAXIMO_SERVICIO = 30;
     private const LONGITUD_MAXIMA_INFORME = 12000;
@@ -194,7 +221,10 @@ class AnalisisController
             $datosPersistencia += [
                 'id_medico' => (int) $_SESSION['user_id'],
                 'id_paciente' => (int) $paciente['id'],
-                'id_carpeta' => $this->obtenerCarpetaPermitida((int) ($_POST['id_carpeta'] ?? 0)),
+                'id_carpeta' => $this->obtenerCarpetaPermitida(
+                    (int) ($_POST['id_carpeta'] ?? 0),
+                    (int) $paciente['id']
+                ),
                 'ojo' => $ojo,
                 'fecha_captura' => $this->normalizarFechaCaptura((string) ($_POST['fecha_captura'] ?? '')),
                 'imagen_path' => $rutaRelativa,
@@ -264,11 +294,24 @@ class AnalisisController
                 return;
             }
             $controles = $this->model->obtenerControlesPrevios($idAnalisis, $idMedico);
-            $textoGenerado = (new ServicioBorradorClinicoOpenAI())->generar($analisis, $controles);
+            $advertenciaBorrador = null;
+            $textoGenerado = (new ServicioBorradorClinicoLocal())->generar($analisis, $controles);
+            if (filter_var(env_value('REPORT_AI_ENABLED', 'false'), FILTER_VALIDATE_BOOLEAN)
+                && trim((string) env_value('OPENAI_API_KEY', '')) !== '') {
+                try {
+                    $textoGenerado = (new ServicioBorradorClinicoOpenAI())->generar($analisis, $controles);
+                } catch (Throwable $errorOpenAI) {
+                    error_log('RetinAI borrador OpenAI; se usó respaldo local: ' . $errorOpenAI->getMessage());
+                    $advertenciaBorrador = 'OpenAI no estuvo disponible. Se generó un borrador comparativo local con datos verificados de la base de datos.';
+                }
+            } else {
+                $advertenciaBorrador = 'OpenAI no está configurado. Se generó un borrador comparativo local con datos verificados de la base de datos.';
+            }
             $this->modeloInforme->guardarBorrador($idAnalisis, $idMedico, $textoGenerado, $textoGenerado);
             $this->responderJson([
                 'success' => true,
                 'informe' => $this->modeloInforme->obtenerPorAnalisis($idAnalisis, $idMedico),
+                'advertencia_borrador' => $advertenciaBorrador,
             ]);
         } catch (Throwable $error) {
             error_log('RetinAI generarBorrador: ' . $error->getMessage());
@@ -399,7 +442,7 @@ class AnalisisController
             (int) $_SESSION['user_id']
         );
         if ($comparacion === null) {
-            $this->responderJson(['success' => false, 'error' => 'Los controles deben pertenecer al mismo paciente y al mismo ojo.'], 422);
+            $this->responderJson(['success' => false, 'error' => 'Los controles deben pertenecer al mismo paciente, la misma carpeta y el mismo ojo.'], 422);
             return;
         }
         $this->responderJson(['success' => true] + $comparacion);
@@ -673,13 +716,19 @@ class AnalisisController
         return $probabilidad;
     }
 
-    private function obtenerCarpetaPermitida(int $idCarpeta): ?int
+    private function obtenerCarpetaPermitida(int $idCarpeta, int $idPaciente): ?int
     {
         if ($idCarpeta <= 0) {
             return null;
         }
         $carpeta = (new CarpetaModel())->obtenerPorId($idCarpeta);
-        return $carpeta && (int) $carpeta['id_medico'] === (int) $_SESSION['user_id'] ? $idCarpeta : null;
+        if (!$carpeta
+            || (int) $carpeta['id_medico'] !== (int) $_SESSION['user_id']
+            || (int) $carpeta['id_paciente'] !== $idPaciente) {
+            throw new RuntimeException('La carpeta seleccionada no pertenece al paciente identificado.');
+        }
+
+        return $idCarpeta;
     }
 
     private function normalizarFechaCaptura(string $fecha): string
@@ -734,7 +783,7 @@ class AnalisisController
     }
 }
 
-if (isset($_GET['action'])) {
+if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === realpath(__FILE__) && isset($_GET['action'])) {
     $controlador = new AnalisisController();
     switch ($_GET['action']) {
         case 'validar_imagen': $controlador->validarImagen(); break;

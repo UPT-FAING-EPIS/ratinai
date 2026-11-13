@@ -1,0 +1,35 @@
+/* Estilos de auth/login.php. */
+
+/* Presentación anteriormente declarada en atributos de la vista. */
+.ajuste-fondo-transparent-box-shadow-none-padding-0-ancho-auto-height-auto {
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+    width: auto;
+    height: auto;
+    margin-bottom: 12px;
+}
+
+.ajuste-height-48px-border-radius-8px-visualizacion-block {
+    height: 48px;
+    border-radius: 8px;
+    display: block;
+}
+
+.ajuste-reduccion-flex-0-margen-superior-1px {
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+.ajuste-relleno-derecho-40px {
+    padding-right: 40px;
+}
+
+.oculto-inicialmente {
+    display: none;
+}
+
+.icono-alerta-login {
+    flex-shrink: 0;
+    margin-top: 1px;
+}

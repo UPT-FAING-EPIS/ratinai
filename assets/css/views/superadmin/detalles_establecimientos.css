@@ -1,0 +1,37 @@
+/* Estilos de superadmin/detalles_establecimientos.php. */
+
+/* Presentación anteriormente declarada en atributos de la vista. */
+.ajuste-visualizacion-flex-justify-content-space-between-align-items-center {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.ajuste-text-decoration-none-visualizacion-inline-flex-align-items-center-gap-8px {
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+}
+
+.ajuste-columnas-repeat-5-minmax-140px-1fr {
+    grid-template-columns: repeat(5, minmax(140px, 1fr));
+}
+
+.ajuste-tamano-texto-13px-color-text-margen-superior-12px {
+    font-size: 13px;
+    color: var(--text);
+    margin-top: 12px;
+}
+
+.ajuste-columnas-repeat-3-minmax-160px-1fr-margen-inferior-24px {
+    grid-template-columns: repeat(3, minmax(160px, 1fr));
+    margin-bottom: 24px;
+}
+
+.ajuste-border-0-padding-0-margin-0 {
+    border: 0;
+    padding: 0;
+    margin: 0;
+}

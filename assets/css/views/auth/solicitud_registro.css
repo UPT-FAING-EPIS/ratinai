@@ -1,0 +1,32 @@
+/* Estilos de auth/solicitud_registro.php. */
+
+/* Presentación anteriormente declarada en atributos de la vista. */
+.ajuste-reduccion-flex-0-margen-superior-1px {
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+.oculto-inicialmente {
+    display: none;
+}
+
+.ajuste-margen-inferior-14px-tamano-texto-12px-color-text2 {
+    margin-bottom: 14px;
+    font-size: 12px;
+    color: var(--text2);
+}
+
+.ajuste-margen-inferior-12px-tamano-texto-12px-color-text2 {
+    margin-bottom: 12px;
+    font-size: 12px;
+    color: var(--text2);
+}
+
+.ajuste-visualizacion-none-margen-superior-16px {
+    display: none;
+    margin-top: 16px;
+}
+
+.ajuste-margen-superior-12px {
+    margin-top: 12px;
+}

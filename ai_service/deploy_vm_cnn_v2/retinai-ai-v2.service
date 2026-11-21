@@ -1,0 +1,17 @@
+[Unit]
+Description=API de inferencia RetinAI CNN v2
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/retinai/ai_service_v2
+EnvironmentFile=/etc/retinai-ai-v2.env
+ExecStart=/opt/retinai/venv-v2/bin/uvicorn servidor_v2:aplicacion --host 127.0.0.1 --port 8000 --workers 1
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

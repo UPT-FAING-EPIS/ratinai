@@ -1,0 +1,28 @@
+RETINAI CNN V2 - PAQUETE PARA VM
+
+Copiar la carpeta DEPLOY_VM_CNN_V2 completa a:
+  /opt/retinai/ai_service_v2
+
+La estructura final debe ser:
+  /opt/retinai/ai_service_v2/servidor_v2.py
+  /opt/retinai/ai_service_v2/requirements.txt
+  /opt/retinai/ai_service_v2/modelo_v2/informacion_modelo.json
+  /opt/retinai/ai_service_v2/modelo_v2/filtro_retinografia.tflite
+  /opt/retinai/ai_service_v2/modelo_v2/filtro_calidad.tflite
+  /opt/retinai/ai_service_v2/modelo_v2/clasificador_4clases.tflite
+
+El servicio requiere estas variables:
+  RETINAI_CLAVE_API=<clave compartida con la aplicación web>
+  RETINAI_USO_ACADEMICO=true
+  RETINAI_DIRECTORIO_MODELOS=/opt/retinai/ai_service_v2/modelo_v2
+
+Crear un entorno aislado para no modificar las dependencias de CNN v1:
+  python3 -m venv /opt/retinai/venv-v2
+  /opt/retinai/venv-v2/bin/pip install -r /opt/retinai/ai_service_v2/requirements.txt
+
+La API expone:
+  GET  /health
+  POST /api/validar   (contenido y calidad)
+  POST /api/analizar  (revalida y clasifica en cuatro clases)
+
+No usar para decisiones clínicas. Es un prototipo académico con modelos reales.

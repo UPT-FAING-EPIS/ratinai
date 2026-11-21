@@ -1,0 +1,22 @@
+{
+  "version": "cnn-v2-candidato",
+  "aprobado_para_uso": false,
+  "clases_clinicas": ["normal", "diabetes", "glaucoma", "catarata"],
+  "umbral_clinico": 0.5,
+  "modelos": {
+    "retinografia": {
+      "archivo": "filtro_retinografia.tflite",
+      "tamano_entrada": [224, 224],
+      "umbral": 0.5
+    },
+    "calidad": {
+      "archivo": "filtro_calidad.tflite",
+      "tamano_entrada": [224, 224],
+      "umbral": 0.5
+    },
+    "clinico": {
+      "archivo": "clasificador_4clases.tflite",
+      "tamano_entrada": [224, 224]
+    }
+  }
+}

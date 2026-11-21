@@ -301,6 +301,33 @@
     margin-top: 7px;
 }
 
+.estado-guardado.sincronizacion-completada,
+.estado-guardado.sincronizacion-local,
+.estado-guardado.sincronizacion-fallida {
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 12px;
+}
+
+.estado-guardado.sincronizacion-completada {
+    border-color: #86efac;
+    background: #f0fdf4;
+    color: #166534;
+}
+
+.estado-guardado.sincronizacion-local {
+    border-color: #bfdbfe;
+    background: #eff6ff;
+    color: #1e40af;
+}
+
+.estado-guardado.sincronizacion-fallida {
+    border-color: #fcd34d;
+    background: #fffbeb;
+    color: #92400e;
+}
+
 @media (max-width: 1050px) {
 
     .rejilla-carga,

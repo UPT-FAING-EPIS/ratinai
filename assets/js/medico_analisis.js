@@ -417,6 +417,24 @@ document.addEventListener('DOMContentLoaded', () => {
     elementos.guardarBorrador.addEventListener('click', () => guardarBorrador(false));
     elementos.aprobarInforme.addEventListener('click', () => guardarBorrador(true));
 
+    function mostrarEstadoSincronizacion(estado) {
+        const estados = {
+            completada: 'Informe aprobado y PDF sincronizado con la cuenta documental.',
+            fallida: 'Informe aprobado y PDF local guardado. Falló la sincronización; el administrador puede reintentarla.',
+            local: 'Informe aprobado y PDF local guardado. El establecimiento aún no conectó una cuenta documental.',
+        };
+        elementos.estadoBorrador.classList.remove(
+            'sincronizacion-completada',
+            'sincronizacion-fallida',
+            'sincronizacion-local'
+        );
+        if (estados[estado]) {
+            elementos.estadoBorrador.classList.add(`sincronizacion-${estado}`);
+        }
+        elementos.estadoBorrador.textContent = estados[estado]
+            || 'Informe aprobado; no se pudo determinar el estado documental.';
+    }
+
     async function guardarBorrador(aprobar) {
         if (!borradorGuardado || !idAnalisisActual) return;
         const texto = elementos.textoInforme.value.trim();
@@ -440,12 +458,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 elementos.guardarBorrador.style.display = 'none';
                 elementos.aprobarInforme.style.display = 'none';
                 elementos.descargarPdf.style.display = 'inline-flex';
-                const estados = {
-                    completada: 'Informe aprobado y PDF sincronizado con la cuenta documental.',
-                    fallida: 'Informe aprobado y PDF local guardado. Falló la sincronización; el administrador puede reintentarla.',
-                    local: 'Informe aprobado y PDF local guardado. El establecimiento aún no conectó una cuenta documental.',
-                };
-                elementos.estadoBorrador.textContent = estados[respuesta.estado_sincronizacion] || 'Informe aprobado.';
+                mostrarEstadoSincronizacion(respuesta.estado_sincronizacion);
                 completarFlujo();
             } else {
                 elementos.estadoBorrador.textContent = 'Borrador guardado en el servidor.';
@@ -627,7 +640,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 elementos.guardarBorrador.style.display = 'none';
                 elementos.aprobarInforme.style.display = 'none';
                 elementos.descargarPdf.style.display = 'inline-flex';
-                elementos.estadoBorrador.textContent = 'Informe aprobado.';
+                mostrarEstadoSincronizacion(
+                    analisis.proveedor_sincronizacion === 'local'
+                        ? 'local'
+                        : analisis.estado_sincronizacion
+                );
                 completarFlujo();
             }
         } catch (error) {

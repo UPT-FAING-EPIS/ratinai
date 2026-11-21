@@ -39,6 +39,15 @@ function contarSolicitudesPendientes(): int {
 function datosEstablecimientosAdministrador(string $correo, int $idAdministrador, int $idAsignado): array {
     require_once __DIR__ . '/../models/EstablecimientoModel.php';
     require_once __DIR__ . '/../models/DoctorModel.php';
+    // Compatibilidad con sesiones abiertas antes de que el correo se guardara
+    // en sesión: se recupera por ID para conservar las solicitudes antiguas.
+    $correo = trim($correo);
+    if ($correo === '' && $idAdministrador > 0) {
+        $conexion = (new Database())->getConnection();
+        $consultaCorreo = $conexion->prepare('SELECT correo FROM usuarios WHERE id = :id LIMIT 1');
+        $consultaCorreo->execute(['id' => $idAdministrador]);
+        $correo = trim((string) $consultaCorreo->fetchColumn());
+    }
     $establecimientos = (new EstablecimientoModel())->getByOwnerId($idAdministrador);
     $solicitudes = (new SolicitudModel())->getSolicitudesByContactEmailOrOwner($correo, $idAdministrador);
     $ids = array_map('intval', array_column($establecimientos, 'id'));

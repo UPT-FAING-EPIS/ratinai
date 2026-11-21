@@ -49,6 +49,7 @@ class AuthController {
             $_SESSION['user_id']               = $user['id'];
             $_SESSION['rol_codigo']             = $user['rol_codigo'];
             $_SESSION['nombre']                 = $user['nombre'];
+            $_SESSION['correo']                 = $user['correo'];
             $_SESSION['establecimiento_id']     = $user['establecimiento_id'];
             $_SESSION['es_password_temporal']   = (bool) $user['es_password_temporal'];
             $_SESSION['last_activity']          = time();

@@ -19,7 +19,7 @@ try {
     // El controlador agrupa centros, solicitudes y el contador del menú.
     ["mis_establecimientos" => $mis_establecimientos, "solicitudes" => $solicitudes,
         "cnt_pendientes" => $cnt_pendientes] = datosEstablecimientosAdministrador(
-            $user["correo"], (int) $user["id"], $est_id);
+            (string) ($user["correo"] ?? ""), (int) $user["id"], $est_id);
 } catch (Exception $ex) {
     $mis_establecimientos = [];
     $solicitudes = [];

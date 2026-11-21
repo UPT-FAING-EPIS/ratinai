@@ -76,7 +76,8 @@ $oauthDisponible = str_starts_with(APP_URL, "https://");
                     <p>Cuenta documental conectada correctamente.</p>
                 </div><?php endif; ?>
                 <p>Elige una sola cuenta. Puede ser personal o corporativa. Al conectar otro proveedor, el anterior deja
-                    de estar activo.</p>
+                    de estar activo. Cada PDF se envía automáticamente después de que el médico aprueba el informe; un
+                    análisis sin informe aprobado todavía no genera un archivo documental.</p>
                 <?php if (
         !$oauthDisponible
     ): ?><p class="text-muted">La autorización de cuentas se inicia desde la aplicación HTTPS de Azure, donde están
@@ -102,7 +103,7 @@ $oauthDisponible = str_starts_with(APP_URL, "https://");
         match ($configuracion["proveedor"] ?? "local") {
             "google_drive" => "Google Drive",
             "onedrive" => "OneDrive",
-            default => "Sin cuenta conectada",
+            default => "Solo copia local",
         },
     ) ?></strong>
                     </div>
@@ -121,7 +122,7 @@ $oauthDisponible = str_starts_with(APP_URL, "https://");
                 </div>
                 <p class="text-muted ajuste-tamano-texto-12px"><?= htmlspecialchars(
         $configuracion["ultima_prueba_mensaje"] ??
-            "Conecta una cuenta para sincronizar los PDF aprobados.",
+            "Conecta una cuenta para sincronizar automáticamente los PDF aprobados.",
     ) ?></p>
                 <?php if (
         in_array(

@@ -387,6 +387,7 @@ class AnalisisController
                 );
                 $estadoSincronizacion = $almacenamiento['estado'];
             } catch (Throwable $errorAlmacenamiento) {
+                error_log('RetinAI almacenamiento de informe #' . (int) $informe['id'] . ': ' . $errorAlmacenamiento->getMessage());
                 $estadoSincronizacion = 'fallida';
             }
             $this->responderJson([

@@ -98,6 +98,7 @@ function current_user() {
     return [
         'id'                  => $_SESSION['user_id'] ?? null,
         'nombre'              => $_SESSION['nombre'] ?? '',
+        'correo'              => $_SESSION['correo'] ?? '',
         'rol_codigo'          => $_SESSION['rol_codigo'] ?? '',
         'establecimiento_id'  => $_SESSION['establecimiento_id'] ?? null,
         'es_password_temporal'=> $_SESSION['es_password_temporal'] ?? false,

@@ -92,7 +92,8 @@ class AnalisisModel {
                    i.texto_generado, i.texto_editado, i.fecha_aprobacion,
                    i.ruta_pdf, i.hash_pdf,
                    v.valoracion, v.motivo AS motivo_valoracion, v.comentario AS comentario_valoracion,
-                   s.estado AS estado_sincronizacion, s.ultimo_error AS error_sincronizacion
+                   s.estado AS estado_sincronizacion, s.proveedor AS proveedor_sincronizacion,
+                   s.ultimo_error AS error_sincronizacion
             FROM analisis_retinales a
             INNER JOIN usuarios u ON u.id = a.id_medico
             LEFT JOIN  pacientes p ON p.id = a.id_paciente
